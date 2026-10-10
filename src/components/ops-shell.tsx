@@ -1383,6 +1383,9 @@ export function OpsShell() {
                       <button disabled={busy} onClick={() => load()}>
                         DB 새로고침
                       </button>
+                      <button type="button" disabled={busy} onClick={logout}>
+                        개인 계정 로그아웃
+                      </button>
                     </>
                   )}
                   <p>
