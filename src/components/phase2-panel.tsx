@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { OpsDialog } from "./ops-dialog";
 import { occurrences, type Phase2Resource } from "@/lib/phase2";
 import { scheduleOverlaps, type OpsData, type OpsRow } from "@/lib/ops";
+import { metricKeys, personalTemplates } from "@/lib/personal-content";
+import { recurrenceStatus, runStates } from "@/lib/workflow";
 type Field = {
   key: string;
   label: string;
@@ -118,6 +120,7 @@ export function Phase2Panel({
   day,
   calendarView = "month",
   onCalendarData,
+  onOpenTask,
 }: {
   resource: Exclude<Phase2Resource, "exceptions">;
   enabled: boolean;
@@ -125,6 +128,7 @@ export function Phase2Panel({
   day: string;
   calendarView?: string;
   onCalendarData?: (data: OpsData) => void;
+  onOpenTask?: (id: string) => void;
 }) {
   const [data, setData] = useState<OpsData>({}),
     [ready, setReady] = useState(false),
@@ -137,6 +141,17 @@ export function Phase2Panel({
     [notice, setNotice] = useState(""),
     [scope, setScope] = useState("one");
   const [calendarRecurrence, setCalendarRecurrence] = useState(false);
+  const [personalContent, setPersonalContent] = useState(false);
+  const [contentHistory, setContentHistory] = useState(false),
+    [versions, setVersions] = useState<OpsRow[]>([]);
+  const [contentTasks, setContentTasks] = useState<OpsRow[]>([]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(interval);
+  }, []);
+  const [runReady, setRunReady] = useState(false),
+    [runs, setRuns] = useState<OpsRow[]>([]);
   const [archiveFilter, setArchiveFilter] = useState("all");
   const load = useCallback(async () => {
     setReady(false);
@@ -146,6 +161,18 @@ export function Phase2Panel({
       setData(r.data);
       onCalendarData?.(r.data);
       setCalendarRecurrence(r.calendarRecurrence === true);
+      setPersonalContent(r.personalContent === true);
+      setContentHistory(r.contentHistory === true);
+      setVersions(r.versions || []);
+      setContentTasks(r.contentTasks || []);
+      if (resource === "recurrence") {
+        const response = await fetch("/api/workflow?workspace=PERSONAL", {
+          cache: "no-store",
+        });
+        const workflow = await response.json();
+        setRunReady(response.ok && workflow.ready === true);
+        setRuns(workflow.data?.runs || []);
+      }
       setReady(true);
       if (r.truncated.length)
         setError("조회 제한 1,000건 초과. 전체 데이터가 아닙니다.");
@@ -159,7 +186,7 @@ export function Phase2Panel({
     } finally {
       setLoading(false);
     }
-  }, [onCalendarData]);
+  }, [onCalendarData, resource]);
   useEffect(() => {
     let mounted = true;
     if (enabled)
@@ -216,6 +243,30 @@ export function Phase2Panel({
         (archiveFilter === "inbox" ? r.inbox === true : r.favorite === true)),
   );
   const balance = values.reduce((sum, r) => sum + Number(r.amount), 0);
+  async function recordRun(row: OpsRow, status: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/workflow?workspace=PERSONAL", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "run",
+          id: row.rule_id || row.id,
+          original_at: row.original_at,
+          status,
+        }),
+      });
+      const r = await response.json();
+      if (!response.ok) throw new Error(r.error);
+      if (await load())
+        setNotice("실행 기록 저장 및 DB 재조회를 확인했습니다.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "실행 기록 저장 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <section className="ops-card">
       <div className="ops-section-head">
@@ -322,6 +373,88 @@ export function Phase2Panel({
                 : "발행일 없음"}
             </p>
           ) : null}
+          {resource === "content" ? (
+            <details>
+              <summary>검수·수정·성과 버전 이력</summary>
+              {contentHistory ? (
+                versions
+                  .filter((v) => v.content_id === r.id)
+                  .map((v) => {
+                    const snapshot = v.snapshot as OpsRow,
+                      details = snapshot.personal_details as
+                        | Record<string, unknown>
+                        | undefined;
+                    return (
+                      <div key={v.id}>
+                        <strong>
+                          버전 {String(v.version)} ·{" "}
+                          {local(v.created_at).replace("T", " ")}
+                        </strong>
+                        <p>
+                          {String(details?.step || snapshot.stage)} · 검수{" "}
+                          {String(details?.review || snapshot.approval)} · 담당{" "}
+                          {String(details?.reviewer || "기록 없음")}
+                        </p>
+                        <p>
+                          수정 사유:{" "}
+                          {String(details?.change_reason || "기록 없음")}
+                        </p>
+                        <p>
+                          검수 메모:{" "}
+                          {String(details?.review_notes || "기록 없음")}
+                        </p>
+                        <p>
+                          검수 날짜:{" "}
+                          {details?.reviewed_at
+                            ? local(details.reviewed_at).replace("T", " ")
+                            : "기록 없음"}
+                        </p>
+                        {details?.metrics_at ? (
+                          <p>
+                            성과 기준{" "}
+                            {local(details.metrics_at).replace("T", " ")} ·
+                            조회수 {String(details.views ?? "미기록")} · 저장{" "}
+                            {String(details.saves ?? "미기록")}
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })
+              ) : (
+                <p>
+                  버전 원장은 SQL008 적용 후 보존합니다. 현재 저장된 상세는
+                  그대로 유지합니다.
+                </p>
+              )}
+            </details>
+          ) : null}
+          {resource === "content" && r.personal_details ? (
+            <>
+              <button
+                disabled={!canWrite || !contentHistory}
+                onClick={() =>
+                  void save({
+                    action: "content_task",
+                    id: r.id,
+                    step: (r.personal_details as Record<string, unknown>).step,
+                  })
+                }
+              >
+                현재 제작 단계 업무 연결
+              </button>
+              {contentTasks
+                .filter((t) => t.content_id === r.id)
+                .map((t) => (
+                  <button
+                    key={t.id}
+                    disabled={!onOpenTask || busy}
+                    onClick={() => onOpenTask?.(String(t.task_id))}
+                  >
+                    {String(t.step)} 업무·시간 기록 열기
+                  </button>
+                ))}
+            </>
+          ) : null}
           {resource === "inspiration" ? (
             <p>
               {String(r.category)} · {r.inbox ? "Inbox" : "보관"}{" "}
@@ -338,6 +471,32 @@ export function Phase2Panel({
               {local(r.starts_at).replace("T", " ")} ~{" "}
               {local(r.ends_at).replace("T", " ")}
             </p>
+          ) : null}
+          {resource === "recurrence" ? (
+            <label>
+              수행 상태
+              <select
+                aria-label={`${r.title} ${r.original_at} 수행 상태`}
+                value={recurrenceStatus(
+                  r,
+                  runs.find(
+                    (run) =>
+                      run.rule_id === r.rule_id &&
+                      Date.parse(String(run.original_at)) ===
+                        Date.parse(String(r.original_at)),
+                  ),
+                  now,
+                )}
+                disabled={!canWrite || !runReady}
+                onChange={(e) => void recordRun(r, e.target.value)}
+              >
+                {Object.entries(runStates).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
           ) : null}
           {r.url || r.result_url ? (
             <a
@@ -387,6 +546,41 @@ export function Phase2Panel({
           목록은 기준 날짜부터 최대 370일 범위이며 회차 계산은 최대
           10,000건입니다. 대량 기록의 전체 집계가 아닙니다.
         </p>
+      ) : null}
+      {resource === "recurrence" && ready ? (
+        <>
+          <p>
+            {runReady
+              ? "예정 시간이 지나도 실행 기록 없으면 실행 미확인입니다. 완료는 직접 확인해 기록하세요."
+              : "실행 원장은 SQL007 적용 후 저장 가능합니다."}
+          </p>
+          <details>
+            <summary>이전 미완료 실행 기록</summary>
+            {runs
+              .filter((r) => r.status !== "completed")
+              .map((r) => (
+                <div key={r.id}>
+                  <strong>{String(r.title)}</strong>
+                  <p>
+                    {local(r.original_at).replace("T", " ")} ·{" "}
+                    {runStates[r.status as keyof typeof runStates]}
+                  </p>
+                  <button
+                    disabled={!canWrite || !runReady}
+                    onClick={() => void recordRun(r, "completed")}
+                  >
+                    수동 완료 확인
+                  </button>
+                </div>
+              ))}
+            {!runs.some((r) => r.status !== "completed") ? (
+              <p>
+                저장된 미완료 실행 기록이 없습니다. 예정 회차 계산은 실행 기록이
+                아닙니다.
+              </p>
+            ) : null}
+          </details>
+        </>
       ) : null}
       {resource === "recurrence" && ready ? (
         <>
@@ -443,6 +637,37 @@ export function Phase2Panel({
                   value[field.key] = value[field.key]
                     ? `${value[field.key]}:00+09:00`
                     : null;
+              }
+              if (
+                resource === "content" &&
+                personalContent &&
+                f.get("personal:type")
+              ) {
+                const details = {
+                  ...((editor.personal_details || {}) as Record<
+                    string,
+                    unknown
+                  >),
+                };
+                for (const [key, input] of f.entries())
+                  if (key.startsWith("personal:"))
+                    details[key.slice(9)] = input;
+                for (const key of [
+                  "shoot_at",
+                  "edit_at",
+                  "published_at",
+                  "reviewed_at",
+                  "metrics_at",
+                  "sponsor_due_at",
+                ])
+                  details[key] = details[key]
+                    ? `${details[key]}:00+09:00`
+                    : null;
+                value.personal_details = details;
+                details.sponsored = f.has("personal:sponsored");
+                details.performance_checks = [24, 72, 168].filter((h) =>
+                  f.has(`personal:check:${h}`),
+                );
               }
               if (resource === "recurrence" && editor.id)
                 void save({
@@ -513,7 +738,16 @@ export function Phase2Panel({
                     disabled={busy}
                   >
                     {field.choices.map(([v, label]) => (
-                      <option key={v} disabled={resource === "recurrence" && field.key === "frequency" && ["monthly", "yearly"].includes(v) && !calendarRecurrence} value={v}>
+                      <option
+                        key={v}
+                        disabled={
+                          resource === "recurrence" &&
+                          field.key === "frequency" &&
+                          ["monthly", "yearly"].includes(v) &&
+                          !calendarRecurrence
+                        }
+                        value={v}
+                      >
                         {label}
                       </option>
                     ))}
@@ -552,6 +786,198 @@ export function Phase2Panel({
                 )}
               </label>
             ))}
+            {resource === "content" ? (
+              <fieldset disabled={busy || !personalContent}>
+                <legend>PERSONAL 인스타그램 콘텐츠</legend>
+                <PersonalChecklist
+                  value={String(
+                    (
+                      editor.personal_details as
+                        | Record<string, unknown>
+                        | undefined
+                    )?.checklist || "",
+                  )}
+                />
+                <label>
+                  <input
+                    type="checkbox"
+                    name="personal:sponsored"
+                    defaultChecked={
+                      (
+                        editor.personal_details as
+                          | Record<string, unknown>
+                          | undefined
+                      )?.sponsored === true
+                    }
+                  />
+                  협찬 콘텐츠
+                </label>
+                <label>
+                  협찬 제출 기한 (서울 시간)
+                  <input
+                    type="datetime-local"
+                    name="personal:sponsor_due_at"
+                    defaultValue={local(
+                      (
+                        editor.personal_details as
+                          | Record<string, unknown>
+                          | undefined
+                      )?.sponsor_due_at,
+                    )}
+                  />
+                </label>
+                {!personalContent ? (
+                  <p>
+                    추가 SQL 006 적용 전입니다. 기존 콘텐츠 등록은 계속 사용할
+                    수 있습니다.
+                  </p>
+                ) : null}
+                {(
+                  [
+                    [
+                      "type",
+                      "콘텐츠 유형",
+                      [
+                        ["", "기존 콘텐츠 (개인 확장 사용 안 함)"],
+                        ["reel", "메이크업 릴스"],
+                        ["selfie", "셀카·완성컷"],
+                        ["carousel", "발색·제품 비교 캐러셀"],
+                        ["review", "뷰티 제품 리뷰"],
+                        ["sponsored", "협찬 콘텐츠"],
+                      ],
+                    ],
+                    [
+                      "step",
+                      "개인 제작 단계",
+                      [
+                        ["idea", "아이디어"],
+                        ["planning", "기획"],
+                        ["shooting", "촬영"],
+                        ["editing", "편집"],
+                        ["review", "검수"],
+                        ["revision", "수정 요청"],
+                        ["scheduled", "발행 예정"],
+                        ["published", "발행 완료"],
+                        ["results", "성과 확인"],
+                      ],
+                    ],
+                    [
+                      "review",
+                      "개인 검수 상태",
+                      [
+                        ["none", "해당 없음"],
+                        ["pending", "검수 대기"],
+                        ["revision", "수정 요청"],
+                        ["approved", "승인"],
+                      ],
+                    ],
+                  ] as [string, string, [string, string][]][]
+                ).map(([key, label, choices]) => (
+                  <label key={key}>
+                    {label}
+                    <select
+                      name={`personal:${key}`}
+                      defaultValue={String(
+                        (
+                          editor.personal_details as
+                            | Record<string, unknown>
+                            | undefined
+                        )?.[key] ?? choices[0][0],
+                      )}
+                    >
+                      {choices.map(([v, name]) => (
+                        <option key={v} value={v}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+                {[
+                  ["products", "사용 제품", "text"],
+                  ["reference_url", "레퍼런스 URL", "url"],
+                  ["shoot_at", "촬영 예정 (서울 시간)", "datetime-local"],
+                  ["edit_at", "편집 예정 (서울 시간)", "datetime-local"],
+                  [
+                    "published_at",
+                    "실제 발행 시각 (서울 시간)",
+                    "datetime-local",
+                  ],
+                  ["review_notes", "검수 메모", "text"],
+                  ["change_reason", "수정 사유", "text"],
+                  ["reviewer", "승인 담당자", "text"],
+                  ["reviewed_at", "검수 시각 (서울 시간)", "datetime-local"],
+                  ["sponsor_disclosure", "협찬 표기 확인 메모", "text"],
+                  ["outcome", "결과 및 성과 메모", "text"],
+                  [
+                    "metrics_at",
+                    "성과 기록 기준 시각 (서울 시간)",
+                    "datetime-local",
+                  ],
+                  ...metricKeys.map((key, i) => [
+                    key,
+                    [
+                      "조회수",
+                      "도달",
+                      "좋아요",
+                      "댓글",
+                      "공유",
+                      "저장",
+                      "프로필 방문",
+                      "팔로워 변화",
+                    ][i],
+                    "number",
+                  ]),
+                ].map(([key, label, type]) => {
+                  const value = (
+                    editor.personal_details as
+                      | Record<string, unknown>
+                      | undefined
+                  )?.[key];
+                  return (
+                    <label key={key}>
+                      {label}
+                      <input
+                        name={`personal:${key}`}
+                        type={type}
+                        maxLength={2000}
+                        step={type === "number" ? "1" : undefined}
+                        defaultValue={
+                          type === "datetime-local"
+                            ? local(value)
+                            : String(value ?? "")
+                        }
+                      />
+                    </label>
+                  );
+                })}
+                <p>
+                  성과는 수동 기록입니다. 단계별 업무·버전 이력은 SQL008 적용 후
+                  연결합니다.
+                </p>
+                <p>
+                  성과 점검 일정은 선택한 경우에만 실제 발행 시각을 기준으로
+                  Calendar에 표시합니다. 외부 실행·알림·자동 업로드는 하지
+                  않습니다.
+                </p>
+                {[24, 72, 168].map((h) => (
+                  <label key={h}>
+                    <input
+                      type="checkbox"
+                      name={`personal:check:${h}`}
+                      defaultChecked={(
+                        (
+                          editor.personal_details as
+                            | Record<string, unknown>
+                            | undefined
+                        )?.performance_checks as number[] | undefined
+                      )?.includes(h)}
+                    />
+                    {h === 168 ? "7일" : `${h}시간`} 성과 점검 일정
+                  </label>
+                ))}
+              </fieldset>
+            ) : null}
             {resource === "content" ? (
               <label>
                 프로젝트
@@ -611,5 +1037,29 @@ export function Phase2Panel({
         </OpsDialog>
       ) : null}
     </section>
+  );
+}
+function PersonalChecklist({ value }: { value: string }) {
+  const [text, setText] = useState(value);
+  return (
+    <>
+      <div className="ops-actions">
+        {Object.entries(personalTemplates).map(([type, body], i) => (
+          <button type="button" key={type} onClick={() => setText(body)}>
+            {["릴스", "셀카", "캐러셀", "리뷰", "협찬"][i]} 체크리스트 불러오기
+          </button>
+        ))}
+      </div>
+      <label>
+        수정 가능한 제작 체크리스트
+        <textarea
+          name="personal:checklist"
+          maxLength={2000}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+      </label>
+      <p>체크리스트를 불러와도 일정은 자동 확정하지 않습니다.</p>
+    </>
   );
 }

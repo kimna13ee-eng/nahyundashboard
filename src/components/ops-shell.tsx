@@ -14,6 +14,10 @@ import { AnalyticsPanel } from "./analytics-panel";
 import { ContentAnalyticsPanel } from "./content-analytics-panel";
 import { journalEntries } from "@/lib/journal-report";
 import { JournalExport } from "./journal-export";
+import { attentionTasks, resumeContext } from "@/lib/workflow-context";
+import { contentCalendar } from "@/lib/personal-content";
+import { WorkflowInbox, ParkFields, parkForm } from "./workflow-inbox";
+import { savedSnapshot, contactStates } from "@/lib/workflow";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -52,6 +56,7 @@ import { statusLabels, type Status } from "@/lib/domain";
 type Space = "ALL" | "PERSONAL" | "FRENGLE";
 const menus = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "inbox", label: "Quick Inbox", icon: NotebookPen },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "automations", label: "Automations", icon: Workflow },
@@ -119,6 +124,11 @@ export function OpsShell() {
     [user, setUser] = useState<{ email?: string } | null>(null),
     [configured, setConfigured] = useState<boolean | null>(null);
   const [taskClassification, setTaskClassification] = useState(false);
+  const [libraryWorkflow, setLibraryWorkflow] = useState(false);
+  const [workflowReady, setWorkflowReady] = useState(false);
+  const [workflowData, setWorkflowData] = useState<OpsData>({});
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [parkOpen, setParkOpen] = useState(false);
   const [excludeJournalTests, setExcludeJournalTests] = useState(true);
   const [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(false),
@@ -156,6 +166,26 @@ export function OpsShell() {
   const activeTask = tasks.find((t) => t.id === active?.task_id);
   const [recovery, setRecovery] = useState(false);
   const [quickLog, setQuickLog] = useState(false);
+  const [resumeTask, setResumeTask] = useState<string | null>(null);
+  const resumeTarget = tasks.find((t) => t.id === resumeTask);
+  const savedContext = resumeTarget
+    ? resumeContext(
+        resumeTarget,
+        notes,
+        events,
+        sessions.find((s) => s.task_id === resumeTask && s.status === "PARKED")
+          ?.id,
+      )
+    : null;
+  const snapshot =
+    space !== "FRENGLE" && user
+      ? savedSnapshot(
+          workflowData.contexts || [],
+          sessions.find(
+            (s) => s.task_id === resumeTask && s.status === "PARKED",
+          )?.id,
+        )
+      : undefined;
   const staleInterval = active
     ? longRunningInterval(intervals, active.id, tick + offset)
     : undefined;
@@ -175,18 +205,31 @@ export function OpsShell() {
     const token = ++generation.current;
     setLoading(true);
     try {
-      const result = await api("/api/ops?workspace=PERSONAL");
+      const [result, workflow] = await Promise.all([
+        api("/api/ops?workspace=PERSONAL"),
+        api("/api/workflow?workspace=PERSONAL").catch(() => ({
+          ready: false,
+          data: {},
+        })),
+      ]);
       if (token !== generation.current) return;
       setData(result.data);
+      setWorkflowReady(workflow.ready === true);
+      setWorkflowData(workflow.data || {});
       setTaskClassification(result.taskClassification === true);
+      setLibraryWorkflow(result.libraryWorkflow === true);
       setOffset(Date.parse(result.serverNow) - Date.now());
       setTruncated(result.truncated);
       setError("");
+      return true;
     } catch (e) {
       if (token === generation.current) {
         setError(e instanceof Error ? e.message : "불러오기 실패");
         setData({});
+        setWorkflowData({});
+        setWorkflowReady(false);
       }
+      return false;
     } finally {
       if (token === generation.current) setLoading(false);
     }
@@ -237,11 +280,15 @@ export function OpsShell() {
       setError("");
       try {
         await api("/api/ops?workspace=PERSONAL", method, body);
-        setNotice("서버 저장이 확인되었습니다.");
         setEditor(null);
         setDeleteTarget(null);
         setSummary(false);
-        await load();
+        const refreshed = await load();
+        setNotice(
+          refreshed
+            ? "서버 저장 및 DB 재조회가 확인되었습니다."
+            : "서버 저장은 확인됐으나 재조회에 실패했습니다. 다시 새로고침해 주세요.",
+        );
         return true;
       } catch (e) {
         setError(e instanceof Error ? e.message : "저장 실패");
@@ -252,14 +299,39 @@ export function OpsShell() {
     },
     [load],
   );
-  function timer(command: string, taskId?: string, summaryText = "") {
+  function timer(
+    command: string,
+    taskId?: string,
+    summaryText = "",
+    context?: Record<string, unknown>,
+  ) {
     return mutate({
       action: "timer",
       command,
       task_id: taskId || null,
       request_id: crypto.randomUUID(),
       summary: summaryText,
+      ...(workflowReady ? { context: context || {} } : {}),
     });
+  }
+  async function workflowAction(body: unknown) {
+    setBusy(true);
+    setError("");
+    try {
+      await api("/api/workflow?workspace=PERSONAL", "POST", body);
+      const refreshed = await load();
+      setNotice(
+        refreshed
+          ? "서버 저장 및 DB 재조회가 확인되었습니다."
+          : "저장됐으나 재조회 실패. 다시 새로고침해 주세요.",
+      );
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "저장 실패");
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
   async function login(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -287,6 +359,11 @@ export function OpsShell() {
       generation.current++;
       setUser(null);
       setData({});
+      setWorkflowData({});
+      setWorkflowReady(false);
+      setCaptureOpen(false);
+      setParkOpen(false);
+      setResumeTask(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "로그아웃 실패");
     } finally {
@@ -306,7 +383,7 @@ export function OpsShell() {
         title="작업 시작 / 재개"
         aria-label={`${t.title} 작업 시작`}
         disabled={!canWrite || active?.task_id === t.id}
-        onClick={() => timer("start", t.id)}
+        onClick={() => setResumeTask(t.id)}
       >
         <Play size={15} />
       </button>
@@ -367,6 +444,9 @@ export function OpsShell() {
                 {text(projects.find((p) => p.id === t.project_id)?.title) ||
                   "독립 업무"}{" "}
                 · {text(t.due_date) || "마감일 없음"}
+                {t.contact_status && t.contact_status !== "none"
+                  ? ` · ${contactStates[t.contact_status as keyof typeof contactStates]} · 후속 ${t.follow_up_at ? dateTime(t.follow_up_at) : "날짜 미지정"}`
+                  : ""}
               </small>
             </button>
             <span className={`ops-badge ${text(t.status)}`}>
@@ -418,13 +498,7 @@ export function OpsShell() {
     </div>
   );
   const today = seoulDate(new Date(tick));
-  const attention = tasks.filter(
-    (t) =>
-      t.status !== "completed" &&
-      (t.approval === "pending" ||
-        (t.due_date && text(t.due_date) < today) ||
-        t.status === "failed"),
-  );
+  const attention = attentionTasks(tasks, today);
   const todaySchedules = schedules.filter(
     (s) => seoulDate(new Date(text(s.starts_at))) === today,
   );
@@ -433,19 +507,40 @@ export function OpsShell() {
       (project === "all" || t.project_id === project) &&
       text(t.title).toLowerCase().includes(search.toLowerCase()),
   );
-  const [calendarExtra, setCalendarExtra] = useState<{ key: string; data: OpsData }>({ key: "", data: {} });
+  const [calendarExtra, setCalendarExtra] = useState<{
+    key: string;
+    data: OpsData;
+  }>({ key: "", data: {} });
   const calendarKey = (user?.email || "signed-out") + ":" + space;
-  const receiveCalendarData = useCallback((data: OpsData) => {
-    setCalendarExtra({ key: calendarKey, data });
-  }, [calendarKey]);
-  const extra = calendarExtra.key === calendarKey && user && space !== "FRENGLE" ? calendarExtra.data : {};
+  const receiveCalendarData = useCallback(
+    (data: OpsData) => {
+      setCalendarExtra({ key: calendarKey, data });
+    },
+    [calendarKey],
+  );
+  const extra =
+    calendarExtra.key === calendarKey && user && space !== "FRENGLE"
+      ? calendarExtra.data
+      : {};
   const recurrenceFrom = day.slice(0, 7) + "-01";
-  const recurrenceTo = new Date(Date.parse(day + "T00:00:00Z") + 370 * 86400000).toISOString().slice(0, 10);
-  const journalRows = journalEntries(space === "FRENGLE" ? {} : data, day, tick + offset, excludeJournalTests);
+  const recurrenceTo = new Date(Date.parse(day + "T00:00:00Z") + 370 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const journalRows = journalEntries(
+    space === "FRENGLE" ? {} : data,
+    day,
+    tick + offset,
+    excludeJournalTests,
+  );
   const inRange = (s: OpsRow) => scheduleOverlaps(s, day, calendarView);
   const calendarItems: (OpsRow & { source: string })[] = [
-    ...occurrences(extra.recurrence || [], extra.exceptions || [], recurrenceFrom, recurrenceTo).map((s): OpsRow & { source: string } => ({ ...s, source: "반복 일정" })),
-    ...(extra.content || []).filter(c => c.publish_at).map(c => ({ id: "publish-" + c.id, title: c.title, starts_at: c.publish_at, ends_at: new Date(Date.parse(String(c.publish_at)) + 60000).toISOString(), source: "콘텐츠 발행" })),
+    ...occurrences(
+      extra.recurrence || [],
+      extra.exceptions || [],
+      recurrenceFrom,
+      recurrenceTo,
+    ).map((s): OpsRow & { source: string } => ({ ...s, source: "반복 일정" })),
+    ...contentCalendar(extra.content || []),
     ...schedules.map(
       (s) => ({ ...s, source: "일정" }) as OpsRow & { source: string },
     ),
@@ -548,7 +643,10 @@ export function OpsShell() {
           <button
             className="ops-primary"
             disabled={!canWrite}
-            onClick={() => setEditor({ resource: "tasks" })}
+            onClick={() => {
+              setCaptureOpen(true);
+              setView("inbox");
+            }}
           >
             <Plus size={15} />
             Quick Capture
@@ -576,6 +674,20 @@ export function OpsShell() {
             </div>
             <span>{today}</span>
           </div>
+          {view === "inbox" ? (
+            <WorkflowInbox
+              items={space === "FRENGLE" ? [] : workflowData.inbox || []}
+              projects={projects}
+              ready={workflowReady && space !== "FRENGLE"}
+              enabled={Boolean(user) && space !== "FRENGLE"}
+              busy={busy}
+              error={error}
+              open={captureOpen}
+              setOpen={setCaptureOpen}
+              activeTitle={text(activeTask?.title)}
+              act={workflowAction}
+            />
+          ) : null}
           <div className="ops-connection">
             <strong>
               {space === "FRENGLE"
@@ -684,7 +796,10 @@ export function OpsShell() {
                 </section>
               </div>
               <section className="ops-card">
-                {heads("My Attention", "승인 대기 · 지연 · 실패")}
+                {heads(
+                  "My Attention",
+                  "실패 · 오늘 마감 및 지연 · 승인 대기 · 후속 날짜 · 14일 이상 미갱신",
+                )}
                 {taskList(attention)}
               </section>
               <section className="ops-card">
@@ -712,7 +827,7 @@ export function OpsShell() {
                       </p>
                       <button
                         disabled={!canWrite}
-                        onClick={() => timer("start", text(s.task_id))}
+                        onClick={() => setResumeTask(text(s.task_id))}
                       >
                         <Play size={15} />
                         이어하기
@@ -827,7 +942,12 @@ export function OpsShell() {
                   <>
                     <p>
                       상태: {statusLabels[selected.status as Status]} ·
-                      우선순위: {text(selected.priority)} · 분류: {selected.work_kind === "unexpected" ? "돌발 업무" : selected.work_kind === "planned" ? "계획 업무" : "미분류"}
+                      우선순위: {text(selected.priority)} · 분류:{" "}
+                      {selected.work_kind === "unexpected"
+                        ? "돌발 업무"
+                        : selected.work_kind === "planned"
+                          ? "계획 업무"
+                          : "미분류"}
                     </p>
                     <p>
                       담당자: {text(selected.assignee) || "미지정"} · 도구:{" "}
@@ -1065,8 +1185,9 @@ export function OpsShell() {
                 <Empty label="이 기간에 등록된 일정이 없습니다." />
               )}
               <p className="ops-footnote">
-                반복 일정과 콘텐츠 발행 예정은 캘린더에 함께 표시됩니다. 아래에서 반복 회차를 관리하세요.
-                자동화 예정 시간은 미연결입니다.
+                반복 일정과 콘텐츠 발행 예정은 캘린더에 함께 표시됩니다.
+                아래에서 반복 회차를 관리하세요. 자동화 예정 시간은
+                미연결입니다.
               </p>
             </section>
           ) : null}
@@ -1076,15 +1197,44 @@ export function OpsShell() {
               <JournalExport
                 excludeTests={excludeJournalTests}
                 onExcludeTests={setExcludeJournalTests}
-                key={"journal-export:" + (user?.email || "signed-out") + space + day}
+                key={
+                  "journal-export:" +
+                  (user?.email || "signed-out") +
+                  space +
+                  day
+                }
                 data={space === "FRENGLE" ? {} : data}
                 day={day}
                 now={tick + offset}
-                enabled={Boolean(user) && !loading && !error && space !== "FRENGLE"}
+                enabled={
+                  Boolean(user) && !loading && !error && space !== "FRENGLE"
+                }
               />
               <div className="ops-toolbar">
-                <button aria-label="일지 이전 날짜" onClick={() => setDay(new Date(Date.parse(day + "T00:00:00Z") - 86400000).toISOString().slice(0, 10))}>이전 날</button>
-                <button aria-label="일지 다음 날짜" onClick={() => setDay(new Date(Date.parse(day + "T00:00:00Z") + 86400000).toISOString().slice(0, 10))}>다음 날</button>
+                <button
+                  aria-label="일지 이전 날짜"
+                  onClick={() =>
+                    setDay(
+                      new Date(Date.parse(day + "T00:00:00Z") - 86400000)
+                        .toISOString()
+                        .slice(0, 10),
+                    )
+                  }
+                >
+                  이전 날
+                </button>
+                <button
+                  aria-label="일지 다음 날짜"
+                  onClick={() =>
+                    setDay(
+                      new Date(Date.parse(day + "T00:00:00Z") + 86400000)
+                        .toISOString()
+                        .slice(0, 10),
+                    )
+                  }
+                >
+                  다음 날
+                </button>
                 <input
                   aria-label="일지 날짜"
                   type="date"
@@ -1093,56 +1243,59 @@ export function OpsShell() {
                 />
               </div>
               {journalRows.map(({ session: s }) => (
-                  <div className="ops-note" key={s.id}>
-                    <strong>
-                      {text(tasks.find((t) => t.id === s.task_id)?.title)} ·{" "}
-                      {text(s.status)}
-                    </strong>
-                    <p>
-                      선택 날짜 작업 시간{" "}
-                      {clock(
-                        intervalSecondsForDay(
-                          intervals.filter((i) => i.session_id === s.id),
-                          tick + offset,
-                          day,
-                        ),
-                      )}
-                    </p>
-                    {intervals
-                      .filter((i) => i.session_id === s.id)
-                      .map((i) => (
-                        <small className="block" key={i.id}>
-                          {dateTime(i.starts_at)} →{" "}
-                          {i.ends_at ? dateTime(i.ends_at) : "진행 중"}
-                        </small>
-                      ))}
-                    {events
-                      .filter(
-                        (e) =>
-                          e.session_id === s.id ||
-                          e.previous_session_id === s.id,
-                      )
-                      .map((e) => (
-                        <small className="block" key={e.id}>
-                          {dateTime(e.created_at)} · {text(e.kind)}
-                        </small>
-                      ))}
-                    <pre>
-                      {text(s.summary) || "세션 요약 없음 · 시간 기록은 보존됨"}
-                    </pre>
-                    {notes
-                      .filter(
-                        (n) =>
-                          n.task_id === s.task_id &&
-                          n.kind === "next_action" &&
-                          !n.done,
-                      )
-                      .map((n) => (
-                        <p key={n.id}>다음 액션: {text(n.body)}</p>
-                      ))}
-                  </div>
-                ))}
-              {!loading && !error && user && space !== "FRENGLE" && !journalRows.length ? (
+                <div className="ops-note" key={s.id}>
+                  <strong>
+                    {text(tasks.find((t) => t.id === s.task_id)?.title)} ·{" "}
+                    {text(s.status)}
+                  </strong>
+                  <p>
+                    선택 날짜 작업 시간{" "}
+                    {clock(
+                      intervalSecondsForDay(
+                        intervals.filter((i) => i.session_id === s.id),
+                        tick + offset,
+                        day,
+                      ),
+                    )}
+                  </p>
+                  {intervals
+                    .filter((i) => i.session_id === s.id)
+                    .map((i) => (
+                      <small className="block" key={i.id}>
+                        {dateTime(i.starts_at)} →{" "}
+                        {i.ends_at ? dateTime(i.ends_at) : "진행 중"}
+                      </small>
+                    ))}
+                  {events
+                    .filter(
+                      (e) =>
+                        e.session_id === s.id || e.previous_session_id === s.id,
+                    )
+                    .map((e) => (
+                      <small className="block" key={e.id}>
+                        {dateTime(e.created_at)} · {text(e.kind)}
+                      </small>
+                    ))}
+                  <pre>
+                    {text(s.summary) || "세션 요약 없음 · 시간 기록은 보존됨"}
+                  </pre>
+                  {notes
+                    .filter(
+                      (n) =>
+                        n.task_id === s.task_id &&
+                        n.kind === "next_action" &&
+                        !n.done,
+                    )
+                    .map((n) => (
+                      <p key={n.id}>다음 액션: {text(n.body)}</p>
+                    ))}
+                </div>
+              ))}
+              {!loading &&
+              !error &&
+              user &&
+              space !== "FRENGLE" &&
+              !journalRows.length ? (
                 <Empty label="선택 날짜와 필터에 해당하는 작업 기록이 없습니다." />
               ) : null}
             </section>
@@ -1225,6 +1378,24 @@ export function OpsShell() {
                         </button>
                       </div>
                       <small>{text(l.category)}</small>
+                      {libraryWorkflow ? (
+                        <p>
+                          {text(l.tool) || "도구 미지정"} ·{" "}
+                          {l.status === "archived" ? "보관" : "사용 중"} ·
+                          프로젝트{" "}
+                          {text(
+                            projects.find((p) => p.id === l.project_id)?.title,
+                          ) || "미분류"}{" "}
+                          · 최신 승인 버전{" "}
+                          {l.approved_version_id
+                            ? dateTime(
+                                rows("prompt_versions").find(
+                                  (v) => v.id === l.approved_version_id,
+                                )?.created_at,
+                              )
+                            : "미지정"}
+                        </p>
+                      ) : null}
                       <details>
                         <summary>원문 펼치기</summary>
                         <pre>{text(l.body)}</pre>
@@ -1263,6 +1434,36 @@ export function OpsShell() {
                                   {dateTime(v.created_at)} · {text(v.title)}
                                 </small>
                                 <pre>{text(v.body)}</pre>
+                                {v.metadata ? (
+                                  <p>
+                                    수정 이유:{" "}
+                                    {text(
+                                      (v.metadata as Record<string, unknown>)
+                                        .change_reason,
+                                    ) || "기록 없음"}{" "}
+                                    · 적용 도구:{" "}
+                                    {text(
+                                      (v.metadata as Record<string, unknown>)
+                                        .tool,
+                                    ) || "미지정"}
+                                  </p>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  disabled={!canWrite}
+                                  onClick={() =>
+                                    setEditor({
+                                      resource: "library_items",
+                                      row: {
+                                        ...l,
+                                        title: v.title,
+                                        body: v.body,
+                                      },
+                                    })
+                                  }
+                                >
+                                  이 버전으로 복원 검토
+                                </button>
                               </div>
                             ))}
                         </details>
@@ -1294,6 +1495,12 @@ export function OpsShell() {
             <Phase2Panel
               key={"content:" + (user?.email || "signed-out") + space}
               resource="content"
+              onOpenTask={async (id) => {
+                await load();
+                setDetail(id);
+                setTab("Overview");
+                setView("projects");
+              }}
               enabled={Boolean(user) && space !== "FRENGLE"}
               projects={projects}
               day={day}
@@ -1301,20 +1508,22 @@ export function OpsShell() {
           ) : null}
           {view === "analytics" ? (
             <>
-            <AnalyticsPanel
-              taskClassification={taskClassification}
-              data={space === "FRENGLE" ? {} : data}
-              enabled={Boolean(user) && !error && space !== "FRENGLE"}
-              now={tick + offset}
-              day={day}
-            />
-            <ContentAnalyticsPanel
-              key={"content-analytics:" + (user?.email || "signed-out") + space}
-              enabled={Boolean(user) && space !== "FRENGLE"}
-              projects={projects}
-              day={day}
-              now={tick + offset}
-            />
+              <AnalyticsPanel
+                taskClassification={taskClassification}
+                data={space === "FRENGLE" ? {} : data}
+                enabled={Boolean(user) && !error && space !== "FRENGLE"}
+                now={tick + offset}
+                day={day}
+              />
+              <ContentAnalyticsPanel
+                key={
+                  "content-analytics:" + (user?.email || "signed-out") + space
+                }
+                enabled={Boolean(user) && space !== "FRENGLE"}
+                projects={projects}
+                day={day}
+                now={tick + offset}
+              />
             </>
           ) : null}
           {view === "calendar" ? (
@@ -1450,7 +1659,11 @@ export function OpsShell() {
             </button>
             <button
               disabled={!canWrite}
-              onClick={() => timer("pause", text(active.task_id))}
+              onClick={() =>
+                workflowReady
+                  ? setParkOpen(true)
+                  : timer("pause", text(active.task_id))
+              }
             >
               <Pause size={17} />
               일시정지
@@ -1511,9 +1724,149 @@ export function OpsShell() {
           </div>
         </OpsDialog>
       ) : null}
+      {resumeTarget && savedContext ? (
+        <OpsDialog
+          title="Context Resume · 작업 시작 / 이어하기"
+          busy={busy}
+          close={() => setResumeTask(null)}
+        >
+          <h3>{text(resumeTarget.title)}</h3>
+          <form
+            className="ops-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (
+                await timer(
+                  "start",
+                  resumeTarget.id,
+                  "",
+                  parkForm(new FormData(e.currentTarget)),
+                )
+              )
+                setResumeTask(null);
+            }}
+          >
+            <p>
+              {snapshot ? (
+                "중단 당시 저장한 맥락입니다."
+              ) : (
+                <>
+                  현재 저장된 맥락입니다. 중단 당시의 별도 스냅샷은 아직
+                  저장하지 않습니다.
+                </>
+              )}
+            </p>
+            <h4>지난 작업에서 어디까지 진행했는지</h4>
+            <p>
+              {snapshot
+                ? text(snapshot.last_note) || "작성한 메모 없음"
+                : savedContext.latest
+                  ? text(savedContext.latest.body)
+                  : "작성한 메모 없음"}
+            </p>
+            <p>
+              마지막 작업 단계: {text(snapshot?.last_stage) || "기록 없음"} ·
+              마지막 파일: {text(snapshot?.last_file) || "기록 없음"}
+            </p>
+            <p>
+              업무 상태:{" "}
+              {statusLabels[resumeTarget.status as Status] ||
+                text(resumeTarget.status)}{" "}
+              · 도구: {text(snapshot?.tool ?? resumeTarget.tool) || "기록 없음"}
+            </p>
+            {(snapshot?.result_url ?? resumeTarget.result_url) ? (
+              <a
+                href={text(snapshot?.result_url ?? resumeTarget.result_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                저장된 결과물 열기
+              </a>
+            ) : (
+              <p>파일·결과 링크 기록 없음</p>
+            )}
+            <h4>현재 남아 있는 이슈</h4>
+            {((snapshot?.issues as OpsRow[] | undefined) || savedContext.issues)
+              .length ? (
+              (
+                (snapshot?.issues as OpsRow[] | undefined) ||
+                savedContext.issues
+              ).map((n) => <p key={n.id}>{text(n.body)}</p>)
+            ) : (
+              <p>미완료 이슈 기록 없음</p>
+            )}
+            <h4>다음에 해야 하는 일</h4>
+            <p>{text(snapshot?.next_action)}</p>
+            {(
+              (snapshot?.next_actions as OpsRow[] | undefined) ||
+              savedContext.next
+            ).length ? (
+              (
+                (snapshot?.next_actions as OpsRow[] | undefined) ||
+                savedContext.next
+              ).map((n) => <p key={n.id}>{text(n.body)}</p>)
+            ) : (
+              <p>미완료 다음 액션 기록 없음</p>
+            )}
+            <p>
+              중단 시각:{" "}
+              {snapshot
+                ? dateTime(snapshot.paused_at)
+                : savedContext.interruption
+                  ? dateTime(savedContext.interruption.created_at)
+                  : "기록 없음"}{" "}
+              · 중단 사유: {text(snapshot?.reason) || "별도 기록 없음"}
+            </p>
+            {active && active.task_id !== resumeTarget.id ? (
+              <p>
+                시작하면 현재 업무 «{text(activeTask?.title)}»는 PARKED로
+                전환됩니다. 현재 시간 구간을 닫은 뒤 새 구간을 시작합니다.
+              </p>
+            ) : null}
+            {workflowReady && active && active.task_id !== resumeTarget.id ? (
+              <ParkFields />
+            ) : null}
+            {error ? <p role="alert">{error}</p> : null}
+            <button className="ops-primary" disabled={!canWrite}>
+              맥락 확인 후 시작 / 이어하기
+            </button>
+          </form>
+        </OpsDialog>
+      ) : null}
+      {parkOpen && active ? (
+        <OpsDialog
+          title="현재 업무 중단 / 맥락 저장"
+          busy={busy}
+          close={() => setParkOpen(false)}
+        >
+          <form
+            className="ops-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (
+                await timer(
+                  "pause",
+                  text(active.task_id),
+                  "",
+                  parkForm(new FormData(e.currentTarget)),
+                )
+              )
+                setParkOpen(false);
+            }}
+          >
+            <h3>{text(activeTask?.title)}</h3>
+            <ParkFields />
+            {error ? <p role="alert">{error}</p> : null}
+            <button disabled={!canWrite}>맥락 저장 후 PARKED</button>
+          </form>
+        </OpsDialog>
+      ) : null}
       {editor ? (
         <ResourceEditor
           taskClassification={taskClassification}
+          workflowReady={workflowReady}
+          libraryWorkflow={libraryWorkflow}
+          promptVersions={rows("prompt_versions")}
           editor={editor}
           projects={projects}
           busy={busy}
@@ -1732,6 +2085,9 @@ function Empty({ label }: { label: string }) {
 }
 function ResourceEditor({
   taskClassification,
+  workflowReady,
+  libraryWorkflow,
+  promptVersions,
   editor,
   projects,
   busy,
@@ -1740,6 +2096,9 @@ function ResourceEditor({
   save,
 }: {
   taskClassification: boolean;
+  workflowReady: boolean;
+  libraryWorkflow: boolean;
+  promptVersions: OpsRow[];
   editor: Editor;
   projects: OpsRow[];
   busy: boolean;
@@ -1819,6 +2178,10 @@ function ResourceEditor({
       value.kind = row.kind || editor.kind || "prompt";
     }
     if (resource === "tasks") {
+      if (value.contact_status !== undefined)
+        value.follow_up_at = value.follow_up_at
+          ? `${value.follow_up_at}:00+09:00`
+          : null;
       value.due_date = value.due_date || null;
       value.estimated_minutes = Number(value.estimated_minutes || 0);
     }
@@ -1844,6 +2207,49 @@ function ResourceEditor({
     >
       <form onSubmit={submit} className="ops-form">
         {resource !== "task_notes" ? field("title", "제목") : null}
+        {resource === "library_items" && libraryWorkflow ? (
+          <>
+            {field("tool", "적용 도구", "text", 80)}
+            {select(
+              "project_id",
+              "연결 프로젝트",
+              [
+                ["", "연결 없음"],
+                ...projects.map((p) => [p.id, text(p.title)]),
+              ],
+              "",
+            )}
+            {area("change_reason", "변경 이유", 2000)}
+            {select(
+              "status",
+              "사용 상태",
+              [
+                ["active", "사용 중"],
+                ["archived", "보관"],
+              ],
+              "active",
+            )}
+            {row.kind === "prompt"
+              ? select(
+                  "approved_version_id",
+                  "최신 승인 버전",
+                  [
+                    ["", "미지정"],
+                    ...promptVersions
+                      .filter((v) => v.item_id === row.id)
+                      .map((v) => [
+                        v.id,
+                        `${dateTime(v.created_at)} · ${text(v.title)}`,
+                      ]),
+                  ],
+                  "",
+                )
+              : null}
+            <p>
+              승인 버전은 직접 선택합니다. 수정 원문을 자동 승인하지 않습니다.
+            </p>
+          </>
+        ) : null}
         {resource === "projects" ? (
           <>
             {area("description", "설명", 2000)}
@@ -1879,7 +2285,44 @@ function ResourceEditor({
               "normal",
             )}
             {field("due_date", "마감일", "date")}
-            {taskClassification ? select("work_kind", "업무 분류", [["unclassified", "미분류"], ["planned", "계획 업무"], ["unexpected", "돌발 업무"]], "unclassified") : <p>업무 분류는 005 SQL 적용 후 사용할 수 있습니다.</p>}
+            {workflowReady ? (
+              <>
+                {select(
+                  "contact_status",
+                  "후속 상태",
+                  Object.entries(contactStates),
+                  "none",
+                )}
+                <label>
+                  다음 후속 날짜 (서울 시간)
+                  <input
+                    name="follow_up_at"
+                    type="datetime-local"
+                    defaultValue={
+                      row.follow_up_at ? localDateTime(row.follow_up_at) : ""
+                    }
+                  />
+                </label>
+                <p>
+                  비민감 업무 메타데이터만 입력하세요. 고객 명단이나 회사 자료는
+                  저장하지 않습니다.
+                </p>
+              </>
+            ) : null}
+            {taskClassification ? (
+              select(
+                "work_kind",
+                "업무 분류",
+                [
+                  ["unclassified", "미분류"],
+                  ["planned", "계획 업무"],
+                  ["unexpected", "돌발 업무"],
+                ],
+                "unclassified",
+              )
+            ) : (
+              <p>업무 분류는 005 SQL 적용 후 사용할 수 있습니다.</p>
+            )}
             {field("estimated_minutes", "계획 시간 (분)", "number")}
             {field("tool", "연결 도구", "text", 80)}
             {field("assignee", "담당자", "text", 80)}
