@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { json, sameOrigin } from "@/lib/http";
 import { personalClient, personalConfigured } from "@/lib/supabase/server";
 import { parseResource, resources, uuid, type Resource } from "@/lib/ops";
+import { parseParkContext } from "@/lib/workflow";
 const tables: Record<string, string> = {
   projects: "ops_projects",
   tasks: "tasks",
@@ -60,8 +61,17 @@ async function handle(req: NextRequest) {
           },
           503,
         );
-      const classification = await client.from("tasks").select("work_kind").limit(0);
+      const classification = await client
+        .from("tasks")
+        .select("work_kind")
+        .limit(0);
       return json({
+        libraryWorkflow: !(
+          await client
+            .from("ops_library_items")
+            .select("approved_version_id")
+            .limit(0)
+        ).error,
         taskClassification: !classification.error,
         data: Object.fromEntries(results.map((r) => [r.name, r.data])),
         serverNow: new Date().toISOString(),
@@ -81,12 +91,18 @@ async function handle(req: NextRequest) {
         body.summary.length > 10000
       )
         return json({ error: "타이머 요청을 확인해 주세요." }, 400);
-      const { error } = await client.rpc("ops_timer", {
-        p_command: body.command,
-        p_task_id: body.task_id || null,
-        p_request_id: body.request_id,
-        p_summary: body.summary,
-      });
+      const { error } = await client.rpc(
+        body.context ? "ops_timer_context" : "ops_timer",
+        {
+          p_command: body.command,
+          p_task_id: body.task_id || null,
+          p_request_id: body.request_id,
+          p_summary: body.summary,
+          ...(body.context
+            ? { p_context: parseParkContext(body.context) }
+            : {}),
+        },
+      );
       return error
         ? json(
             {
