@@ -67,8 +67,41 @@ export function parseResource(resource: Resource, raw: unknown) {
       assignee: text(v.assignee ?? "", 80),
       result_url: link(v.result_url),
       estimated_minutes: minutes,
-      ...(v.work_kind !== undefined ? { work_kind: choice(v.work_kind, ["unclassified", "planned", "unexpected"]) } : {}),
+      ...(v.work_kind !== undefined
+        ? {
+            work_kind: choice(v.work_kind, [
+              "unclassified",
+              "planned",
+              "unexpected",
+            ]),
+          }
+        : {}),
       approval: choice(v.approval ?? "none", ["none", "pending", "approved"]),
+      ...(v.contact_status !== undefined
+        ? {
+            contact_status: choice(v.contact_status, [
+              "none",
+              "planned",
+              "sent",
+              "waiting",
+              "materials",
+              "follow_up",
+              "answered",
+              "closed",
+            ]),
+            follow_up_at: v.follow_up_at
+              ? (() => {
+                  if (
+                    typeof v.follow_up_at !== "string" ||
+                    !/(Z|[+-]\d{2}:\d{2})$/.test(v.follow_up_at) ||
+                    !Number.isFinite(Date.parse(v.follow_up_at))
+                  )
+                    throw new Error("후속 시각을 확인해 주세요.");
+                  return new Date(v.follow_up_at).toISOString();
+                })()
+              : null,
+          }
+        : {}),
     };
   }
   if (resource === "projects")
@@ -114,7 +147,9 @@ export function parseResource(resource: Resource, raw: unknown) {
   if (
     containsSecret(body) ||
     containsSecret(String(v.title ?? "")) ||
-    containsSecret(String(v.url ?? ""))
+    containsSecret(String(v.url ?? "")) ||
+    containsSecret(String(v.tool ?? "")) ||
+    containsSecret(String(v.change_reason ?? ""))
   )
     throw new Error(
       "인증정보로 보이는 내용이 있습니다. 비밀정보를 제거해 주세요.",
@@ -132,6 +167,15 @@ export function parseResource(resource: Resource, raw: unknown) {
     body,
     url: link(v.url),
     favorite: v.favorite === true,
+    ...(v.tool !== undefined
+      ? {
+          tool: text(v.tool, 80),
+          project_id: fk(v.project_id),
+          change_reason: text(v.change_reason ?? "", 2000),
+          status: choice(v.status ?? "active", ["active", "archived"]),
+          approved_version_id: fk(v.approved_version_id),
+        }
+      : {}),
   };
 }
 export function seoulDate(now = new Date()) {

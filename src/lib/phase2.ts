@@ -1,4 +1,5 @@
 import { uuid, containsSecret, type OpsRow } from "./ops.ts";
+import { parsePersonalContent } from "./personal-content.ts";
 export const phase2Tables = {
   content: "ops_content",
   inspiration: "ops_inspiration",
@@ -83,11 +84,43 @@ export function parsePhase2(resource: Phase2Resource, raw: unknown) {
       favorite: v.favorite === true,
       inbox: v.inbox !== false,
     };
-  if (resource === "content")
+  if (resource === "content") {
+    const details =
+      v.personal_details !== undefined
+        ? parsePersonalContent(v.personal_details)
+        : undefined;
+    const stage = details
+      ? {
+          idea: "idea",
+          planning: "production",
+          shooting: "production",
+          editing: "production",
+          review: "review",
+          revision: "review",
+          scheduled: "approval",
+          published: "published",
+          results: "results",
+        }[String(details.step)] || "idea"
+      : v.stage;
+    const approval = details
+      ? details.review === "approved"
+        ? "approved"
+        : ["pending", "revision"].includes(String(details.review))
+          ? "pending"
+          : "none"
+      : v.approval;
+    if (
+      ["published", "results"].includes(String(stage)) &&
+      approval === "pending"
+    )
+      throw new Error(
+        "검수·수정 대기 콘텐츠는 발행 단계로 변경할 수 없습니다.",
+      );
     return {
+      ...(details ? { personal_details: details } : {}),
       ...common,
       channel: str(v.channel ?? "", 80),
-      stage: option(v.stage, [
+      stage: option(stage, [
         "idea",
         "production",
         "review",
@@ -95,7 +128,7 @@ export function parsePhase2(resource: Phase2Resource, raw: unknown) {
         "published",
         "results",
       ]),
-      approval: option(v.approval, ["none", "pending", "approved"]),
+      approval: option(approval, ["none", "pending", "approved"]),
       publish_at: v.publish_at ? instant(v.publish_at) : null,
       result_url: url(v.result_url),
       project_id: v.project_id
@@ -106,6 +139,7 @@ export function parsePhase2(resource: Phase2Resource, raw: unknown) {
             })()
         : null,
     };
+  }
   const starts_at = instant(v.starts_at),
     ends_at = instant(v.ends_at);
   if (
@@ -129,16 +163,31 @@ export function parsePhase2(resource: Phase2Resource, raw: unknown) {
   };
 }
 // Calculate from the original Seoul date so clamping never shifts later months.
-export function recurrenceAt(start: number, frequency: unknown, interval: number, index: number) {
+export function recurrenceAt(
+  start: number,
+  frequency: unknown,
+  interval: number,
+  index: number,
+) {
   if (frequency === "daily" || frequency === "weekly")
-    return start + index * interval * (frequency === "weekly" ? 7 : 1) * 86400000;
+    return (
+      start + index * interval * (frequency === "weekly" ? 7 : 1) * 86400000
+    );
   if (frequency !== "monthly" && frequency !== "yearly") return NaN;
   const local = new Date(start + 9 * 3600000);
-  const month = local.getUTCMonth() + index * interval * (frequency === "yearly" ? 12 : 1);
+  const month =
+    local.getUTCMonth() + index * interval * (frequency === "yearly" ? 12 : 1);
   const target = new Date(Date.UTC(local.getUTCFullYear(), month, 1));
-  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  const last = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
   target.setUTCDate(Math.min(local.getUTCDate(), last));
-  target.setUTCHours(local.getUTCHours(), local.getUTCMinutes(), local.getUTCSeconds(), local.getUTCMilliseconds());
+  target.setUTCHours(
+    local.getUTCHours(),
+    local.getUTCMinutes(),
+    local.getUTCSeconds(),
+    local.getUTCMilliseconds(),
+  );
   return target.getTime() - 9 * 3600000;
 }
 export function occurrences(
@@ -165,10 +214,20 @@ export function occurrences(
       continue;
     const anchor = new Date(start + 9 * 3600000);
     const window = new Date(lower - duration + 9 * 3600000);
-    const months = (window.getUTCFullYear() - anchor.getUTCFullYear()) * 12 + window.getUTCMonth() - anchor.getUTCMonth();
-    const first = r.frequency === "monthly" || r.frequency === "yearly"
-      ? Math.max(0, Math.floor(months / (Number(r.interval) * (r.frequency === "yearly" ? 12 : 1))) - 1)
-      : Math.max(0, Math.ceil((lower - duration - start) / step));
+    const months =
+      (window.getUTCFullYear() - anchor.getUTCFullYear()) * 12 +
+      window.getUTCMonth() -
+      anchor.getUTCMonth();
+    const first =
+      r.frequency === "monthly" || r.frequency === "yearly"
+        ? Math.max(
+            0,
+            Math.floor(
+              months /
+                (Number(r.interval) * (r.frequency === "yearly" ? 12 : 1)),
+            ) - 1,
+          )
+        : Math.max(0, Math.ceil((lower - duration - start) / step));
     for (let n = first, count = 0; count < 1000; n++, count++) {
       if (output.length >= 10000) break;
       const at = recurrenceAt(start, r.frequency, Number(r.interval), n);
