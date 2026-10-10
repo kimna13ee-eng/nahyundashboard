@@ -3,6 +3,7 @@ import { json, sameOrigin } from "@/lib/http";
 import { personalClient, personalConfigured } from "@/lib/supabase/server";
 import { phase2Tables, parsePhase2, type Phase2Resource } from "@/lib/phase2";
 import { uuid } from "@/lib/ops";
+import { personalStages } from "@/lib/personal-content";
 async function handle(req: NextRequest) {
   if (
     !["PERSONAL", "ALL"].includes(
@@ -45,8 +46,37 @@ async function handle(req: NextRequest) {
           },
           503,
         );
-      const capability = await client.rpc("ops_recurrence_at", { p_start: "2026-01-31T09:00:00+09:00", p_frequency: "monthly", p_interval: 1, p_index: 1 });
+      const capability = await client.rpc("ops_recurrence_at", {
+        p_start: "2026-01-31T09:00:00+09:00",
+        p_frequency: "monthly",
+        p_interval: 1,
+        p_index: 1,
+      });
       return json({
+        contentHistory: !(
+          await client.from("ops_content_versions").select("id").limit(0)
+        ).error,
+        versions:
+          (
+            await client
+              .from("ops_content_versions")
+              .select("*")
+              .eq("owner_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1000)
+          ).data || [],
+        contentTasks:
+          (
+            await client
+              .from("ops_content_tasks")
+              .select("*")
+              .eq("owner_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1000)
+          ).data || [],
+        personalContent: !(
+          await client.from("ops_content").select("personal_details").limit(0)
+        ).error,
         calendarRecurrence: !capability.error,
         data: Object.fromEntries(results.map((r) => [r.name, r.data])),
         truncated: results
@@ -55,6 +85,22 @@ async function handle(req: NextRequest) {
       });
     }
     const body = await req.json();
+    if (body.action === "content_task") {
+      if (!uuid(body.id) || !personalStages.includes(body.step))
+        return json({ error: "콘텐츠·단계 확인 필요" }, 400);
+      const result = await client.rpc("ops_content_task", {
+        p_content: body.id,
+        p_step: body.step,
+      });
+      return result.error
+        ? json(
+            {
+              error: "단계 업무 연결 실패. SQL008 적용과 권한을 확인해 주세요.",
+            },
+            409,
+          )
+        : json({ ok: true, id: result.data });
+    }
     if (body.action === "recurrence_change") {
       if (
         !uuid(body.id) ||
@@ -109,6 +155,16 @@ async function handle(req: NextRequest) {
           : json({ error: "항목을 찾을 수 없습니다." }, 404);
     }
     const value = parsePhase2(resource, body.value);
+    if (
+      resource === "content" &&
+      "personal_details" in value &&
+      (await client.from("ops_content").select("personal_details").limit(0))
+        .error
+    )
+      return json(
+        { error: "개인 콘텐츠 확장 SQL 006 적용이 필요합니다." },
+        503,
+      );
     const q =
       req.method === "POST"
         ? client.from(table).insert({ ...value, owner_id: user.id })
@@ -130,7 +186,7 @@ async function handle(req: NextRequest) {
     return json(
       {
         error:
-          e instanceof Error && /확인|입력|종료|연차/.test(e.message)
+          e instanceof Error && /확인|입력|종료|연차|검수|발행/.test(e.message)
             ? e.message
             : "요청을 처리하지 못했습니다.",
       },
