@@ -531,15 +531,20 @@ export function OpsShell() {
               <option>FRENGLE</option>
             </select>
           </label>
-          <span className="ops-top-label">
+          <button
+            type="button"
+            className="ops-top-label"
+            aria-label={user ? "개인 계정 설정 열기" : "개인 계정 로그인 열기"}
+            onClick={() => move("settings")}
+          >
             {space === "FRENGLE"
               ? "회사 저장소 미연결"
               : configured === false
                 ? "Supabase 미연결"
                 : user
-                  ? "개인 계정 로그인"
-                  : "로그인 필요"}
-          </span>
+                  ? "개인 계정 설정"
+                  : "개인 계정 로그인"}
+          </button>
           <button
             className="ops-primary"
             disabled={!canWrite}
