@@ -16,6 +16,7 @@ import { ContentAnalyticsPanel } from "./content-analytics-panel";
 import { journalEntries } from "@/lib/journal-report";
 import { JournalExport } from "./journal-export";
 import { attentionTasks, resumeContext } from "@/lib/workflow-context";
+import { calendarLabel, calendarTitle } from "@/lib/mobile-calendar";
 import { contentCalendar } from "@/lib/personal-content";
 import { WorkflowInbox, ParkFields, parkForm } from "./workflow-inbox";
 import { quickStartContext } from "@/lib/quick-start";
@@ -131,6 +132,13 @@ export function OpsShell() {
     [data, setData] = useState<OpsData>({}),
     [user, setUser] = useState<{ email?: string } | null>(null),
     [configured, setConfigured] = useState<boolean | null>(null);
+  const [authState, setAuthState] = useState<
+    "INITIALIZING" | "AUTHENTICATED" | "UNAUTHENTICATED" | "ERROR"
+  >("INITIALIZING");
+  const [calendarDetail, setCalendarDetail] = useState<OpsRow | null>(null);
+  const noteWrites = useRef(new Set<string>());
+  const startSubmit = useRef(false);
+  const [contentFocus, setContentFocus] = useState<string | undefined>();
   const [taskClassification, setTaskClassification] = useState(false);
   const [libraryWorkflow, setLibraryWorkflow] = useState(false);
   const [workflowReady, setWorkflowReady] = useState(false);
@@ -207,6 +215,7 @@ export function OpsShell() {
     : undefined;
   const canWrite =
     Boolean(user) &&
+    authState === "AUTHENTICATED" &&
     configured === true &&
     space !== "FRENGLE" &&
     dataReady &&
@@ -264,10 +273,14 @@ export function OpsShell() {
         if (mounted) {
           setConfigured(s.configured);
           setUser(s.user);
+          setAuthState(s.user ? "AUTHENTICATED" : "UNAUTHENTICATED");
         }
       })
       .catch((e) => {
-        if (mounted) setError(e.message);
+        if (mounted) {
+          setError(e.message);
+          setAuthState("ERROR");
+        }
       });
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") setTick(Date.now());
@@ -296,7 +309,26 @@ export function OpsShell() {
           return;
         if (Date.now() - lastRefresh < 2000) return;
         lastRefresh = Date.now();
-        void load();
+        void (async () => {
+          try {
+            const session = await api("/api/session");
+            setAuthState(session.user ? "AUTHENTICATED" : "UNAUTHENTICATED");
+            if (session.user?.email !== user?.email) setUser(session.user);
+            if (session.user) await load();
+            else {
+              setData({});
+              setDataReady(false);
+              setWorkflowData({});
+              setWorkflowReady(false);
+              setTimerGuardReady(false);
+            }
+          } catch {
+            setAuthState("ERROR");
+            setError(
+              "인증 또는 연결 상태를 확인하지 못했습니다. 새로고침해 주세요.",
+            );
+          }
+        })();
       };
       window.addEventListener("focus", focus);
       window.addEventListener("online", focus);
@@ -401,6 +433,7 @@ export function OpsShell() {
       });
       const session = await api("/api/session");
       setUser(session.user);
+      setAuthState(session.user ? "AUTHENTICATED" : "UNAUTHENTICATED");
       setNotice("개인 계정 로그인 완료");
     } catch (e) {
       setError(e instanceof Error ? e.message : "로그인 실패");
@@ -414,6 +447,7 @@ export function OpsShell() {
       await api("/api/auth", "POST", { action: "logout" });
       generation.current++;
       setUser(null);
+      setAuthState("UNAUTHENTICATED");
       setData({});
       setWorkflowData({});
       setWorkflowReady(false);
@@ -432,6 +466,7 @@ export function OpsShell() {
     }
   }
   function move(id: string) {
+    setContentFocus(undefined);
     setView(id);
     setDetail(null);
     setSearch("");
@@ -610,6 +645,10 @@ export function OpsShell() {
       .map((t) => ({
         id: `due-${t.id}`,
         title: t.title,
+        is_test: t.is_test,
+        status: t.status,
+        project_id: t.project_id,
+        notes: t.notes,
         starts_at: `${t.due_date}T00:00:00+09:00`,
         ends_at: `${t.due_date}T23:59:59+09:00`,
         source: "업무 마감",
@@ -659,7 +698,10 @@ export function OpsShell() {
         </nav>
         <div className="ops-user">
           <strong>PERSONAL 전용</strong>
-          <small>{user?.email || "로그인 전"}</small>
+          <small>
+            {user?.email ||
+              (authState === "INITIALIZING" ? "MY OPS 시작 중" : "로그인 전")}
+          </small>
           {user ? (
             <button disabled={busy} onClick={logout}>
               로그아웃
@@ -672,7 +714,7 @@ export function OpsShell() {
       <div className="ops-main-shell">
         <header className="ops-top">
           <AppRecoveryControls
-            loading={loading || busy}
+            loading={loading || busy || authState === "INITIALIZING"}
             refresh={async () => {
               const session = await api("/api/session").catch(() => null);
               if (session) {
@@ -680,14 +722,27 @@ export function OpsShell() {
                 setConfigured(session.configured);
               }
               if (session?.user) {
-                await load();
-                window.dispatchEvent(new Event("myops:refresh"));
-              } else
-                setError(
+                if (!(await load()))
+                  throw new Error(
+                    "데이터 조회 실패. 연결 후 다시 시도해 주세요.",
+                  );
+                setAuthState("AUTHENTICATED");
+                const waits: Promise<boolean>[] = [];
+                window.dispatchEvent(
+                  new CustomEvent("myops:refresh", { detail: { waits } }),
+                );
+                if ((await Promise.all(waits)).some((ok) => !ok))
+                  throw new Error(
+                    "현재 화면 데이터 조회 실패. 다시 시도해 주세요.",
+                  );
+              } else {
+                setAuthState(session ? "UNAUTHENTICATED" : "ERROR");
+                throw new Error(
                   session
                     ? "설정에서 개인 계정으로 로그인해 주세요."
                     : "인증 상태 조회 실패. 연결 후 다시 시도해 주세요.",
                 );
+              }
             }}
           />
           <label>
@@ -709,16 +764,27 @@ export function OpsShell() {
           <button
             type="button"
             className="ops-top-label"
-            aria-label={user ? "개인 계정 설정 열기" : "개인 계정 로그인 열기"}
+            aria-label={
+              authState === "INITIALIZING"
+                ? "로그인 상태 확인 중"
+                : user
+                  ? "개인 계정 설정 열기"
+                  : "개인 계정 로그인 열기"
+            }
+            disabled={authState === "INITIALIZING"}
             onClick={() => move("settings")}
           >
             {space === "FRENGLE"
               ? "회사 저장소 미연결"
-              : configured === false
-                ? "Supabase 미연결"
-                : user
-                  ? "개인 계정 설정"
-                  : "개인 계정 로그인"}
+              : authState === "INITIALIZING"
+                ? "MY OPS 시작 중 · 인증 복원을 확인하고 있습니다."
+                : authState === "ERROR"
+                  ? "연결 또는 인증 오류. 데이터 새로고침으로 다시 확인해 주세요."
+                  : configured === false
+                    ? "Supabase 미연결"
+                    : user
+                      ? "개인 계정 설정"
+                      : "개인 계정 로그인"}
           </button>
           <button
             className="ops-primary"
@@ -742,6 +808,16 @@ export function OpsShell() {
           </button>
         </header>
         <main className="ops-main">
+          {authState === "INITIALIZING" ? (
+            <p role="status">
+              MY OPS 시작 중 · 로그인 상태를 확인하고 있습니다.
+            </p>
+          ) : null}
+          {authState === "ERROR" ? (
+            <p role="alert">
+              연결 또는 인증 오류 · 새로고침으로 다시 확인해 주세요.
+            </p>
+          ) : null}
           <div className="ops-heading">
             <div>
               <small>YOUR WORK, WITH INTENTION.</small>
@@ -1302,7 +1378,22 @@ export function OpsShell() {
                           {calendarItems
                             .filter((s) => scheduleOverlaps(s, d))
                             .map((s) => (
-                              <small key={s.id}>{text(s.title)}</small>
+                              <button
+                                key={s.id}
+                                className="ops-calendar-event"
+                                aria-label={`${calendarLabel(s)} ${text(s.title)} ${dateTime(s.starts_at)}`}
+                                onClick={() => setCalendarDetail(s)}
+                              >
+                                <span className="ops-calendar-full">
+                                  {text(s.title)}
+                                </span>
+                                <span
+                                  className="ops-calendar-short"
+                                  aria-hidden="true"
+                                >
+                                  {calendarTitle(s)}
+                                </span>
+                              </button>
                             ))}
                         </div>
                       );
@@ -1312,7 +1403,16 @@ export function OpsShell() {
               ) : calendarItems.length ? (
                 calendarItems.map((s) => (
                   <div className="ops-entry" key={s.id}>
-                    <strong>{text(s.title)}</strong>
+                    <button
+                      className="ops-calendar-event"
+                      aria-label={`${calendarLabel(s)} ${text(s.title)}`}
+                      onClick={() => setCalendarDetail(s)}
+                    >
+                      <span className="ops-calendar-full">{text(s.title)}</span>
+                      <span className="ops-calendar-short" aria-hidden="true">
+                        {calendarTitle(s)}
+                      </span>
+                    </button>
                     <small>
                       {text(s.source)} · {dateTime(s.starts_at)} –{" "}
                       {dateTime(s.ends_at)}
@@ -1634,6 +1734,7 @@ export function OpsShell() {
             <Phase2Panel
               key={"content:" + (user?.email || "signed-out") + space}
               resource="content"
+              initialContentId={contentFocus}
               onOpenTask={async (id) => {
                 await load();
                 setDetail(id);
@@ -1697,7 +1798,13 @@ export function OpsShell() {
                         ? "조회 결과 확인"
                         : "로그인 후 조회 검증 필요"}
                   </p>
-                  {!user ? (
+                  {authState === "INITIALIZING" || authState === "ERROR" ? (
+                    <p role="status">
+                      {authState === "INITIALIZING"
+                        ? "로그인 상태 확인 중…"
+                        : "인증 상태 재확인이 필요합니다."}
+                    </p>
+                  ) : !user ? (
                     <form className="ops-form" onSubmit={login}>
                       <label>
                         개인 계정 이메일
@@ -1844,6 +1951,65 @@ export function OpsShell() {
           <span>더보기</span>
         </button>
       </nav>
+      {calendarDetail ? (
+        <OpsDialog
+          title="일정 상세"
+          busy={false}
+          close={() => setCalendarDetail(null)}
+        >
+          <h3>{text(calendarDetail.title)}</h3>
+          <dl className="ops-calendar-detail">
+            <dt>분류</dt>
+            <dd>{calendarLabel(calendarDetail)}</dd>
+            <dt>일정 단계</dt>
+            <dd>{text(calendarDetail.source)}</dd>
+            <dt>시작 (서울 시간)</dt>
+            <dd>{dateTime(calendarDetail.starts_at)}</dd>
+            <dt>종료 (서울 시간)</dt>
+            <dd>{dateTime(calendarDetail.ends_at)}</dd>
+            <dt>상태</dt>
+            <dd>{text(calendarDetail.status) || "기록 없음"}</dd>
+            <dt>프로젝트</dt>
+            <dd>
+              {text(
+                projects.find((p) => p.id === calendarDetail.project_id)?.title,
+              ) || "연결 없음"}
+            </dd>
+            <dt>메모</dt>
+            <dd>{text(calendarDetail.notes) || "기록 없음"}</dd>
+          </dl>
+          <div className="ops-form-actions">
+            <button type="button" data-dialog-close>
+              닫기
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const id =
+                  text(calendarDetail.task_id) ||
+                  text((calendarDetail.task as OpsRow | undefined)?.id);
+                if (id) {
+                  move("projects");
+                  setDetail(id);
+                } else if (calendarDetail.content_id) {
+                  move("content");
+                  setContentFocus(text(calendarDetail.content_id));
+                } else if (calendarDetail.source === "일정")
+                  setEditor({ resource: "schedules", row: calendarDetail });
+                setCalendarDetail(null);
+              }}
+              disabled={
+                !calendarDetail.content_id &&
+                !calendarDetail.task &&
+                !calendarDetail.task_id &&
+                calendarDetail.source !== "일정"
+              }
+            >
+              관련 콘텐츠 / 업무 열기
+            </button>
+          </div>
+        </OpsDialog>
+      ) : null}
       {moreMenu ? (
         <OpsDialog
           title="전체 메뉴"
@@ -1872,22 +2038,104 @@ export function OpsShell() {
           busy={busy}
           close={() => setResumeTask(null)}
         >
+          <p>현재 업무 제목</p>
           <h3>{text(resumeTarget.title)}</h3>
           <form
             className="ops-form"
             onSubmit={async (e) => {
               e.preventDefault();
-              if (
-                await timer(
-                  "start",
-                  resumeTarget.id,
-                  "",
-                  parkForm(new FormData(e.currentTarget)),
-                )
-              )
-                setResumeTask(null);
+              if (startSubmit.current) return;
+              startSubmit.current = true;
+              try {
+                const form = new FormData(e.currentTarget);
+                for (const [kind, body] of [
+                  [
+                    "general",
+                    [
+                      form.get("start_stage"),
+                      form.get("start_note"),
+                      form.get("start_file"),
+                    ]
+                      .filter(Boolean)
+                      .join("\n"),
+                  ],
+                  ["next_action", String(form.get("start_next") || "")],
+                ]) {
+                  if (!body) continue;
+                  const key = resumeTarget.id + kind + body;
+                  if (noteWrites.current.has("uncertain:" + key)) {
+                    setError(
+                      "이전 메모 저장 응답을 확인하지 못했습니다. 업무 상세에서 저장 여부를 먼저 확인하고 새로고침해 주세요.",
+                    );
+                    return;
+                  }
+                  if (!noteWrites.current.has(key)) {
+                    if (
+                      !(await mutate({
+                        resource: "task_notes",
+                        value: {
+                          task_id: resumeTarget.id,
+                          kind,
+                          body,
+                          pinned: false,
+                          done: false,
+                        },
+                      }))
+                    ) {
+                      noteWrites.current.add("uncertain:" + key);
+                      return;
+                    }
+                    noteWrites.current.add(key);
+                  }
+                }
+                if (await timer("start", resumeTarget.id, "", parkForm(form))) {
+                  noteWrites.current.clear();
+                  setResumeTask(null);
+                }
+              } finally {
+                startSubmit.current = false;
+              }
             }}
           >
+            <fieldset disabled={busy}>
+              <legend>이번 업무에서 진행할 내용 (선택)</legend>
+              <label>
+                현재 작업 단계
+                <input
+                  name="start_stage"
+                  maxLength={500}
+                  placeholder="예: 릴스 컷 편집"
+                />
+              </label>
+              <label>
+                특이사항 / 작업 메모
+                <textarea
+                  name="start_note"
+                  maxLength={1200}
+                  placeholder="예: 첫 장면 자막을 수정해야 합니다."
+                />
+              </label>
+              <label>
+                다음 액션
+                <input
+                  name="start_next"
+                  maxLength={2000}
+                  placeholder="예: 썸네일 검수 요청"
+                />
+              </label>
+              <label>
+                관련 파일 또는 결과 URL
+                <input
+                  name="start_file"
+                  maxLength={250}
+                  placeholder="예: 편집 파일 경로 또는 https://…"
+                />
+              </label>
+              <p>
+                입력 내용은 업무 메모로 먼저 저장합니다. 타이머 실패 시 저장된
+                메모는 유지됩니다.
+              </p>
+            </fieldset>
             <p>
               {snapshot ? (
                 "중단 당시 저장한 맥락입니다."
@@ -1973,7 +2221,11 @@ export function OpsShell() {
               className="ops-primary"
               disabled={!canWrite || !timerGuardReady}
             >
-              맥락 확인 후 시작 / 이어하기
+              {busy
+                ? "처리 중…"
+                : snapshot
+                  ? "메모 저장 후 이어하기"
+                  : "메모 저장 후 업무 시작"}
             </button>
           </form>
         </OpsDialog>
@@ -2004,7 +2256,7 @@ export function OpsShell() {
             <ParkFields />
             {error ? <p role="alert">{error}</p> : null}
             <button disabled={!canWrite || !timerGuardReady}>
-              맥락 저장 후 PARKED
+              {busy ? "처리 중…" : "맥락 저장 후 일시정지"}
             </button>
           </form>
         </OpsDialog>

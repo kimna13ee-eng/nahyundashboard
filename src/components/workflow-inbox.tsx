@@ -14,7 +14,18 @@ export function ParkFields() {
       ].map(([key, label]) => (
         <label key={key}>
           {label}
-          <input name={`park:${key}`} maxLength={2000} />
+          <input
+            name={`park:${key}`}
+            maxLength={2000}
+            placeholder={
+              {
+                last_stage: "예: 초안 검수",
+                next_action: "예: 수정 후 재검수 요청",
+                last_file: "예: 작업 파일 경로 또는 결과 URL",
+                reason: "예: 돌발 요청 처리",
+              }[key]
+            }
+          />
         </label>
       ))}
       <p>

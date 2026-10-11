@@ -146,6 +146,12 @@ export function contentCalendar(content: OpsRow[]) {
       .map(([kind, source, at]) => ({
         id: `${kind}-${c.id}`,
         title: c.title,
+        content_id: c.id,
+        content_type: p?.type,
+        is_test: c.is_test,
+        notes: c.notes,
+        status: p?.step || c.stage,
+        project_id: c.project_id,
         starts_at: at,
         ends_at: new Date(Date.parse(String(at)) + 60000).toISOString(),
         source: String(source),

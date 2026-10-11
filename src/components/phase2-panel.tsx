@@ -128,6 +128,7 @@ export function Phase2Panel({
   calendarView = "month",
   onCalendarData,
   onOpenTask,
+  initialContentId,
 }: {
   resource: Exclude<Phase2Resource, "exceptions">;
   enabled: boolean;
@@ -136,6 +137,7 @@ export function Phase2Panel({
   calendarView?: string;
   onCalendarData?: (data: OpsData) => void;
   onOpenTask?: (id: string) => void;
+  initialContentId?: string;
 }) {
   const [data, setData] = useState<OpsData>({}),
     [ready, setReady] = useState(false),
@@ -147,6 +149,18 @@ export function Phase2Panel({
     [query, setQuery] = useState(""),
     [notice, setNotice] = useState(""),
     [scope, setScope] = useState("one");
+  const openedContent = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const row = (data.content || []).find((r) => r.id === initialContentId);
+    if (
+      resource === "content" &&
+      row &&
+      openedContent.current !== initialContentId
+    ) {
+      openedContent.current = initialContentId;
+      queueMicrotask(() => setEditor(row));
+    }
+  }, [data, initialContentId, resource]);
   const [calendarRecurrence, setCalendarRecurrence] = useState(false);
   const [personalContent, setPersonalContent] = useState(false);
   const [contentHistory, setContentHistory] = useState(false),
@@ -207,9 +221,18 @@ export function Phase2Panel({
     };
   }, [enabled, load]);
   useEffect(() => {
-    const refresh = () => {
-      if (enabled && !saving.current && !document.querySelector("dialog[open]"))
-        void load();
+    const refresh = (event: Event) => {
+      if (
+        enabled &&
+        !saving.current &&
+        !document.querySelector("dialog[open]")
+      ) {
+        const promise = load();
+        (
+          event as CustomEvent<{ waits?: Promise<boolean>[] }>
+        )?.detail?.waits?.push(promise);
+        void promise;
+      }
     };
     window.addEventListener("myops:refresh", refresh);
     return () => window.removeEventListener("myops:refresh", refresh);

@@ -815,3 +815,37 @@
  .ops-form input, .ops-form textarea, .ops-form select { font-size: 16px; }
  .ops-modal .ops-section-head { position: sticky; top: 0; z-index: 2; background: white; }
 }
+/* Mobile real-use patch: full titles stay in DOM and DB. */
+.ops-calendar-short { display: none; }
+.ops-calendar-event { text-align: left; overflow-wrap: anywhere; max-width: 100%; }
+.ops-month .ops-calendar-event { display: block; width: 100%; font-size: 10px; padding: 4px; }
+.ops-calendar-detail { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 8px 16px; }
+.ops-calendar-detail dd { margin: 0; overflow-wrap: anywhere; }
+.ops-refresh { display: flex; align-items: center; gap: 6px; }
+.ops-spinning { animation: ops-spin 1s linear infinite; }
+@keyframes ops-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ops-spinning { animation: none; } }
+.ops-saving { padding: 12px 20px; }
+.ops-modal fieldset { display: grid; gap: 14px; min-width: 0; }
+.ops-modal fieldset label { display: grid; gap: 7px; }
+.ops-form-actions { display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 760px) {
+ .ops-top { position: sticky; top: 0; z-index: 25; background: #faf8f5; }
+ .ops-refresh { width: 44px; height: 44px; padding: 10px !important; flex-shrink: 0; }
+ .ops-refresh span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+ .ops-app-recovery { position: relative; min-width: 0; }
+ .ops-app-recovery > p { flex-basis: 100%; max-width: 260px; }
+ .ops-app-recovery details > div { left: 0; max-width: calc(100vw - 32px); }
+ .ops-calendar-full { display: none; }
+ .ops-calendar-short { display: inline; }
+ .ops-month > div { min-width: 0; }
+ .ops-month .ops-calendar-event { min-height: 44px; font-size: 9px; line-height: 1.5; padding: 2px; white-space: normal; }
+ .ops-main button, .ops-modal button, .ops-top button { min-height: 44px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+ .ops-form-actions > button { flex: 1 1 120px; }
+ .ops-timer { flex-wrap: wrap; }
+ .ops-timer > div { min-width: 0; flex: 1; }
+ .ops-timer strong { overflow-wrap: anywhere; }
+ .ops-modal { width: calc(100vw - 24px); max-width: calc(100vw - 24px); }
+ .ops-toolbar { flex-wrap: wrap; }
+ .ops-calendar-detail { grid-template-columns: 1fr; gap: 4px; }
+}
