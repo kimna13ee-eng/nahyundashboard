@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./editorial.css";
+import "./compact.css";
+import "./structured-layout.css";
 export const metadata: Metadata = {
   title: "MY OPS · 개인 업무 관제센터",
   description: "PERSONAL과 FRENGLE을 구분하는 개인 업무 운영 OS",

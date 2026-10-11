@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { OpsDialog } from "./ops-dialog";
+import { OpsFormActions } from "./ops-form-actions";
 import type { OpsRow } from "@/lib/ops";
 export function ParkFields() {
   return (
@@ -83,12 +84,25 @@ export function WorkflowInbox({
   const row: Record<string, unknown> = editor || {};
   return (
     <>
-      <section className="ops-card">
-        <h2>Quick Inbox</h2>
-        <p>
-          PERSONAL · 미분류 아이디어와 돌발 업무. 등록만 하면 현재 타이머를
-          유지합니다.
-        </p>
+      <section className="ops-card ops-inbox">
+        <div className="ops-section-head">
+          <div>
+            <h2>Quick Inbox</h2>
+            <p>
+              PERSONAL · 미분류 아이디어와 돌발 업무. 등록만 하면 현재 타이머를
+              유지합니다.
+            </p>
+          </div>
+          <button
+            disabled={!canWrite}
+            onClick={() => {
+              setRequestId(crypto.randomUUID());
+              setOpen(true);
+            }}
+          >
+            빠르게 수집
+          </button>
+        </div>
         {checking ? (
           <p role="status">저장소 연결을 확인하고 있습니다.</p>
         ) : !enabled ? (
@@ -100,18 +114,13 @@ export function WorkflowInbox({
           </p>
         ) : null}
         <div className="ops-toolbar">
-          <button
-            disabled={!canWrite}
-            onClick={() => {
-              setRequestId(crypto.randomUUID());
-              setOpen(true);
-            }}
-          >
-            빠르게 수집
-          </button>
           <label>
             Inbox 보기
-            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <select
+              aria-label="Inbox 분류 필터"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
               <option value="inbox">미분류</option>
               <option value="converted">업무로 변환됨</option>
               <option value="archived">보관</option>
@@ -174,7 +183,10 @@ export function WorkflowInbox({
             </div>
           ))}
         {ready && !items.some((i) => i.status === filter) ? (
-          <p>이 분류에 등록된 항목이 없습니다.</p>
+          <div className="ops-empty-state">
+            <strong>등록된 항목이 없습니다.</strong>
+            <p>빠르게 수집한 항목은 선택한 분류에서 확인할 수 있습니다.</p>
+          </div>
         ) : null}
       </section>
       {open ? (
@@ -299,14 +311,16 @@ export function WorkflowInbox({
                   <ParkFields />
                 </>
               ) : null}
-              <div className="ops-actions">
-                <button value="inbox">Inbox에 보관</button>
+              <OpsFormActions busy={busy}>
+                <button className="ops-primary" value="inbox">
+                  Inbox에 보관
+                </button>
                 <button value="now" disabled={!canStart}>
                   지금 처리
                 </button>
                 <button value="schedule">일정 잡기</button>
                 {editor ? <button value="task">업무로 변환</button> : null}
-              </div>
+              </OpsFormActions>
             </fieldset>
             {!ready ? (
               <p>연결 확인이 완료될 때까지 저장할 수 없습니다.</p>

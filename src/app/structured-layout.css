@@ -1,0 +1,123 @@
+/* Shared header / toolbar / content hierarchy, layered over the preserved base. */
+.editorial {
+  --layout-gap: 12px;
+}
+.editorial .ops-card > h2 {
+  margin: 0;
+  padding: 16px 20px 4px;
+  font-size: 17px;
+  font-weight: 650;
+}
+.editorial .ops-card > h2 + p {
+  margin: 0;
+  padding: 0 20px 12px;
+  color: var(--action-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.editorial .ops-card > .ops-toolbar {
+  margin: 0;
+  padding: 12px 20px;
+  border-block: 1px solid var(--line);
+}
+.editorial .ops-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.editorial .ops-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+.editorial .ops-section-head {
+  gap: 8px 12px;
+  align-items: center;
+}
+.editorial .ops-section-head h2 {
+  font-size: 17px;
+  line-height: 1.4;
+}
+.editorial .ops-section-head p {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.editorial .ops-card:not(.ops-leave-records) > .ops-note {
+  margin-inline: 20px;
+}
+.editorial .ops-card > .ops-empty-state {
+  margin: 16px 20px;
+}
+.editorial .ops-empty-state {
+  padding: 16px;
+  background: #f8f6fa;
+  border: 1px dashed #d7d0df;
+  border-radius: 6px;
+}
+.editorial .ops-empty-state p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--action-muted);
+}
+.editorial .ops-inbox .ops-section-head {
+  padding: 16px 20px;
+}
+.editorial .ops-inbox .ops-section-head > div {
+  min-width: 0;
+}
+.editorial .ops-inbox .ops-toolbar select {
+  min-width: 140px;
+  max-width: 100%;
+}
+.editorial .ops-inbox > p[role="status"] {
+  padding-inline: 20px;
+  font-size: 13px;
+}
+.editorial .ops-artifact-hash {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.editorial .ops-download-section .ops-detail {
+  display: grid;
+  gap: 10px;
+}
+.editorial .ops-download-section .ops-detail > p {
+  margin: 0;
+}
+.editorial .ops-download-section button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (max-width: 600px) {
+  .editorial .ops-section-head {
+    flex-wrap: wrap;
+  }
+  .editorial .ops-card > h2 {
+    padding-inline: 16px;
+  }
+  .editorial .ops-card > h2 + p,
+  .editorial .ops-card > .ops-toolbar {
+    padding-inline: 16px;
+  }
+  .editorial .ops-card:not(.ops-leave-records) > .ops-note,
+  .editorial .ops-card > .ops-empty-state {
+    margin-inline: 16px;
+  }
+  .editorial .ops-inbox .ops-section-head {
+    padding: 16px;
+  }
+  .editorial .ops-inbox .ops-toolbar label {
+    flex-wrap: wrap;
+  }
+  .editorial .ops-desktop-download-shortcut {
+    display: none;
+  }
+}

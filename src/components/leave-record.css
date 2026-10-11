@@ -1,0 +1,70 @@
+/* Leave-only alignment layer; Compact UI tokens and data behavior stay intact. */
+.editorial .ops-leave-records {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  min-width: 0;
+}
+.editorial .ops-leave-records > .ops-section-head {
+  padding: 0;
+  align-items: flex-start;
+}
+.editorial .ops-leave-records > p,
+.editorial .ops-leave-records .ops-note p {
+  margin: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-leave-records > button {
+  justify-self: start;
+}
+.editorial .ops-leave-records > input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.editorial .ops-leave-records .ops-note {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 12px 0;
+}
+.editorial .ops-leave-records .ops-note > strong,
+.editorial .ops-leave-records .ops-note > p {
+  grid-column: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-leave-records .ops-note > button {
+  grid-row: 1 / span 3;
+  margin: 0;
+}
+.editorial .ops-leave-records .ops-note > button:not(.ops-danger) {
+  grid-column: 2;
+}
+.editorial .ops-leave-records .ops-note > .ops-danger {
+  grid-column: 3;
+}
+.editorial .ops-leave-form > label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  line-height: 1.5;
+}
+.editorial .ops-leave-form input,
+.editorial .ops-leave-form select {
+  box-sizing: border-box;
+  min-height: 34px;
+  height: 34px;
+  width: 100%;
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .editorial .ops-leave-records { padding: 16px; }
+  .editorial .ops-leave-records > .ops-section-head { flex-wrap: wrap; }
+  .editorial .ops-leave-records .ops-note { grid-template-columns: minmax(0, 1fr) auto; }
+  .editorial .ops-leave-records .ops-note > button { grid-row: auto; }
+  .editorial .ops-leave-records .ops-note > button:not(.ops-danger) { grid-column: 1; justify-self: start; }
+  .editorial .ops-leave-records .ops-note > .ops-danger { grid-column: 2; }
+}

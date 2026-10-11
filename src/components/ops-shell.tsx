@@ -8,6 +8,8 @@ import {
 } from "react";
 import Link from "next/link";
 import { OpsDialog } from "./ops-dialog";
+import { OpsFormActions } from "./ops-form-actions";
+import { DesktopDownload } from "./desktop-download";
 import { AppRecoveryControls } from "./app-recovery-controls";
 import { occurrences } from "@/lib/phase2";
 import { Phase2Panel } from "./phase2-panel";
@@ -476,6 +478,7 @@ export function OpsShell() {
   const taskActions = (t: OpsRow) => (
     <div className="ops-actions">
       <button
+        className="ops-icon"
         title="작업 시작 / 재개"
         aria-label={`${t.title} 작업 시작`}
         disabled={!canWrite || !timerGuardReady || active?.task_id === t.id}
@@ -484,6 +487,7 @@ export function OpsShell() {
         <Play size={15} />
       </button>
       <button
+        className="ops-icon"
         aria-label={`${t.title} 수정`}
         disabled={!canWrite}
         onClick={() => setEditor({ resource: "tasks", row: t })}
@@ -491,6 +495,7 @@ export function OpsShell() {
         <Pencil size={15} />
       </button>
       <button
+        className="ops-icon ops-danger"
         aria-label={`${t.title} 삭제`}
         disabled={!canWrite}
         onClick={() => setDeleteTarget({ resource: "tasks", row: t })}
@@ -578,6 +583,7 @@ export function OpsShell() {
   const itemActions = (resource: Resource, row: OpsRow) => (
     <div className="ops-actions">
       <button
+        className="ops-icon"
         disabled={!canWrite}
         aria-label={`${row.title || "메모"} 수정`}
         onClick={() => setEditor({ resource, row, taskId: text(row.task_id) })}
@@ -585,6 +591,7 @@ export function OpsShell() {
         <Pencil size={15} />
       </button>
       <button
+        className="ops-icon ops-danger"
         disabled={!canWrite}
         aria-label={`${row.title || "메모"} 삭제`}
         onClick={() => setDeleteTarget({ resource, row })}
@@ -713,6 +720,7 @@ export function OpsShell() {
       </aside>
       <div className="ops-main-shell">
         <header className="ops-top">
+          <DesktopDownload compact signedIn={Boolean(user)} />
           <AppRecoveryControls
             loading={loading || busy || authState === "INITIALIZING"}
             refresh={async () => {
@@ -1319,6 +1327,7 @@ export function OpsShell() {
                   ))}
                 </div>
                 <button
+                  className="ops-icon"
                   aria-label="이전 날짜"
                   onClick={() => dayShift(calendarView === "week" ? -7 : -1)}
                 >
@@ -1331,6 +1340,7 @@ export function OpsShell() {
                   onChange={(e) => setDay(e.target.value || today)}
                 />
                 <button
+                  className="ops-icon"
                   aria-label="다음 날짜"
                   onClick={() => dayShift(calendarView === "week" ? 7 : 1)}
                 >
@@ -1597,6 +1607,7 @@ export function OpsShell() {
                       <div className="ops-entry-title">
                         <strong>{text(l.title)}</strong>
                         <button
+                          className="ops-icon"
                           disabled={!canWrite}
                           aria-label={`${l.title} 즐겨찾기`}
                           onClick={() =>
@@ -1864,6 +1875,7 @@ export function OpsShell() {
               </section>
             </div>
           ) : null}
+          {view === "settings" ? <DesktopDownload signedIn={Boolean(user)} /> : null}
           {view === "settings" ? (
             <Phase2Panel
               key={"leave:" + (user?.email || "signed-out") + space}
@@ -2217,16 +2229,18 @@ export function OpsShell() {
               <ParkFields />
             ) : null}
             {error ? <p role="alert">{error}</p> : null}
-            <button
-              className="ops-primary"
-              disabled={!canWrite || !timerGuardReady}
-            >
-              {busy
-                ? "처리 중…"
-                : snapshot
-                  ? "메모 저장 후 이어하기"
-                  : "메모 저장 후 업무 시작"}
-            </button>
+            <OpsFormActions busy={busy}>
+              <button
+                className="ops-primary"
+                disabled={!canWrite || !timerGuardReady}
+              >
+                {busy
+                  ? "처리 중…"
+                  : snapshot
+                    ? "메모 저장 후 이어하기"
+                    : "메모 저장 후 업무 시작"}
+              </button>
+            </OpsFormActions>
           </form>
         </OpsDialog>
       ) : null}
@@ -2255,9 +2269,14 @@ export function OpsShell() {
             <h3>{text(tasks.find((t) => t.id === parkOpen.task_id)?.title)}</h3>
             <ParkFields />
             {error ? <p role="alert">{error}</p> : null}
-            <button disabled={!canWrite || !timerGuardReady}>
-              {busy ? "처리 중…" : "맥락 저장 후 일시정지"}
-            </button>
+            <OpsFormActions busy={busy}>
+              <button
+                className="ops-primary"
+                disabled={!canWrite || !timerGuardReady}
+              >
+                {busy ? "처리 중…" : "맥락 저장 후 일시정지"}
+              </button>
+            </OpsFormActions>
           </form>
         </OpsDialog>
       ) : null}
@@ -2297,18 +2316,20 @@ export function OpsShell() {
               {error}
             </p>
           ) : null}
-          <button
-            className="ops-danger"
-            disabled={busy}
-            onClick={() =>
-              mutate(
-                { resource: deleteTarget.resource, id: deleteTarget.row.id },
-                "DELETE",
-              )
-            }
-          >
-            삭제
-          </button>
+          <OpsFormActions busy={busy}>
+            <button
+              className="ops-danger"
+              disabled={busy}
+              onClick={() =>
+                mutate(
+                  { resource: deleteTarget.resource, id: deleteTarget.row.id },
+                  "DELETE",
+                )
+              }
+            >
+              삭제
+            </button>
+          </OpsFormActions>
         </OpsDialog>
       ) : null}
       {quickLog ? (
@@ -2385,9 +2406,11 @@ export function OpsShell() {
                 {error}
               </p>
             ) : null}
-            <button className="ops-primary" disabled={!canWrite}>
-              {busy ? "저장 중…" : "기록 저장"}
-            </button>
+            <OpsFormActions busy={busy}>
+              <button className="ops-primary" disabled={!canWrite}>
+                {busy ? "저장 중…" : "기록 저장"}
+              </button>
+            </OpsFormActions>
           </form>
         </OpsDialog>
       ) : null}
@@ -2469,12 +2492,14 @@ export function OpsShell() {
             </label>
             <p>요약 없이 종료해도 시간 기록은 보존됩니다.</p>
             {error ? <p className="ops-alert bad">{error}</p> : null}
-            <button
-              className="ops-primary"
-              disabled={!canWrite || !timerGuardReady}
-            >
-              작업 종료
-            </button>
+            <OpsFormActions busy={busy}>
+              <button
+                className="ops-primary"
+                disabled={!canWrite || !timerGuardReady}
+              >
+                작업 종료
+              </button>
+            </OpsFormActions>
           </form>
         </OpsDialog>
       ) : null}

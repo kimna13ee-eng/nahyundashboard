@@ -105,7 +105,12 @@ export function OpsDialog({
     >
       <div className="ops-section-head">
         <h2>{title}</h2>
-        <button aria-label="닫기" disabled={busy} onClick={safeClose}>
+        <button
+          className="ops-icon"
+          aria-label="닫기"
+          disabled={busy}
+          onClick={safeClose}
+        >
           ×
         </button>
       </div>
@@ -121,24 +126,26 @@ export function OpsDialog({
           aria-label="미저장 입력 확인"
         >
           <p>작성 중인 내용이 있습니다. 저장하지 않고 닫을까요?</p>
-          <button
-            type="button"
-            autoFocus
-            onClick={() => {
-              setConfirmDiscard(false);
-              requestAnimationFrame(() => lastInput.current?.focus());
-            }}
-          >
-            계속 작성
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            className="ops-danger"
-            onClick={close}
-          >
-            저장하지 않고 닫기
-          </button>
+          <div className="ops-form-actions">
+            <button
+              type="button"
+              autoFocus
+              onClick={() => {
+                setConfirmDiscard(false);
+                requestAnimationFrame(() => lastInput.current?.focus());
+              }}
+            >
+              계속 작성
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              className="ops-danger"
+              onClick={close}
+            >
+              저장하지 않고 닫기
+            </button>
+          </div>
         </div>
       ) : null}
       <div className="ops-detail" inert={confirmDiscard}>

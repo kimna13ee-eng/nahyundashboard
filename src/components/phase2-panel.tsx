@@ -1,6 +1,9 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { OpsDialog } from "./ops-dialog";
+import { OpsFormActions } from "./ops-form-actions";
+import { RecurringScheduleRow } from "./recurring-schedule-row";
+import "./leave-record.css";
 import { occurrences, type Phase2Resource } from "@/lib/phase2";
 import { scheduleOverlaps, type OpsData, type OpsRow } from "@/lib/ops";
 import { metricKeys, personalTemplates } from "@/lib/personal-content";
@@ -319,7 +322,7 @@ export function Phase2Panel({
     }
   }
   return (
-    <section className="ops-card">
+    <section className={`ops-card${resource === "leave" ? " ops-leave-records" : ""}`}>
       <div className="ops-section-head">
         <div>
           <h2>{labels[resource]}</h2>
@@ -402,188 +405,193 @@ export function Phase2Panel({
           아이디어만 집계합니다. 외부 트렌드 수집·자동 업로드는 미연결입니다.
         </p>
       ) : null}
-      {filtered.slice(0, 300).map((r) => (
-        <div className="ops-note" key={r.id}>
-          <strong>{String(r.title)}</strong>
-          <p>{String(r.notes || "")}</p>
-          {resource === "content" ? (
-            <p>
-              {
-                fields.content
-                  .find((f) => f.key === "stage")
-                  ?.choices?.find(([k]) => k === r.stage)?.[1]
-              }{" "}
-              · {String(r.channel || "채널 미지정")} · 승인{" "}
-              {
-                fields.content
-                  .find((f) => f.key === "approval")
-                  ?.choices?.find(([key]) => key === r.approval)?.[1]
-              }{" "}
-              ·{" "}
-              {r.publish_at
-                ? local(r.publish_at).replace("T", " ")
-                : "발행일 없음"}
-            </p>
-          ) : null}
-          {resource === "content" ? (
-            <details>
-              <summary>검수·수정·성과 버전 이력</summary>
-              {contentHistory ? (
-                versions
-                  .filter((v) => v.content_id === r.id)
-                  .map((v) => {
-                    const snapshot = v.snapshot as OpsRow,
-                      details = snapshot.personal_details as
-                        | Record<string, unknown>
-                        | undefined;
-                    return (
-                      <div key={v.id}>
-                        <strong>
-                          버전 {String(v.version)} ·{" "}
-                          {local(v.created_at).replace("T", " ")}
-                        </strong>
-                        <p>
-                          {String(details?.step || snapshot.stage)} · 검수{" "}
-                          {String(details?.review || snapshot.approval)} · 담당{" "}
-                          {String(details?.reviewer || "기록 없음")}
-                        </p>
-                        <p>
-                          수정 사유:{" "}
-                          {String(details?.change_reason || "기록 없음")}
-                        </p>
-                        <p>
-                          검수 메모:{" "}
-                          {String(details?.review_notes || "기록 없음")}
-                        </p>
-                        <p>
-                          검수 날짜:{" "}
-                          {details?.reviewed_at
-                            ? local(details.reviewed_at).replace("T", " ")
-                            : "기록 없음"}
-                        </p>
-                        {details?.metrics_at ? (
-                          <p>
-                            성과 기준{" "}
-                            {local(details.metrics_at).replace("T", " ")} ·
-                            조회수 {String(details.views ?? "미기록")} · 저장{" "}
-                            {String(details.saves ?? "미기록")}
-                          </p>
-                        ) : null}
-                      </div>
-                    );
-                  })
-              ) : (
-                <p>
-                  버전 원장은 SQL008 적용 후 보존합니다. 현재 저장된 상세는
-                  그대로 유지합니다.
-                </p>
-              )}
-            </details>
-          ) : null}
-          {resource === "content" && r.personal_details ? (
-            <>
-              <button
-                disabled={!canWrite || !contentHistory}
-                onClick={() =>
-                  void save({
-                    action: "content_task",
-                    id: r.id,
-                    step: (r.personal_details as Record<string, unknown>).step,
-                  })
-                }
-              >
-                현재 제작 단계 업무 연결
-              </button>
-              {contentTasks
-                .filter((t) => t.content_id === r.id)
-                .map((t) => (
-                  <button
-                    key={t.id}
-                    disabled={!onOpenTask || busy}
-                    onClick={() => onOpenTask?.(String(t.task_id))}
-                  >
-                    {String(t.step)} 업무·시간 기록 열기
-                  </button>
-                ))}
-            </>
-          ) : null}
-          {resource === "inspiration" ? (
-            <p>
-              {String(r.category)} · {r.inbox ? "Inbox" : "보관"}{" "}
-              {r.favorite ? "★" : ""}
-            </p>
-          ) : null}
-          {resource === "leave" ? (
-            <p>
-              {String(r.date)} · {String(r.amount)}일
-            </p>
-          ) : null}
-          {resource === "recurrence" ? (
-            <p>
-              {local(r.starts_at).replace("T", " ")} ~{" "}
-              {local(r.ends_at).replace("T", " ")}
-            </p>
-          ) : null}
-          {resource === "recurrence" ? (
-            <label>
-              수행 상태
-              <select
-                aria-label={`${r.title} ${r.original_at} 수행 상태`}
-                value={recurrenceStatus(
-                  r,
-                  runs.find(
-                    (run) =>
-                      run.rule_id === r.rule_id &&
-                      Date.parse(String(run.original_at)) ===
-                        Date.parse(String(r.original_at)),
-                  ),
-                  now,
-                )}
-                disabled={!canWrite || !runReady}
-                onChange={(e) => void recordRun(r, e.target.value)}
-              >
-                {Object.entries(runStates).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          {r.url || r.result_url ? (
-            <a
-              href={String(r.url || r.result_url)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              원본 링크 열기
-            </a>
-          ) : null}
-          <button
+      {filtered.slice(0, 300).map((r) =>
+        resource === "recurrence" ? (
+          <RecurringScheduleRow
+            key={r.id}
+            row={r}
+            start={local(r.starts_at).replace("T", " ")}
+            end={local(r.ends_at).replace("T", " ")}
+            status={recurrenceStatus(
+              r,
+              runs.find(
+                (run) =>
+                  run.rule_id === r.rule_id &&
+                  Date.parse(String(run.original_at)) ===
+                    Date.parse(String(r.original_at)),
+              ),
+              now,
+            )}
+            states={runStates}
             disabled={!canWrite}
-            onClick={() => {
+            statusDisabled={!canWrite || !runReady}
+            onStatus={(value) => void recordRun(r, value)}
+            onEdit={() => {
               setError("");
               setScope("one");
               setUncertainSave(false);
               setEditor(r);
             }}
-            aria-label={`${r.title} 수정`}
-          >
-            수정
-          </button>
-          <button
-            disabled={!canWrite}
-            onClick={() => {
+            onRemove={() => {
               setError("");
               setScope("one");
               setRemoval(r);
             }}
-            aria-label={`${r.title} 삭제`}
-          >
-            삭제
-          </button>
-        </div>
-      ))}
+          />
+        ) : (
+          <div className="ops-note" key={r.id}>
+            <strong>{String(r.title)}</strong>
+            <p>{String(r.notes || "")}</p>
+            {resource === "content" ? (
+              <p>
+                {
+                  fields.content
+                    .find((f) => f.key === "stage")
+                    ?.choices?.find(([k]) => k === r.stage)?.[1]
+                }{" "}
+                · {String(r.channel || "채널 미지정")} · 승인{" "}
+                {
+                  fields.content
+                    .find((f) => f.key === "approval")
+                    ?.choices?.find(([key]) => key === r.approval)?.[1]
+                }{" "}
+                ·{" "}
+                {r.publish_at
+                  ? local(r.publish_at).replace("T", " ")
+                  : "발행일 없음"}
+              </p>
+            ) : null}
+            {resource === "content" ? (
+              <details>
+                <summary>검수·수정·성과 버전 이력</summary>
+                {contentHistory ? (
+                  versions
+                    .filter((v) => v.content_id === r.id)
+                    .map((v) => {
+                      const snapshot = v.snapshot as OpsRow,
+                        details = snapshot.personal_details as
+                          | Record<string, unknown>
+                          | undefined;
+                      return (
+                        <div key={v.id}>
+                          <strong>
+                            버전 {String(v.version)} ·{" "}
+                            {local(v.created_at).replace("T", " ")}
+                          </strong>
+                          <p>
+                            {String(details?.step || snapshot.stage)} · 검수{" "}
+                            {String(details?.review || snapshot.approval)} ·
+                            담당 {String(details?.reviewer || "기록 없음")}
+                          </p>
+                          <p>
+                            수정 사유:{" "}
+                            {String(details?.change_reason || "기록 없음")}
+                          </p>
+                          <p>
+                            검수 메모:{" "}
+                            {String(details?.review_notes || "기록 없음")}
+                          </p>
+                          <p>
+                            검수 날짜:{" "}
+                            {details?.reviewed_at
+                              ? local(details.reviewed_at).replace("T", " ")
+                              : "기록 없음"}
+                          </p>
+                          {details?.metrics_at ? (
+                            <p>
+                              성과 기준{" "}
+                              {local(details.metrics_at).replace("T", " ")} ·
+                              조회수 {String(details.views ?? "미기록")} · 저장{" "}
+                              {String(details.saves ?? "미기록")}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                ) : (
+                  <p>
+                    버전 원장은 SQL008 적용 후 보존합니다. 현재 저장된 상세는
+                    그대로 유지합니다.
+                  </p>
+                )}
+              </details>
+            ) : null}
+            {resource === "content" && r.personal_details ? (
+              <>
+                <button
+                  disabled={!canWrite || !contentHistory}
+                  onClick={() =>
+                    void save({
+                      action: "content_task",
+                      id: r.id,
+                      step: (r.personal_details as Record<string, unknown>)
+                        .step,
+                    })
+                  }
+                >
+                  현재 제작 단계 업무 연결
+                </button>
+                {contentTasks
+                  .filter((t) => t.content_id === r.id)
+                  .map((t) => (
+                    <button
+                      key={t.id}
+                      disabled={!onOpenTask || busy}
+                      onClick={() => onOpenTask?.(String(t.task_id))}
+                    >
+                      {String(t.step)} 업무·시간 기록 열기
+                    </button>
+                  ))}
+              </>
+            ) : null}
+            {resource === "inspiration" ? (
+              <p>
+                {String(r.category)} · {r.inbox ? "Inbox" : "보관"}{" "}
+                {r.favorite ? "★" : ""}
+              </p>
+            ) : null}
+            {resource === "leave" ? (
+              <p>
+                {String(r.date)} · {String(r.amount)}일
+              </p>
+            ) : null}
+            {r.url || r.result_url ? (
+              <a
+                className="ops-link-action"
+                href={String(r.url || r.result_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                원본 링크 열기
+              </a>
+            ) : null}
+            <button
+              disabled={!canWrite}
+              onClick={() => {
+                setError("");
+                setScope("one");
+                setUncertainSave(false);
+                setEditor(r);
+              }}
+              aria-label={`${r.title} 수정`}
+            >
+              수정
+            </button>
+            <button
+              className="ops-danger"
+              disabled={!canWrite}
+              onClick={() => {
+                setError("");
+                setScope("one");
+                setRemoval(r);
+              }}
+              aria-label={`${r.title} 삭제`}
+            >
+              삭제
+            </button>
+          </div>
+        ),
+      )}
       {ready && !filtered.length ? (
         <p>
           {list.length
@@ -699,7 +707,7 @@ export function Phase2Panel({
         >
           <form
             key={scope}
-            className="ops-form"
+            className={`ops-form${resource === "leave" ? " ops-leave-form" : ""}`}
             onSubmit={(e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
@@ -1094,7 +1102,11 @@ export function Phase2Panel({
               </label>
             ) : null}
             {error ? <p role="alert">{error}</p> : null}
-            <button disabled={busy || uncertainSave}>저장</button>
+            <OpsFormActions busy={busy}>
+              <button className="ops-primary" disabled={busy || uncertainSave}>
+                저장
+              </button>
+            </OpsFormActions>
           </form>
         </OpsDialog>
       ) : null}
@@ -1116,22 +1128,25 @@ export function Phase2Panel({
             </label>
           ) : null}
           {error ? <p role="alert">{error}</p> : null}
-          <button
-            disabled={busy}
-            onClick={() =>
-              resource === "recurrence"
-                ? save({
-                    action: "recurrence_change",
-                    id: removal.rule_id,
-                    original_at: removal.original_at,
-                    scope,
-                    cancel: true,
-                  })
-                : save({ resource, id: removal.id }, "DELETE")
-            }
-          >
-            삭제
-          </button>
+          <OpsFormActions busy={busy}>
+            <button
+              className="ops-danger"
+              disabled={busy}
+              onClick={() =>
+                resource === "recurrence"
+                  ? save({
+                      action: "recurrence_change",
+                      id: removal.rule_id,
+                      original_at: removal.original_at,
+                      scope,
+                      cancel: true,
+                    })
+                  : save({ resource, id: removal.id }, "DELETE")
+              }
+            >
+              삭제
+            </button>
+          </OpsFormActions>
         </OpsDialog>
       ) : null}
     </section>
