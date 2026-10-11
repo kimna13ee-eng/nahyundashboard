@@ -127,8 +127,10 @@ export function contentCalendar(content: OpsRow[]) {
     return [
       ["shoot", "콘텐츠 촬영", p?.shoot_at],
       ["edit", "콘텐츠 편집", p?.edit_at],
-      ["publish", "콘텐츠 발행", c.publish_at],
-      ...(Array.isArray(p?.performance_checks) && p?.published_at
+      ["publish", "콘텐츠 발행 예정", c.publish_at],
+      ["actual-publish", "콘텐츠 실제 발행", p?.published_at],
+      ...(Array.isArray(p?.performance_checks) &&
+      Number.isFinite(Date.parse(String(p?.published_at)))
         ? p.performance_checks
             .filter((h) => [24, 72, 168].includes(Number(h)))
             .map((h) => [

@@ -1,5 +1,6 @@
 "use client";
 import { workKindSeconds } from "@/lib/work-kind";
+import { isVerificationRecord } from "@/lib/content-analytics";
 import { useState } from "react";
 import {
   intervalSeconds,
@@ -22,11 +23,7 @@ export function AnalyticsPanel({
   const [excludeTests, setExcludeTests] = useState(true);
   const [date, setDate] = useState(day);
   const tasks = (data.tasks || []).filter(
-    (t) =>
-      !excludeTests ||
-      !/^\[(?:Time Tracker|CRUD|Quick Log|Calendar) 테스트/.test(
-        String(t.title),
-      ),
+    (t) => !excludeTests || !isVerificationRecord(t),
   );
   const taskIds = new Set(tasks.map((t) => t.id));
   const sessions = (data.work_sessions || []).filter((s) =>
@@ -70,8 +67,18 @@ export function AnalyticsPanel({
             {switches.length}회
           </p>
           <h3>선택 날짜 업무 분류별 작업 시간</h3>
-          {taskClassification ? <p>계획 업무 {fmt(kindTimes.planned)} · 돌발 업무 {fmt(kindTimes.unexpected)} · 미분류 {fmt(kindTimes.unclassified)}</p> : <p>업무 분류 DB 미적용: 005 SQL 적용 후 집계합니다.</p>}
-          <p>현재 업무 분류를 기준으로 과거 작업 시간도 집계합니다. 기존 업무는 미분류이며 자동 추정하지 않습니다.</p>
+          {taskClassification ? (
+            <p>
+              계획 업무 {fmt(kindTimes.planned)} · 돌발 업무{" "}
+              {fmt(kindTimes.unexpected)} · 미분류 {fmt(kindTimes.unclassified)}
+            </p>
+          ) : (
+            <p>업무 분류 DB 미적용: 005 SQL 적용 후 집계합니다.</p>
+          )}
+          <p>
+            현재 업무 분류를 기준으로 과거 작업 시간도 집계합니다. 기존 업무는
+            미분류이며 자동 추정하지 않습니다.
+          </p>
           <h3>프로젝트별 전체 작업 시간</h3>
           {(data.projects || []).map((p) => {
             const tids = new Set(
@@ -115,7 +122,8 @@ export function AnalyticsPanel({
           })}
           {!tasks.length ? <p>집계할 업무가 없습니다.</p> : null}
           <p>
-            외부 자동화는 미연결입니다. 조회 제한이 있는 경우 전체 통계가 아닙니다.
+            외부 자동화는 미연결입니다. 조회 제한이 있는 경우 전체 통계가
+            아닙니다.
           </p>
         </>
       )}

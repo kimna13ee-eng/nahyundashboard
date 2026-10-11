@@ -68,7 +68,7 @@ test("개인 콘텐츠 촬영·편집·발행과 실제 시각·성과 검증", 
         publish_at: "2026-10-13T09:00:00+09:00",
       },
     ]).length,
-    3,
+    4,
   );
   assert.throws(() =>
     parsePersonalContent({

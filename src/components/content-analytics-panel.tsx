@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { contentStages, contentSummary } from "@/lib/content-analytics";
 import type { OpsRow } from "@/lib/ops";
-import { isVerificationTitle } from "@/lib/content-analytics";
+import { isVerificationRecord } from "@/lib/content-analytics";
 
 export function ContentAnalyticsPanel({
   enabled,
@@ -226,7 +226,7 @@ export function ContentAnalyticsPanel({
                     {rows
                       .filter(
                         (r) =>
-                          (!excludeTests || !isVerificationTitle(r.title)) &&
+                          (!excludeTests || !isVerificationRecord(r)) &&
                           (channel === "all" ||
                             String(r.channel || "") === channel) &&
                           (project === "all" ||

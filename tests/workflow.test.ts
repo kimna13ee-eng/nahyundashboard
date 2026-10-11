@@ -125,12 +125,12 @@ test("개인 체크리스트·협찬·옵트인 성과 점검과 프롬프트 �
   });
   assert.equal(p.sponsored, true);
   assert.ok(String(p.checklist).includes("BGM"));
-  assert.equal(contentCalendar([{ id: "c", personal_details: p }]).length, 3);
+  assert.equal(contentCalendar([{ id: "c", personal_details: p }]).length, 4);
   assert.equal(
     contentCalendar([
       { id: "c", personal_details: { ...p, performance_checks: [] } },
     ]).length,
-    0,
+    1,
   );
   assert.throws(() => parsePersonalContent({ ...p, performance_checks: [2] }));
   const text = "  원문\n\n${literal}\n";

@@ -580,6 +580,29 @@ export function Phase2Panel({
               </p>
             ) : null}
           </details>
+          <details>
+            <summary>전체 실행 원장 (완료 포함)</summary>
+            {runs.map((r) => (
+              <div className="ops-note" key={r.id}>
+                <strong>{String(r.title)}</strong>
+                <p>
+                  {local(r.original_at).replace("T", " ")} ·{" "}
+                  {runStates[r.status as keyof typeof runStates]}
+                </p>
+                {r.notes ? <p>{String(r.notes)}</p> : null}
+                {r.confirmed_at ? (
+                  <small>
+                    완료 확인: {local(r.confirmed_at).replace("T", " ")}
+                  </small>
+                ) : null}
+              </div>
+            ))}
+            {!runs.length ? (
+              <p>
+                저장된 실행 기록이 없습니다. 예정 회차는 실행 기록과 구분합니다.
+              </p>
+            ) : null}
+          </details>
         </>
       ) : null}
       {resource === "recurrence" && ready ? (

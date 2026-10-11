@@ -64,6 +64,14 @@ async function handle(req: NextRequest) {
       if (!["inbox", "task", "now", "schedule", "archive"].includes(b.mode))
         return json({ error: "수집 동작 확인 필요" }, 400);
       const value = parseCapture(b.value);
+      if (b.mode === "now") {
+        const guard = await client.rpc("ops_timer_guard_ready");
+        if (guard.error || guard.data !== true)
+          return json(
+            { error: "타이머 보호 SQL010 적용·연결 확인이 필요합니다." },
+            503,
+          );
+      }
       const context = parseParkContext(b.context || {});
       if (b.mode === "schedule" && !value.schedule_at)
         return json({ error: "일정 시각을 입력해 주세요." }, 400);
@@ -79,6 +87,34 @@ async function handle(req: NextRequest) {
             409,
           )
         : json({ ok: true, id: result.data });
+    }
+    if (b.action === "inbox_restore") {
+      const previous = await client
+        .from(tables.inbox)
+        .select("converted_task_id")
+        .eq("id", b.id)
+        .eq("owner_id", user.id)
+        .eq("status", "archived")
+        .maybeSingle();
+      if (previous.error) return json({ error: "보관 이력 조회 실패" }, 409);
+      if (!previous.data)
+        return json({ error: "보관 항목을 찾지 못했습니다." }, 404);
+      const restored = await client
+        .from(tables.inbox)
+        .update({
+          status: previous.data.converted_task_id ? "converted" : "inbox",
+        })
+        .eq("id", b.id)
+        .eq("owner_id", user.id)
+        .eq("status", "archived")
+        .select("id")
+        .maybeSingle();
+      return restored.error || !restored.data
+        ? json(
+            { error: "복원 실패 또는 다른 창에서 상태가 변경되었습니다." },
+            409,
+          )
+        : json({ ok: true });
     }
     if (b.action === "inbox_update") {
       const value = parseCapture(b.value);

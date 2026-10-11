@@ -17,6 +17,7 @@ import { JournalExport } from "./journal-export";
 import { attentionTasks, resumeContext } from "@/lib/workflow-context";
 import { contentCalendar } from "@/lib/personal-content";
 import { WorkflowInbox, ParkFields, parkForm } from "./workflow-inbox";
+import { quickStartContext } from "@/lib/quick-start";
 import { savedSnapshot, contactStates } from "@/lib/workflow";
 import {
   LayoutDashboard,
@@ -126,9 +127,12 @@ export function OpsShell() {
   const [taskClassification, setTaskClassification] = useState(false);
   const [libraryWorkflow, setLibraryWorkflow] = useState(false);
   const [workflowReady, setWorkflowReady] = useState(false);
+  const [timerGuardReady, setTimerGuardReady] = useState(false);
+  const [workflowChecked, setWorkflowChecked] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
   const [workflowData, setWorkflowData] = useState<OpsData>({});
   const [captureOpen, setCaptureOpen] = useState(false);
-  const [parkOpen, setParkOpen] = useState(false);
+  const [parkOpen, setParkOpen] = useState<OpsRow | null>(null);
   const [excludeJournalTests, setExcludeJournalTests] = useState(true);
   const [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(false),
@@ -144,7 +148,7 @@ export function OpsShell() {
     [day, setDay] = useState(seoulDate()),
     [tick, setTick] = useState(() => Date.now()),
     [offset, setOffset] = useState(0),
-    [summary, setSummary] = useState(false),
+    [summary, setSummary] = useState<OpsRow | null>(null),
     [moreMenu, setMoreMenu] = useState(false),
     [deleteTarget, setDeleteTarget] = useState<{
       resource: Resource;
@@ -152,6 +156,7 @@ export function OpsShell() {
     } | null>(null),
     [truncated, setTruncated] = useState<string[]>([]);
   const generation = useRef(0);
+  const pendingTimer = useRef<{ key: string; requestId: string } | null>(null);
   const rows = (name: string) => (space === "FRENGLE" ? [] : data[name] || []);
   const tasks = rows("tasks"),
     projects = rows("projects"),
@@ -193,6 +198,7 @@ export function OpsShell() {
     Boolean(user) &&
     configured === true &&
     space !== "FRENGLE" &&
+    dataReady &&
     !busy &&
     !loading;
   const activeSeconds = active
@@ -214,7 +220,10 @@ export function OpsShell() {
       ]);
       if (token !== generation.current) return;
       setData(result.data);
+      setTimerGuardReady(result.timerGuardReady === true);
+      setDataReady(true);
       setWorkflowReady(workflow.ready === true);
+      setWorkflowChecked(true);
       setWorkflowData(workflow.data || {});
       setTaskClassification(result.taskClassification === true);
       setLibraryWorkflow(result.libraryWorkflow === true);
@@ -226,6 +235,9 @@ export function OpsShell() {
       if (token === generation.current) {
         setError(e instanceof Error ? e.message : "불러오기 실패");
         setData({});
+        setDataReady(false);
+        setTimerGuardReady(false);
+        setWorkflowChecked(true);
         setWorkflowData({});
         setWorkflowReady(false);
       }
@@ -282,7 +294,7 @@ export function OpsShell() {
         await api("/api/ops?workspace=PERSONAL", method, body);
         setEditor(null);
         setDeleteTarget(null);
-        setSummary(false);
+        setSummary(null);
         const refreshed = await load();
         setNotice(
           refreshed
@@ -299,20 +311,37 @@ export function OpsShell() {
     },
     [load],
   );
-  function timer(
+  async function timer(
     command: string,
     taskId?: string,
     summaryText = "",
     context?: Record<string, unknown>,
+    expectedSessionId = command === "start" ? null : active?.id || null,
   ) {
-    return mutate({
+    if (!timerGuardReady) {
+      setError(
+        "타이머 보호 SQL010 적용·연결 확인이 필요합니다. DB 새로고침해 주세요.",
+      );
+      return false;
+    }
+    const payload = {
       action: "timer",
       command,
       task_id: taskId || null,
-      request_id: crypto.randomUUID(),
+      expected_session_id: expectedSessionId,
       summary: summaryText,
-      ...(workflowReady ? { context: context || {} } : {}),
-    });
+      context: context || {},
+    };
+    const key = JSON.stringify(payload);
+    const requestId =
+      pendingTimer.current?.key === key
+        ? pendingTimer.current.requestId
+        : crypto.randomUUID();
+    pendingTimer.current = { key, requestId };
+    const ok = await mutate({ ...payload, request_id: requestId });
+    if (ok && pendingTimer.current?.requestId === requestId)
+      pendingTimer.current = null;
+    return ok;
   }
   async function workflowAction(body: unknown) {
     setBusy(true);
@@ -361,8 +390,13 @@ export function OpsShell() {
       setData({});
       setWorkflowData({});
       setWorkflowReady(false);
+      setTimerGuardReady(false);
+      pendingTimer.current = null;
+      setWorkflowChecked(false);
+      setDataReady(false);
       setCaptureOpen(false);
-      setParkOpen(false);
+      setParkOpen(null);
+      setSummary(null);
       setResumeTask(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "로그아웃 실패");
@@ -382,7 +416,7 @@ export function OpsShell() {
       <button
         title="작업 시작 / 재개"
         aria-label={`${t.title} 작업 시작`}
-        disabled={!canWrite || active?.task_id === t.id}
+        disabled={!canWrite || !timerGuardReady || active?.task_id === t.id}
         onClick={() => setResumeTask(t.id)}
       >
         <Play size={15} />
@@ -686,6 +720,12 @@ export function OpsShell() {
               setOpen={setCaptureOpen}
               activeTitle={text(activeTask?.title)}
               act={workflowAction}
+              canStart={timerGuardReady}
+              checking={loading || (Boolean(user) && !workflowChecked)}
+              onOpenTask={(id) => {
+                setView("projects");
+                setDetail(id);
+              }}
             />
           ) : null}
           <div className="ops-connection">
@@ -705,6 +745,12 @@ export function OpsShell() {
                     ? "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 외부 도구는 미연결입니다."
                     : "설정에서 개인 계정으로 로그인하세요. 로그인 전에는 실제 데이터를 표시하지 않습니다."}
             </p>
+            {user && dataReady && space !== "FRENGLE" && !timerGuardReady ? (
+              <p role="status">
+                타이머 보호 연결 확인이 필요합니다. SQL010 적용 후 설정에서 DB
+                새로고침해 주세요.
+              </p>
+            ) : null}
             <button onClick={() => move("settings")}>
               설정 <ArrowUpRight size={14} />
             </button>
@@ -807,33 +853,80 @@ export function OpsShell() {
                   "Quick Start / 중단한 업무",
                   "미완료 다음 액션을 확인하고 이어서 작업하세요.",
                 )}
+                {activeTask ? (
+                  <div className="ops-entry">
+                    <strong>진행 중: {text(activeTask.title)}</strong>
+                    <button
+                      onClick={() => {
+                        setView("projects");
+                        setDetail(activeTask.id);
+                      }}
+                    >
+                      진행 중인 업무로 돌아가기
+                    </button>
+                  </div>
+                ) : null}
                 {sessions
                   .filter((s) => s.status === "PARKED")
-                  .map((s) => (
-                    <div className="ops-entry" key={s.id}>
-                      <strong>
-                        {text(tasks.find((t) => t.id === s.task_id)?.title)}
-                      </strong>
-                      <p>
-                        {notes
-                          .filter(
-                            (n) =>
-                              n.task_id === s.task_id &&
-                              n.kind === "next_action" &&
-                              !n.done,
-                          )
-                          .map((n) => text(n.body))
-                          .join(" · ") || "미완료 다음 액션 없음"}
-                      </p>
-                      <button
-                        disabled={!canWrite}
-                        onClick={() => setResumeTask(text(s.task_id))}
-                      >
-                        <Play size={15} />
-                        이어하기
-                      </button>
-                    </div>
-                  ))}
+                  .map((s) => {
+                    const task = tasks.find((t) => t.id === s.task_id);
+                    if (!task) return null;
+                    const context = quickStartContext(
+                      task,
+                      s,
+                      notes,
+                      events,
+                      workflowData.contexts || [],
+                    );
+                    return (
+                      <div className="ops-entry" key={s.id}>
+                        <strong>
+                          {text(tasks.find((t) => t.id === s.task_id)?.title)}
+                        </strong>
+                        <p>
+                          {context.historical
+                            ? "중단 당시 다음 액션"
+                            : "저장된 다음 액션"}
+                          : {context.next.join(" · ") || "기록 없음"}
+                        </p>
+                        {context.lastNote ? (
+                          <p>마지막 메모: {context.lastNote}</p>
+                        ) : null}
+                        {context.issue ? (
+                          <p>
+                            최근 특이사항{context.issueDone ? " (해결됨)" : ""}:{" "}
+                            {context.issue}
+                          </p>
+                        ) : null}
+                        <p>
+                          마지막 중단:{" "}
+                          {context.parkedAt
+                            ? new Date(context.parkedAt).toLocaleString(
+                                "ko-KR",
+                                { timeZone: "Asia/Seoul" },
+                              )
+                            : "시각 기록 없음"}{" "}
+                          · 사유: {context.reason || "기록 없음"}
+                        </p>
+                        {context.resultUrl ? (
+                          <a
+                            href={context.resultUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            연결된 결과물 열기
+                          </a>
+                        ) : null}
+                        <button
+                          disabled={!canWrite || !timerGuardReady}
+                          onClick={() => setResumeTask(text(s.task_id))}
+                        >
+                          <Play size={15} />
+                          이어하기
+                        </button>
+                      </div>
+                    );
+                  })}
                 {sessions.every((s) => s.status !== "PARKED") ? (
                   <Empty label="중단한 업무가 없습니다." />
                 ) : null}
@@ -1658,17 +1751,20 @@ export function OpsShell() {
               기록 확인
             </button>
             <button
-              disabled={!canWrite}
+              disabled={!canWrite || !timerGuardReady}
               onClick={() =>
                 workflowReady
-                  ? setParkOpen(true)
+                  ? setParkOpen(active)
                   : timer("pause", text(active.task_id))
               }
             >
               <Pause size={17} />
               일시정지
             </button>
-            <button disabled={!canWrite} onClick={() => setSummary(true)}>
+            <button
+              disabled={!canWrite || !timerGuardReady}
+              onClick={() => setSummary(active)}
+            >
               <Square size={15} />
               종료
             </button>
@@ -1827,17 +1923,20 @@ export function OpsShell() {
               <ParkFields />
             ) : null}
             {error ? <p role="alert">{error}</p> : null}
-            <button className="ops-primary" disabled={!canWrite}>
+            <button
+              className="ops-primary"
+              disabled={!canWrite || !timerGuardReady}
+            >
               맥락 확인 후 시작 / 이어하기
             </button>
           </form>
         </OpsDialog>
       ) : null}
-      {parkOpen && active ? (
+      {parkOpen ? (
         <OpsDialog
           title="현재 업무 중단 / 맥락 저장"
           busy={busy}
-          close={() => setParkOpen(false)}
+          close={() => setParkOpen(null)}
         >
           <form
             className="ops-form"
@@ -1846,18 +1945,21 @@ export function OpsShell() {
               if (
                 await timer(
                   "pause",
-                  text(active.task_id),
+                  text(parkOpen.task_id),
                   "",
                   parkForm(new FormData(e.currentTarget)),
+                  parkOpen.id,
                 )
               )
-                setParkOpen(false);
+                setParkOpen(null);
             }}
           >
-            <h3>{text(activeTask?.title)}</h3>
+            <h3>{text(tasks.find((t) => t.id === parkOpen.task_id)?.title)}</h3>
             <ParkFields />
             {error ? <p role="alert">{error}</p> : null}
-            <button disabled={!canWrite}>맥락 저장 후 PARKED</button>
+            <button disabled={!canWrite || !timerGuardReady}>
+              맥락 저장 후 PARKED
+            </button>
           </form>
         </OpsDialog>
       ) : null}
@@ -2020,7 +2122,7 @@ export function OpsShell() {
             </p>
           ) : null}
           <button
-            disabled={!canWrite}
+            disabled={!canWrite || !timerGuardReady}
             onClick={async () => {
               if (await timer("pause", text(active.task_id)))
                 setRecovery(false);
@@ -2029,10 +2131,10 @@ export function OpsShell() {
             현재 시각에 일시정지
           </button>
           <button
-            disabled={!canWrite}
+            disabled={!canWrite || !timerGuardReady}
             onClick={() => {
               setRecovery(false);
-              setSummary(true);
+              setSummary(active);
             }}
           >
             요약 작성 후 종료
@@ -2046,7 +2148,7 @@ export function OpsShell() {
         <OpsDialog
           title="작업 종료 / Session Summary"
           busy={busy}
-          close={() => setSummary(false)}
+          close={() => setSummary(null)}
         >
           <form
             className="ops-form"
@@ -2055,18 +2157,24 @@ export function OpsShell() {
               const f = new FormData(e.currentTarget);
               void timer(
                 "finish",
-                text(active?.task_id),
+                text(summary.task_id),
                 text(f.get("summary")),
+                {},
+                summary.id,
               );
             }}
           >
+            <p>{text(tasks.find((t) => t.id === summary.task_id)?.title)}</p>
             <label>
               작업 요약 (선택)
               <textarea name="summary" rows={5} maxLength={10000} />
             </label>
             <p>요약 없이 종료해도 시간 기록은 보존됩니다.</p>
             {error ? <p className="ops-alert bad">{error}</p> : null}
-            <button className="ops-primary" disabled={busy}>
+            <button
+              className="ops-primary"
+              disabled={!canWrite || !timerGuardReady}
+            >
               작업 종료
             </button>
           </form>

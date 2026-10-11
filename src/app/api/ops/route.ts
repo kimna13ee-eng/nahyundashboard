@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { json, sameOrigin } from "@/lib/http";
 import { personalClient, personalConfigured } from "@/lib/supabase/server";
 import { parseResource, resources, uuid, type Resource } from "@/lib/ops";
-import { parseParkContext } from "@/lib/workflow";
+import { parseTimerRequest, timerRpcFailure } from "@/lib/timer-request";
 const tables: Record<string, string> = {
   projects: "ops_projects",
   tasks: "tasks",
@@ -65,7 +65,10 @@ async function handle(req: NextRequest) {
         .from("tasks")
         .select("work_kind")
         .limit(0);
+      const guardCapability = await client.rpc("ops_timer_guard_ready");
       return json({
+        timerGuardReady:
+          !guardCapability.error && guardCapability.data === true,
         libraryWorkflow: !(
           await client
             .from("ops_library_items")
@@ -83,35 +86,15 @@ async function handle(req: NextRequest) {
     }
     const body = await req.json();
     if (body.action === "timer") {
-      if (
-        !["start", "pause", "finish"].includes(body.command) ||
-        !uuid(body.request_id) ||
-        (body.task_id != null && !uuid(body.task_id)) ||
-        typeof body.summary !== "string" ||
-        body.summary.length > 10000
-      )
-        return json({ error: "타이머 요청을 확인해 주세요." }, 400);
-      const { error } = await client.rpc(
-        body.context ? "ops_timer_context" : "ops_timer",
-        {
-          p_command: body.command,
-          p_task_id: body.task_id || null,
-          p_request_id: body.request_id,
-          p_summary: body.summary,
-          ...(body.context
-            ? { p_context: parseParkContext(body.context) }
-            : {}),
-        },
+      const { data, error } = await client.rpc(
+        "ops_timer_guarded",
+        parseTimerRequest(body),
       );
-      return error
-        ? json(
-            {
-              error:
-                "타이머 처리 실패. 다른 탭의 상태를 새로고침하고 재시도하세요.",
-            },
-            409,
-          )
-        : json({ ok: true });
+      if (error) {
+        const failure = timerRpcFailure(error);
+        return json(failure.body, failure.status);
+      }
+      return json({ ok: true, session_id: data });
     }
     if (body.action === "note_to_task") {
       if (!uuid(body.id)) return json({ error: "메모 ID 오류" }, 400);

@@ -42,6 +42,9 @@ export function WorkflowInbox({
   setOpen,
   activeTitle,
   act,
+  checking = false,
+  onOpenTask,
+  canStart = true,
 }: {
   items: OpsRow[];
   projects: OpsRow[];
@@ -53,11 +56,14 @@ export function WorkflowInbox({
   setOpen: (v: boolean) => void;
   activeTitle: string;
   act: (body: unknown) => Promise<boolean>;
+  checking?: boolean;
+  onOpenTask?: (id: string) => void;
+  canStart?: boolean;
 }) {
   const [editor, setEditor] = useState<OpsRow | null>(null),
     [filter, setFilter] = useState("inbox"),
     [requestId, setRequestId] = useState<string | undefined>(undefined);
-  const canWrite = enabled && ready && !busy;
+  const canWrite = enabled && ready && !busy && !checking;
   const close = () => {
     setOpen(false);
     setEditor(null);
@@ -72,7 +78,11 @@ export function WorkflowInbox({
           PERSONAL · 미분류 아이디어와 돌발 업무. 등록만 하면 현재 타이머를
           유지합니다.
         </p>
-        {!ready ? (
+        {checking ? (
+          <p role="status">저장소 연결을 확인하고 있습니다.</p>
+        ) : !enabled ? (
+          <p role="status">연결된 PERSONAL 계정에서 사용할 수 있습니다.</p>
+        ) : !ready ? (
           <p role="status">
             SQL007 적용 또는 연결 확인이 필요합니다. 기존 업무 등록은
             Projects에서 사용할 수 있습니다.
@@ -110,17 +120,19 @@ export function WorkflowInbox({
                     "프로젝트 미분류",
                 )}
               </small>
-              {i.status === "inbox" ? (
+              {i.status !== "archived" ? (
                 <div className="ops-actions">
-                  <button
-                    disabled={!canWrite}
-                    onClick={() => {
-                      setEditor(i);
-                      setOpen(true);
-                    }}
-                  >
-                    정리·업무 변환
-                  </button>
+                  {i.status === "inbox" ? (
+                    <button
+                      disabled={!canWrite}
+                      onClick={() => {
+                        setEditor(i);
+                        setOpen(true);
+                      }}
+                    >
+                      정리·업무 변환
+                    </button>
+                  ) : null}
                   <button
                     disabled={!canWrite}
                     onClick={() =>
@@ -135,6 +147,18 @@ export function WorkflowInbox({
                     보관 처리
                   </button>
                 </div>
+              ) : (
+                <button
+                  disabled={!canWrite}
+                  onClick={() => act({ action: "inbox_restore", id: i.id })}
+                >
+                  복원
+                </button>
+              )}
+              {i.converted_task_id && onOpenTask ? (
+                <button onClick={() => onOpenTask(String(i.converted_task_id))}>
+                  연결된 업무 열기
+                </button>
               ) : null}
             </div>
           ))}
@@ -266,12 +290,16 @@ export function WorkflowInbox({
               ) : null}
               <div className="ops-actions">
                 <button value="inbox">Inbox에 보관</button>
-                <button value="now">지금 처리</button>
+                <button value="now" disabled={!canStart}>
+                  지금 처리
+                </button>
                 <button value="schedule">일정 잡기</button>
                 {editor ? <button value="task">업무로 변환</button> : null}
               </div>
             </fieldset>
-            {!ready ? <p>SQL007 적용 전에는 저장하지 않습니다.</p> : null}
+            {!ready ? (
+              <p>연결 확인이 완료될 때까지 저장할 수 없습니다.</p>
+            ) : null}
             {error ? <p role="alert">{error}</p> : null}
           </form>
         </OpsDialog>
