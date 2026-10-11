@@ -1,0 +1,110 @@
+"use client";
+import { useEffect, useState } from "react";
+export function AppRecoveryControls({
+  refresh,
+  loading,
+}: {
+  refresh: () => Promise<unknown>;
+  loading: boolean;
+}) {
+  const [online, setOnline] = useState(true);
+  const [mode, setMode] = useState("브라우저");
+  const [message, setMessage] = useState("");
+  const [restart, setRestart] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    const sync = () => setOnline(navigator.onLine);
+    queueMicrotask(() => {
+      if (!mounted) return;
+      sync();
+      setMode(
+        window.matchMedia("(display-mode: standalone)").matches ||
+          (navigator as Navigator & { standalone?: boolean }).standalone
+          ? "홈 화면 앱"
+          : "브라우저",
+      );
+    });
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      mounted = false;
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
+  return (
+    <div className="ops-app-recovery">
+      <button
+        type="button"
+        disabled={loading || !online}
+        onClick={async () => {
+          if (document.querySelector("dialog[open]")) {
+            setMessage(
+              "열린 입력창을 먼저 저장하거나 닫아 주세요. 입력은 유지됩니다.",
+            );
+            return;
+          }
+          setMessage("");
+          await refresh();
+        }}
+      >
+        {loading ? "조회 중…" : "데이터 새로고침"}
+      </button>
+      <details>
+        <summary>앱 사용 · 복구</summary>
+        <div>
+          <p>{mode} · 웹 후보 v2.0.0 · 온라인 연결 필요</p>
+          <p>
+            데이터 새로고침은 현재 화면을 유지합니다. 앱 다시 열기는 페이지
+            전체를 재시작합니다.
+          </p>
+          <p>
+            iPhone: Safari 공유 → 홈 화면에 추가. Android/PC: 브라우저 메뉴의
+            설치 또는 홈 화면에 추가. 기기별 설치 여부는 별도 확인이 필요합니다.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              if (document.querySelector("dialog[open]")) {
+                setMessage(
+                  "입력창이 열려 있어 재시작을 막았습니다. 먼저 저장하거나 닫아 주세요.",
+                );
+                return;
+              }
+              setRestart(true);
+            }}
+          >
+            앱 다시 열기
+          </button>
+          {restart ? (
+            <div role="alert">
+              <p>
+                전체 앱을 다시 엽니다. 서버의 진행 중인 타이머는 종료되지
+                않습니다.
+              </p>
+              <button type="button" onClick={() => setRestart(false)}>
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!document.querySelector("dialog[open]"))
+                    window.location.reload();
+                }}
+              >
+                재시작 확인
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </details>
+      {!online ? (
+        <p role="status">
+          네트워크 연결이 끊겼습니다. 입력을 유지하고 연결 후 다시 조회해
+          주세요. 자동 저장·재전송은 하지 않습니다.
+        </p>
+      ) : null}
+      {message ? <p role="status">{message}</p> : null}
+    </div>
+  );
+}

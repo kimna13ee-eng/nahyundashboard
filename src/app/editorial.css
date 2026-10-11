@@ -799,3 +799,19 @@
     padding: 8px;
   }
 }
+/* App shell recovery and mobile safe areas; no personal-data cache. */
+.ops-app-recovery { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; }
+.ops-app-recovery button, .ops-app-recovery summary { min-height: 44px; padding: 8px 10px; cursor: pointer; }
+.ops-app-recovery details > div { position: absolute; z-index: 35; background: white; border: 1px solid #e5ddd5; padding: 16px; max-width: min(360px, 90vw); box-shadow: 0 8px 24px #29272d20; }
+.ops-app-recovery p { max-width: 340px; overflow-wrap: anywhere; }
+.ops-modal { max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+.ops-detail, .ops-note, .ops-task-title { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+ .ops-top { padding-top: env(safe-area-inset-top); }
+ .ops-mobile-nav { height: calc(62px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); }
+ .ops-timer { bottom: calc(62px + env(safe-area-inset-bottom)); }
+ .ops-timer button, .ops-actions button { min-height: 44px; min-width: 44px; }
+ .ops-main { padding-bottom: calc(190px + env(safe-area-inset-bottom)); }
+ .ops-form input, .ops-form textarea, .ops-form select { font-size: 16px; }
+ .ops-modal .ops-section-head { position: sticky; top: 0; z-index: 2; background: white; }
+}

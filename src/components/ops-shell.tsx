@@ -8,6 +8,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { OpsDialog } from "./ops-dialog";
+import { AppRecoveryControls } from "./app-recovery-controls";
 import { occurrences } from "@/lib/phase2";
 import { Phase2Panel } from "./phase2-panel";
 import { AnalyticsPanel } from "./analytics-panel";
@@ -110,12 +111,18 @@ function localDateTime(v: unknown) {
 async function api(path: string, method = "GET", body?: unknown) {
   const r = await fetch(path, {
     method,
+    signal: method === "GET" ? AbortSignal.timeout(20000) : undefined,
     cache: "no-store",
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await r.json();
-  if (!r.ok) throw new Error(data.error || "요청 실패");
+  if (!r.ok)
+    throw new Error(
+      r.status === 401
+        ? "인증이 만료되었습니다. 설정에서 다시 로그인해 주세요."
+        : data.error || "요청 실패",
+    );
   return data;
 }
 export function OpsShell() {
@@ -156,6 +163,10 @@ export function OpsShell() {
     } | null>(null),
     [truncated, setTruncated] = useState<string[]>([]);
   const generation = useRef(0);
+  const backgroundBusy = useRef(false);
+  useEffect(() => {
+    backgroundBusy.current = busy;
+  }, [busy]);
   const pendingTimer = useRef<{ key: string; requestId: string } | null>(null);
   const rows = (name: string) => (space === "FRENGLE" ? [] : data[name] || []);
   const tasks = rows("tasks"),
@@ -258,7 +269,9 @@ export function OpsShell() {
       .catch((e) => {
         if (mounted) setError(e.message);
       });
-    const timer = setInterval(() => setTick(Date.now()), 1000);
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") setTick(Date.now());
+    }, 1000);
     return () => {
       mounted = false;
       clearInterval(timer);
@@ -272,16 +285,30 @@ export function OpsShell() {
       queueMicrotask(() => {
         void load();
       });
+      let lastRefresh = 0;
       const focus = () => {
+        if (
+          document.visibilityState !== "visible" ||
+          !navigator.onLine ||
+          backgroundBusy.current ||
+          document.querySelector("dialog[open]")
+        )
+          return;
+        if (Date.now() - lastRefresh < 2000) return;
+        lastRefresh = Date.now();
         void load();
       };
       window.addEventListener("focus", focus);
+      window.addEventListener("online", focus);
+      document.addEventListener("visibilitychange", focus);
       const refresh = setInterval(focus, 30000);
       return () => {
         // Request generation counter, not a DOM ref.
         // eslint-disable-next-line react-hooks/exhaustive-deps
         generation.current++;
         window.removeEventListener("focus", focus);
+        window.removeEventListener("online", focus);
+        document.removeEventListener("visibilitychange", focus);
         clearInterval(refresh);
       };
     }
@@ -644,6 +671,25 @@ export function OpsShell() {
       </aside>
       <div className="ops-main-shell">
         <header className="ops-top">
+          <AppRecoveryControls
+            loading={loading || busy}
+            refresh={async () => {
+              const session = await api("/api/session").catch(() => null);
+              if (session) {
+                if (session.user?.email !== user?.email) setUser(session.user);
+                setConfigured(session.configured);
+              }
+              if (session?.user) {
+                await load();
+                window.dispatchEvent(new Event("myops:refresh"));
+              } else
+                setError(
+                  session
+                    ? "설정에서 개인 계정으로 로그인해 주세요."
+                    : "인증 상태 조회 실패. 연결 후 다시 시도해 주세요.",
+                );
+            }}
+          />
           <label>
             워크스페이스
             <select
@@ -2544,7 +2590,7 @@ function ResourceEditor({
           </p>
         ) : null}
         <div className="ops-form-actions">
-          <button type="button" disabled={busy} onClick={close}>
+          <button type="button" disabled={busy} data-dialog-close>
             취소
           </button>
           <button className="ops-primary" disabled={busy}>

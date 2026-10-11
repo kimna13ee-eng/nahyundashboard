@@ -1,9 +1,10 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { OpsDialog } from "./ops-dialog";
 import { occurrences, type Phase2Resource } from "@/lib/phase2";
 import { scheduleOverlaps, type OpsData, type OpsRow } from "@/lib/ops";
 import { metricKeys, personalTemplates } from "@/lib/personal-content";
+import { needsPersonalContentType } from "@/lib/personal-content-form";
 import { recurrenceStatus, runStates } from "@/lib/workflow";
 type Field = {
   key: string;
@@ -105,12 +106,18 @@ function local(value: unknown) {
 async function request(method: string, body?: unknown) {
   const res = await fetch("/api/phase2?workspace=PERSONAL", {
     method,
+    signal: method === "GET" ? AbortSignal.timeout(20000) : undefined,
     cache: "no-store",
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
   const result = await res.json();
-  if (!res.ok) throw new Error(result.error || "요청 실패");
+  if (!res.ok)
+    throw new Error(
+      res.status === 401
+        ? "인증이 만료되었습니다. 설정에서 다시 로그인해 주세요."
+        : result.error || "요청 실패",
+    );
   return result;
 }
 export function Phase2Panel({
@@ -153,6 +160,8 @@ export function Phase2Panel({
   const [runReady, setRunReady] = useState(false),
     [runs, setRuns] = useState<OpsRow[]>([]);
   const [archiveFilter, setArchiveFilter] = useState("all");
+  const saving = useRef(false);
+  const [uncertainSave, setUncertainSave] = useState(false);
   const load = useCallback(async () => {
     setReady(false);
     setLoading(true);
@@ -197,7 +206,17 @@ export function Phase2Panel({
       mounted = false;
     };
   }, [enabled, load]);
+  useEffect(() => {
+    const refresh = () => {
+      if (enabled && !saving.current && !document.querySelector("dialog[open]"))
+        void load();
+    };
+    window.addEventListener("myops:refresh", refresh);
+    return () => window.removeEventListener("myops:refresh", refresh);
+  }, [enabled, load]);
   async function save(body: unknown, method = "POST") {
+    if (saving.current || uncertainSave) return;
+    saving.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -212,8 +231,17 @@ export function Phase2Panel({
           : "서버 저장은 확인됐으나 재조회에 실패했습니다.",
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "저장 실패");
+      const uncertain = e instanceof TypeError || e instanceof SyntaxError;
+      if (uncertain) setUncertainSave(true);
+      setError(
+        uncertain
+          ? "저장 응답을 확인하지 못했습니다. 중복 생성을 막기 위해 재전송을 중지했습니다. 입력을 보존한 채 연결을 확인하고, 닫은 뒤 목록을 재조회하여 저장 여부를 먼저 확인해 주세요."
+          : e instanceof Error
+            ? e.message
+            : "저장 실패",
+      );
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
@@ -285,6 +313,7 @@ export function Phase2Panel({
           onClick={() => {
             setScope("all");
             setError("");
+            setUncertainSave(false);
             setEditor({ id: "" });
           }}
         >
@@ -512,6 +541,7 @@ export function Phase2Panel({
             onClick={() => {
               setError("");
               setScope("one");
+              setUncertainSave(false);
               setEditor(r);
             }}
             aria-label={`${r.title} 수정`}
@@ -650,6 +680,27 @@ export function Phase2Panel({
             onSubmit={(e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
+              if (
+                resource === "content" &&
+                personalContent &&
+                needsPersonalContentType(
+                  f,
+                  (
+                    editor.personal_details as
+                      | Record<string, unknown>
+                      | undefined
+                  )?.type,
+                )
+              ) {
+                setError(
+                  "개인 콘텐츠 입력을 저장하려면 콘텐츠 유형을 선택해 주세요. 입력 내용은 유지됩니다.",
+                );
+                const typeField = e.currentTarget.elements.namedItem(
+                  "personal:type",
+                ) as HTMLSelectElement | null;
+                typeField?.focus();
+                return;
+              }
               const value: Record<string, unknown> = Object.fromEntries(
                 f.entries(),
               );
@@ -812,6 +863,7 @@ export function Phase2Panel({
             {resource === "content" ? (
               <fieldset disabled={busy || !personalContent}>
                 <legend>PERSONAL 인스타그램 콘텐츠</legend>
+                {error ? <p role="alert">{error}</p> : null}
                 <PersonalChecklist
                   value={String(
                     (
@@ -1019,7 +1071,7 @@ export function Phase2Panel({
               </label>
             ) : null}
             {error ? <p role="alert">{error}</p> : null}
-            <button disabled={busy}>저장</button>
+            <button disabled={busy || uncertainSave}>저장</button>
           </form>
         </OpsDialog>
       ) : null}
@@ -1068,7 +1120,19 @@ function PersonalChecklist({ value }: { value: string }) {
     <>
       <div className="ops-actions">
         {Object.entries(personalTemplates).map(([type, body], i) => (
-          <button type="button" key={type} onClick={() => setText(body)}>
+          <button
+            type="button"
+            key={type}
+            onClick={(e) => {
+              setText(body);
+              const typeField = e.currentTarget.form?.elements.namedItem(
+                "personal:type",
+              ) as HTMLSelectElement | null;
+              if (typeField) {
+                typeField.value = type;
+              }
+            }}
+          >
             {["릴스", "셀카", "캐러셀", "리뷰", "협찬"][i]} 체크리스트 불러오기
           </button>
         ))}
