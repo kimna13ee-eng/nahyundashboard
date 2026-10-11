@@ -720,100 +720,110 @@ export function OpsShell() {
       </aside>
       <div className="ops-main-shell">
         <header className="ops-top">
-          <DesktopDownload compact signedIn={Boolean(user)} />
-          <AppRecoveryControls
-            loading={loading || busy || authState === "INITIALIZING"}
-            refresh={async () => {
-              const session = await api("/api/session").catch(() => null);
-              if (session) {
-                if (session.user?.email !== user?.email) setUser(session.user);
-                setConfigured(session.configured);
-              }
-              if (session?.user) {
-                if (!(await load()))
-                  throw new Error(
-                    "데이터 조회 실패. 연결 후 다시 시도해 주세요.",
-                  );
-                setAuthState("AUTHENTICATED");
-                const waits: Promise<boolean>[] = [];
-                window.dispatchEvent(
-                  new CustomEvent("myops:refresh", { detail: { waits } }),
-                );
-                if ((await Promise.all(waits)).some((ok) => !ok))
-                  throw new Error(
-                    "현재 화면 데이터 조회 실패. 다시 시도해 주세요.",
-                  );
-              } else {
-                setAuthState(session ? "UNAUTHENTICATED" : "ERROR");
-                throw new Error(
-                  session
-                    ? "설정에서 개인 계정으로 로그인해 주세요."
-                    : "인증 상태 조회 실패. 연결 후 다시 시도해 주세요.",
-                );
-              }
-            }}
-          />
-          <label>
-            워크스페이스
-            <select
-              aria-label="워크스페이스"
-              value={space}
-              disabled={busy}
-              onChange={(e) => {
-                setSpace(e.target.value as Space);
-                setDetail(null);
+          <div className="ops-header-workspace">
+            {" "}
+            <label>
+              워크스페이스
+              <select
+                aria-label="워크스페이스"
+                value={space}
+                disabled={busy}
+                onChange={(e) => {
+                  setSpace(e.target.value as Space);
+                  setDetail(null);
+                }}
+              >
+                <option>ALL</option>
+                <option>PERSONAL</option>
+                <option>FRENGLE</option>
+              </select>
+            </label>
+          </div>
+          <div className="ops-header-primary" aria-label="빠른 업무 액션">
+            {" "}
+            <button
+              className="ops-primary"
+              disabled={!canWrite}
+              onClick={() => {
+                setCaptureOpen(true);
+                setView("inbox");
               }}
             >
-              <option>ALL</option>
-              <option>PERSONAL</option>
-              <option>FRENGLE</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            className="ops-top-label"
-            aria-label={
-              authState === "INITIALIZING"
-                ? "로그인 상태 확인 중"
-                : user
-                  ? "개인 계정 설정 열기"
-                  : "개인 계정 로그인 열기"
-            }
-            disabled={authState === "INITIALIZING"}
-            onClick={() => move("settings")}
-          >
-            {space === "FRENGLE"
-              ? "회사 저장소 미연결"
-              : authState === "INITIALIZING"
-                ? "MY OPS 시작 중 · 인증 복원을 확인하고 있습니다."
-                : authState === "ERROR"
-                  ? "연결 또는 인증 오류. 데이터 새로고침으로 다시 확인해 주세요."
-                  : configured === false
-                    ? "Supabase 미연결"
-                    : user
-                      ? "개인 계정 설정"
-                      : "개인 계정 로그인"}
-          </button>
-          <button
-            className="ops-primary"
-            disabled={!canWrite}
-            onClick={() => {
-              setCaptureOpen(true);
-              setView("inbox");
-            }}
-          >
-            <Plus size={15} />
-            Quick Capture
-          </button>
-          <button
-            disabled={!canWrite || !tasks.length}
-            onClick={() => {
-              setError("");
-              setQuickLog(true);
-            }}
-          >
-            Quick Log
-          </button>
+              <Plus size={15} />
+              Quick Capture
+            </button>
+            <button
+              disabled={!canWrite || !tasks.length}
+              onClick={() => {
+                setError("");
+                setQuickLog(true);
+              }}
+            >
+              Quick Log
+            </button>
+          </div>
+          <div className="ops-header-utilities" aria-label="앱 관리">
+            {" "}
+            <DesktopDownload compact signedIn={Boolean(user)} />
+            <AppRecoveryControls
+              loading={loading || busy || authState === "INITIALIZING"}
+              refresh={async () => {
+                const session = await api("/api/session").catch(() => null);
+                if (session) {
+                  if (session.user?.email !== user?.email)
+                    setUser(session.user);
+                  setConfigured(session.configured);
+                }
+                if (session?.user) {
+                  if (!(await load()))
+                    throw new Error(
+                      "데이터 조회 실패. 연결 후 다시 시도해 주세요.",
+                    );
+                  setAuthState("AUTHENTICATED");
+                  const waits: Promise<boolean>[] = [];
+                  window.dispatchEvent(
+                    new CustomEvent("myops:refresh", { detail: { waits } }),
+                  );
+                  if ((await Promise.all(waits)).some((ok) => !ok))
+                    throw new Error(
+                      "현재 화면 데이터 조회 실패. 다시 시도해 주세요.",
+                    );
+                } else {
+                  setAuthState(session ? "UNAUTHENTICATED" : "ERROR");
+                  throw new Error(
+                    session
+                      ? "설정에서 개인 계정으로 로그인해 주세요."
+                      : "인증 상태 조회 실패. 연결 후 다시 시도해 주세요.",
+                  );
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="ops-top-label"
+              aria-label={
+                authState === "INITIALIZING"
+                  ? "로그인 상태 확인 중"
+                  : user
+                    ? "개인 계정 설정 열기"
+                    : "개인 계정 로그인 열기"
+              }
+              disabled={authState === "INITIALIZING"}
+              onClick={() => move("settings")}
+            >
+              {space === "FRENGLE"
+                ? "회사 저장소 미연결"
+                : authState === "INITIALIZING"
+                  ? "MY OPS 시작 중 · 인증 복원을 확인하고 있습니다."
+                  : authState === "ERROR"
+                    ? "연결 또는 인증 오류. 데이터 새로고침으로 다시 확인해 주세요."
+                    : configured === false
+                      ? "Supabase 미연결"
+                      : user
+                        ? "개인 계정 설정"
+                        : "개인 계정 로그인"}
+            </button>
+          </div>
         </header>
         <main className="ops-main">
           {authState === "INITIALIZING" ? (
@@ -1875,7 +1885,9 @@ export function OpsShell() {
               </section>
             </div>
           ) : null}
-          {view === "settings" ? <DesktopDownload signedIn={Boolean(user)} /> : null}
+          {view === "settings" ? (
+            <DesktopDownload signedIn={Boolean(user)} />
+          ) : null}
           {view === "settings" ? (
             <Phase2Panel
               key={"leave:" + (user?.email || "signed-out") + space}

@@ -38,74 +38,77 @@ export function AppRecoveryControls({
   }, []);
   return (
     <div className="ops-app-recovery">
-      <button
-        type="button"
-        aria-label="데이터 새로고침"
-        title="데이터 새로고침"
-        className="ops-refresh"
-        aria-busy={refreshing || loading}
-        disabled={loading || refreshing || !online}
-        onClick={async () => {
-          if (document.querySelector("dialog[open]")) {
-            setMessage(
-              "열린 입력창을 먼저 저장하거나 닫아 주세요. 입력은 유지됩니다.",
-            );
-            return;
-          }
-          if (inflight.current) return;
-          inflight.current = true;
-          setRefreshing(true);
-          setMessage("서버에서 다시 조회하는 중…");
-          try {
-            await refresh();
-            setMessage("최신 서버 데이터를 조회했습니다.");
-          } catch (e) {
-            setMessage(
-              e instanceof Error
-                ? e.message
-                : "조회 실패. 연결 후 새로고침을 다시 눌러 주세요.",
-            );
-          } finally {
-            inflight.current = false;
-            setRefreshing(false);
-          }
-        }}
-      >
-        <RefreshCw
-          size={19}
-          className={refreshing || loading ? "ops-spinning" : ""}
-          aria-hidden="true"
-        />
-        <span>{refreshing || loading ? "조회 중…" : "데이터 새로고침"}</span>
-      </button>
-      <details>
-        <summary>앱 사용 · 복구</summary>
-        <div>
-          <p>{mode} · 웹 후보 v2.0.0 · 온라인 연결 필요</p>
-          <p>
-            데이터 새로고침은 현재 화면을 유지합니다. 앱 다시 열기는 페이지
-            전체를 재시작합니다.
-          </p>
-          <p>
-            iPhone: Safari 공유 → 홈 화면에 추가. Android/PC: 브라우저 메뉴의
-            설치 또는 홈 화면에 추가. 기기별 설치 여부는 별도 확인이 필요합니다.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              if (document.querySelector("dialog[open]")) {
-                setMessage(
-                  "입력창이 열려 있어 재시작을 막았습니다. 먼저 저장하거나 닫아 주세요.",
-                );
-                return;
-              }
-              setRestart(true);
-            }}
-          >
-            앱 다시 열기
-          </button>
-        </div>
-      </details>
+      <div className="ops-recovery-actions">
+        <button
+          type="button"
+          aria-label="데이터 새로고침"
+          title="데이터 새로고침"
+          className="ops-refresh"
+          aria-busy={refreshing || loading}
+          disabled={loading || refreshing || !online}
+          onClick={async () => {
+            if (document.querySelector("dialog[open]")) {
+              setMessage(
+                "열린 입력창을 먼저 저장하거나 닫아 주세요. 입력은 유지됩니다.",
+              );
+              return;
+            }
+            if (inflight.current) return;
+            inflight.current = true;
+            setRefreshing(true);
+            setMessage("서버에서 다시 조회하는 중…");
+            try {
+              await refresh();
+              setMessage("최신 서버 데이터를 조회했습니다.");
+            } catch (e) {
+              setMessage(
+                e instanceof Error
+                  ? e.message
+                  : "조회 실패. 연결 후 새로고침을 다시 눌러 주세요.",
+              );
+            } finally {
+              inflight.current = false;
+              setRefreshing(false);
+            }
+          }}
+        >
+          <RefreshCw
+            size={19}
+            className={refreshing || loading ? "ops-spinning" : ""}
+            aria-hidden="true"
+          />
+          <span>{refreshing || loading ? "조회 중…" : "데이터 새로고침"}</span>
+        </button>
+        <details>
+          <summary>앱 사용 · 복구</summary>
+          <div>
+            <p>{mode} · 웹 후보 v2.0.0 · 온라인 연결 필요</p>
+            <p>
+              데이터 새로고침은 현재 화면을 유지합니다. 앱 다시 열기는 페이지
+              전체를 재시작합니다.
+            </p>
+            <p>
+              iPhone: Safari 공유 → 홈 화면에 추가. Android/PC: 브라우저 메뉴의
+              설치 또는 홈 화면에 추가. 기기별 설치 여부는 별도 확인이
+              필요합니다.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (document.querySelector("dialog[open]")) {
+                  setMessage(
+                    "입력창이 열려 있어 재시작을 막았습니다. 먼저 저장하거나 닫아 주세요.",
+                  );
+                  return;
+                }
+                setRestart(true);
+              }}
+            >
+              앱 다시 열기
+            </button>
+          </div>
+        </details>
+      </div>
       {restart ? (
         <OpsDialog
           title="앱을 다시 열까요?"

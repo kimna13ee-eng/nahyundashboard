@@ -121,3 +121,194 @@
     display: none;
   }
 }
+/* Layout recovery: groups wrap before controls shrink; no global text hiding. */
+.editorial .ops-top {
+  height: auto;
+  min-height: 76px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 12px 24px;
+}
+.editorial .ops-header-workspace,
+.editorial .ops-header-primary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.editorial .ops-header-workspace label {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.editorial .ops-header-workspace select {
+  min-width: 112px;
+  min-height: 34px;
+}
+.editorial .ops-header-utilities {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+.editorial .ops-top button,
+.editorial .ops-top summary {
+  flex-shrink: 0;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  white-space: normal;
+}
+.editorial .ops-top-label {
+  margin-left: 0;
+  max-width: 240px;
+  line-height: 1.5;
+}
+.editorial .ops-app-recovery {
+  display: grid;
+  gap: 6px;
+  flex: 1 0 208px;
+}
+.editorial .ops-recovery-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.editorial .ops-recovery-actions details {
+  position: relative;
+  flex: 0 0 auto;
+}
+.editorial .ops-app-recovery details > div {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  right: 0;
+  left: auto;
+}
+.editorial .ops-app-recovery p {
+  margin: 0;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+.editorial .ops-app-recovery > p[role="status"] {
+  max-width: none;
+  padding: 6px 8px;
+  background: var(--mist, #e7e1ed);
+  border-radius: 4px;
+}
+.editorial .ops-resource-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 20px 16px;
+}
+.editorial .ops-resource-toolbar > input {
+  flex: 1 1 200px;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+  min-height: 34px;
+}
+.editorial .ops-resource-toolbar > button {
+  flex: 0 0 auto;
+}
+.editorial .ops-section-help {
+  margin: 12px 20px;
+  padding: 10px 12px;
+  background: #f6f4f1;
+  color: #625b69;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.editorial .ops-record-disclosure {
+  margin: 12px 20px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.editorial .ops-record-disclosure > div,
+.editorial .ops-record-disclosure > p {
+  margin-top: 12px;
+}
+.editorial .ops-inbox .ops-section-head {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.editorial .ops-inbox .ops-section-head > div {
+  flex: 1 1 240px;
+}
+.editorial .ops-inbox .ops-section-head > button {
+  flex: 0 0 auto;
+}
+.editorial .ops-section-head p {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+.editorial .ops-main footer {
+  margin-top: 24px;
+}
+@media (max-width: 1100px) {
+  .editorial .ops-header-utilities {
+    flex-basis: 100%;
+    margin-left: 0;
+    align-items: center;
+  }
+  .editorial .ops-app-recovery {
+    flex: 0 1 auto;
+  }
+}
+@media (max-width: 600px) {
+  .editorial .ops-top {
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+    gap: 8px;
+  }
+  .editorial .ops-header-workspace {
+    flex-basis: 100%;
+  }
+  .editorial .ops-header-primary {
+    flex-basis: 100%;
+  }
+  .editorial .ops-header-utilities {
+    gap: 8px;
+  }
+  .editorial .ops-top button,
+  .editorial .ops-top summary,
+  .editorial .ops-header-workspace select {
+    min-height: 44px;
+  }
+  .editorial .ops-app-recovery {
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+  .editorial .ops-recovery-actions {
+    gap: 8px;
+  }
+  .editorial .ops-top-label {
+    flex: 0 1 120px;
+  }
+  .editorial .ops-app-recovery details > div {
+    left: 0;
+    right: auto;
+    width: min(320px, calc(100vw - 32px));
+  }
+  .editorial .ops-resource-toolbar,
+  .editorial .ops-section-help,
+  .editorial .ops-record-disclosure {
+    margin-inline: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .editorial .ops-header-workspace {
+    flex: 0 0 112px;
+  }
+  .editorial .ops-header-primary {
+    flex: 0 0 auto;
+    gap: 6px;
+  }
+  .editorial .ops-header-utilities {
+    flex-basis: 100%;
+  }
+}

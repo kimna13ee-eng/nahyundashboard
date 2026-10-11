@@ -322,7 +322,9 @@ export function Phase2Panel({
     }
   }
   return (
-    <section className={`ops-card${resource === "leave" ? " ops-leave-records" : ""}`}>
+    <section
+      className={`ops-card${resource === "leave" ? " ops-leave-records" : ""}`}
+    >
       <div className="ops-section-head">
         <div>
           <h2>{labels[resource]}</h2>
@@ -361,9 +363,17 @@ export function Phase2Panel({
         </p>
       ) : null}
       {notice ? <p role="status">{notice}</p> : null}
-      <button disabled={!enabled || busy} onClick={() => load()}>
-        운영 DB 새로고침
-      </button>
+      <div className="ops-resource-toolbar">
+        <button disabled={!enabled || busy} onClick={() => load()}>
+          운영 DB 새로고침
+        </button>
+        <input
+          aria-label={`${labels[resource]} 검색`}
+          placeholder="제목·메모 검색"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
       {resource === "leave" && ready ? (
         <p>
           확인된 발생{" "}
@@ -379,12 +389,6 @@ export function Phase2Panel({
           일 · 잔여 {balance}일
         </p>
       ) : null}
-      <input
-        aria-label={`${labels[resource]} 검색`}
-        placeholder="제목·메모 검색"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
       {resource === "inspiration" ? (
         <label>
           보관 필터
@@ -462,7 +466,7 @@ export function Phase2Panel({
               </p>
             ) : null}
             {resource === "content" ? (
-              <details>
+              <details className="ops-record-disclosure">
                 <summary>검수·수정·성과 버전 이력</summary>
                 {contentHistory ? (
                   versions
@@ -593,7 +597,7 @@ export function Phase2Panel({
         ),
       )}
       {ready && !filtered.length ? (
-        <p>
+        <p className="ops-empty-state">
           {list.length
             ? "검색·필터 결과가 없습니다."
             : "등록된 항목이 없습니다."}
@@ -603,14 +607,14 @@ export function Phase2Panel({
         <p>한 화면에 최대 300건 표시합니다. 검색으로 범위를 좁혀 주세요.</p>
       ) : null}
       {resource === "recurrence" ? (
-        <p>
+        <p className="ops-section-help">
           목록은 기준 날짜부터 최대 370일 범위이며 회차 계산은 최대
           10,000건입니다. 대량 기록의 전체 집계가 아닙니다.
         </p>
       ) : null}
       {resource === "recurrence" && ready ? (
         <>
-          <p>
+          <p className="ops-section-help">
             {runReady
               ? "예정 시간이 지나도 실행 기록 없으면 실행 미확인입니다. 완료는 직접 확인해 기록하세요."
               : "실행 원장은 SQL007 적용 후 저장 가능합니다."}
