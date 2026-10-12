@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:e2e": "node --experimental-strip-types tests/mvp-e2e.cjs",
+    "test:e2e:ux": "node tests/ux-e2e.cjs",
     "lint": "eslint src tests/*.test.ts",
     "test:db": "node --test tests/database.test.mjs tests/phase2-db.test.mjs tests/personal-content-db.test.mjs tests/workflow-db.test.mjs tests/content-history-db.test.mjs tests/prompt-metadata-db.test.mjs tests/stabilization-db.test.mjs",
     "test:demo": "node tests/e2e.cjs"

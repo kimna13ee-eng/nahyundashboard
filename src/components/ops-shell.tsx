@@ -24,6 +24,11 @@ import { WorkflowInbox, ParkFields, parkForm } from "./workflow-inbox";
 import { quickStartContext } from "@/lib/quick-start";
 import { savedSnapshot, contactStates } from "@/lib/workflow";
 import {
+  addSeoulMinutes,
+  scheduleDefaults,
+  scheduleRangeError,
+} from "@/lib/schedule-form";
+import {
   LayoutDashboard,
   CalendarDays,
   FolderKanban,
@@ -76,6 +81,8 @@ type Editor = {
   row?: OpsRow;
   taskId?: string;
   kind?: string;
+  dueDate?: string;
+  scheduleDate?: string;
 };
 const text = (v: unknown) => String(v ?? "");
 function dateTime(v: unknown) {
@@ -570,11 +577,15 @@ export function OpsShell() {
       {action}
     </div>
   );
-  const create = (resource: Resource, label: string, kind?: string) => (
+  const create = (
+    resource: Resource,
+    label: string,
+    options: Omit<Editor, "resource" | "row"> = {},
+  ) => (
     <button
       className="ops-primary"
       disabled={!canWrite}
-      onClick={() => setEditor({ resource, kind })}
+      onClick={() => setEditor({ resource, ...options })}
     >
       <Plus size={15} />
       {label}
@@ -953,7 +964,7 @@ export function OpsShell() {
                   {heads(
                     "오늘의 업무",
                     `마감일 ${today} · 미완료`,
-                    create("tasks", "업무 등록"),
+                    create("tasks", "업무 등록", { dueDate: today }),
                   )}
                   {taskList(
                     tasks.filter(
@@ -965,7 +976,9 @@ export function OpsShell() {
                   {heads(
                     "오늘의 일정",
                     "서울 시간 기준",
-                    create("schedules", "일정 등록"),
+                    create("schedules", "일정 등록", {
+                      scheduleDate: today,
+                    }),
                   )}
                   {todaySchedules.length ? (
                     todaySchedules.map((s) => (
@@ -1317,7 +1330,7 @@ export function OpsShell() {
               {heads(
                 "Calendar",
                 "Asia/Seoul · 연차 기록은 표시하지 않습니다.",
-                create("schedules", "일정 등록"),
+                create("schedules", "일정 등록", { scheduleDate: day }),
               )}
               <div className="ops-toolbar">
                 <div className="ops-tabs">
@@ -1569,7 +1582,7 @@ export function OpsShell() {
                   : create(
                       "library_items",
                       libTab === "prompt" ? "프롬프트 등록" : "스킬 등록",
-                      libTab,
+                      { kind: libTab },
                     ),
               )}
               <div className="ops-toolbar">
@@ -2561,6 +2574,18 @@ function ResourceEditor({
             : resource === "schedules"
               ? "일정"
               : "라이브러리";
+  const defaults = scheduleDefaults(editor.scheduleDate || seoulDate());
+  const [scheduleStart, setScheduleStart] = useState(
+    row.starts_at ? localDateTime(row.starts_at) : defaults.startsAt,
+  );
+  const [scheduleEnd, setScheduleEnd] = useState(
+    row.ends_at ? localDateTime(row.ends_at) : defaults.endsAt,
+  );
+  const [scheduleEndEdited, setScheduleEndEdited] = useState(Boolean(row.id));
+  const scheduleError =
+    resource === "schedules"
+      ? scheduleRangeError(scheduleStart, scheduleEnd)
+      : "";
   const field = (name: string, label: string, type = "text", max = 120) => (
     <label>
       {label}
@@ -2727,7 +2752,15 @@ function ResourceEditor({
               ],
               "normal",
             )}
-            {field("due_date", "마감일", "date")}
+            <label>
+              마감일
+              <input
+                aria-label="마감일"
+                name="due_date"
+                type="date"
+                defaultValue={text(row.due_date || editor.dueDate)}
+              />
+            </label>
             {workflowReady ? (
               <>
                 {select(
@@ -2832,7 +2865,13 @@ function ResourceEditor({
                 required
                 name="starts_at"
                 type="datetime-local"
-                defaultValue={localDateTime(row.starts_at)}
+                value={scheduleStart}
+                onChange={(event) => {
+                  const nextStart = event.currentTarget.value;
+                  setScheduleStart(nextStart);
+                  if (!scheduleEndEdited)
+                    setScheduleEnd(addSeoulMinutes(nextStart, 60));
+                }}
               />
             </label>
             <label>
@@ -2841,13 +2880,26 @@ function ResourceEditor({
                 required
                 name="ends_at"
                 type="datetime-local"
-                defaultValue={
-                  row.ends_at
-                    ? localDateTime(row.ends_at)
-                    : `${seoulDate()}T10:00`
+                value={scheduleEnd}
+                aria-invalid={Boolean(scheduleError)}
+                aria-describedby={
+                  scheduleError ? "schedule-time-error" : undefined
                 }
+                onChange={(event) => {
+                  setScheduleEnd(event.currentTarget.value);
+                  setScheduleEndEdited(true);
+                }}
               />
             </label>
+            {scheduleError ? (
+              <p
+                id="schedule-time-error"
+                className="ops-alert bad"
+                role="alert"
+              >
+                {scheduleError}
+              </p>
+            ) : null}
             {area("notes", "메모", 2000)}
           </>
         ) : null}
@@ -2882,7 +2934,10 @@ function ResourceEditor({
           <button type="button" disabled={busy} data-dialog-close>
             취소
           </button>
-          <button className="ops-primary" disabled={busy}>
+          <button
+            className="ops-primary"
+            disabled={busy || Boolean(scheduleError)}
+          >
             {busy ? "저장 중…" : "저장"}
           </button>
         </div>

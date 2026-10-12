@@ -70,6 +70,8 @@ test("서울 자정 경계에서 날짜별 시간 분할과 진행 구간 제한
   assert.equal(intervalSecondsForDay(rows, now, "2026-10-09"), 0);
 });
 test("서울 날짜와 진행 구간 시간 계산", () => {
+  assert.equal(seoulDate(new Date("2026-10-11T14:59:59Z")), "2026-10-11");
+  assert.equal(seoulDate(new Date("2026-10-11T15:00:00Z")), "2026-10-12");
   assert.equal(seoulDate(new Date("2026-10-10T16:00:00Z")), "2026-10-11");
   assert.equal(
     intervalSeconds(
