@@ -193,7 +193,10 @@ export function OpsShell() {
     intervals = rows("session_intervals"),
     events = rows("session_events"),
     library = rows("library_items"),
-    schedules = rows("schedules");
+    schedules = rows("schedules"),
+    deletedSchedules = rows("deleted_schedules").filter(
+      (schedule) => Date.parse(text(schedule.purge_after)) > tick + offset,
+    );
   const active = sessions.find((s) => s.status === "ACTIVE"),
     selected = tasks.find((t) => t.id === detail);
   const activeTask = tasks.find((t) => t.id === active?.task_id);
@@ -606,6 +609,28 @@ export function OpsShell() {
         disabled={!canWrite}
         aria-label={`${row.title || "메모"} 삭제`}
         onClick={() => setDeleteTarget({ resource, row })}
+      >
+        <Trash2 size={15} />
+      </button>
+    </div>
+  );
+  const scheduleActions = (row: OpsRow) => (
+    <div className="ops-actions">
+      <button
+        className="ops-icon"
+        disabled={!canWrite}
+        aria-label={`${row.title || "일정"} 수정`}
+        onClick={() => setEditor({ resource: "schedules", row })}
+      >
+        <Pencil size={15} />
+      </button>
+      <button
+        className="ops-icon ops-danger"
+        disabled={!canWrite}
+        aria-label={`${row.title || "일정"} 휴지통으로 이동`}
+        onClick={() =>
+          void mutate({ resource: "schedules", id: row.id }, "DELETE")
+        }
       >
         <Trash2 size={15} />
       </button>
@@ -1450,7 +1475,7 @@ export function OpsShell() {
                       {text(s.source)} · {dateTime(s.starts_at)} –{" "}
                       {dateTime(s.ends_at)}
                     </small>
-                    {s.source === "일정" ? itemActions("schedules", s) : null}
+                    {s.source === "일정" ? scheduleActions(s) : null}
                   </div>
                 ))
               ) : (
@@ -1461,6 +1486,44 @@ export function OpsShell() {
                 아래에서 반복 회차를 관리하세요. 자동화 예정 시간은
                 미연결입니다.
               </p>
+              <details className="ops-detail">
+                <summary>일정 휴지통 ({deletedSchedules.length})</summary>
+                <p>삭제 후 12시간 동안 복구할 수 있습니다.</p>
+                {deletedSchedules.length ? (
+                  deletedSchedules.map((schedule) => (
+                    <div className="ops-entry" key={schedule.id}>
+                      <strong>{text(schedule.title)}</strong>
+                      <small>
+                        {dateTime(schedule.starts_at)} –{" "}
+                        {dateTime(schedule.ends_at)} ·{" "}
+                        {text(
+                          projects.find(
+                            (projectRow) =>
+                              projectRow.id === schedule.project_id,
+                          )?.title,
+                        ) || "연결 프로젝트 없음"}
+                      </small>
+                      <small>
+                        복구 가능 기한: {dateTime(schedule.purge_after)}
+                      </small>
+                      <button
+                        disabled={!canWrite}
+                        aria-label={`${schedule.title || "일정"} 복구`}
+                        onClick={() =>
+                          void mutate({
+                            action: "restore_schedule",
+                            id: schedule.id,
+                          })
+                        }
+                      >
+                        복구
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <Empty label="복구 가능한 삭제 일정이 없습니다." />
+                )}
+              </details>
             </section>
           ) : null}
           {view === "journal" ? (

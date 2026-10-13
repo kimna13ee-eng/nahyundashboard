@@ -42,22 +42,35 @@ async function handle(req: NextRequest) {
     if (authError || !user)
       return json({ error: "개인 계정 로그인이 필요합니다." }, 401);
     if (req.method === "GET") {
-      const results = await Promise.all(
-        Object.entries(tables).map(async ([name, table]) => {
-          const { data, error, count } = await client
-            .from(table)
-            .select("*", { count: "exact" })
-            .eq("owner_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1000);
-          return { name, data, error, count };
-        }),
-      );
-      if (results.some((r) => r.error))
+      const serverNow = new Date().toISOString();
+      const [results, deletedSchedules] = await Promise.all([
+        Promise.all(
+          Object.entries(tables).map(async ([name, table]) => {
+            let query = client
+              .from(table)
+              .select("*", { count: "exact" })
+              .eq("owner_id", user.id);
+            if (name === "schedules") query = query.is("deleted_at", null);
+            const { data, error, count } = await query
+              .order("created_at", { ascending: false })
+              .limit(1000);
+            return { name, data, error, count };
+          }),
+        ),
+        client
+          .from("ops_schedules")
+          .select("*", { count: "exact" })
+          .eq("owner_id", user.id)
+          .not("deleted_at", "is", null)
+          .gt("purge_after", serverNow)
+          .order("deleted_at", { ascending: false })
+          .limit(1000),
+      ]);
+      if (results.some((r) => r.error) || deletedSchedules.error)
         return json(
           {
             error:
-              "DB 조회에 실패했습니다. 001/002 마이그레이션 적용과 권한을 확인해 주세요.",
+              "DB 조회에 실패했습니다. 001/002/011 마이그레이션 적용과 권한을 확인해 주세요.",
           },
           503,
         );
@@ -76,11 +89,17 @@ async function handle(req: NextRequest) {
             .limit(0)
         ).error,
         taskClassification: !classification.error,
-        data: Object.fromEntries(results.map((r) => [r.name, r.data])),
-        serverNow: new Date().toISOString(),
-        truncated: results
-          .filter((r) => (r.count || 0) > 1000)
-          .map((r) => r.name),
+        data: {
+          ...Object.fromEntries(results.map((r) => [r.name, r.data])),
+          deleted_schedules: deletedSchedules.data,
+        },
+        serverNow,
+        truncated: [
+          ...results.filter((r) => (r.count || 0) > 1000).map((r) => r.name),
+          ...((deletedSchedules.count || 0) > 1000
+            ? ["deleted_schedules"]
+            : []),
+        ],
         companyConnected: false,
       });
     }
@@ -105,6 +124,22 @@ async function handle(req: NextRequest) {
         ? json({ error: "다음 액션 변환에 실패했습니다." }, 409)
         : json({ id: data });
     }
+    if (body.action === "restore_schedule") {
+      if (!uuid(body.id)) return json({ error: "일정 ID 오류" }, 400);
+      const { data, error } = await client.rpc("ops_schedule_restore", {
+        p_schedule_id: body.id,
+      });
+      if (error)
+        return json(
+          { error: "일정 복구에 실패했습니다. SQL011 적용을 확인해 주세요." },
+          409,
+        );
+      if (data === "expired")
+        return json({ error: "12시간의 복구 가능 시간이 지났습니다." }, 410);
+      if (data === "not_found")
+        return json({ error: "복구할 일정을 찾을 수 없습니다." }, 404);
+      return json({ ok: true, status: data });
+    }
     if (!resources.includes(body.resource))
       return json({ error: "지원하지 않는 항목입니다." }, 400);
     const resource = body.resource as Resource,
@@ -112,6 +147,22 @@ async function handle(req: NextRequest) {
     if (req.method !== "POST" && !uuid(body.id))
       return json({ error: "항목 ID 오류" }, 400);
     if (req.method === "DELETE") {
+      if (resource === "schedules") {
+        const { data, error } = await client.rpc("ops_schedule_soft_delete", {
+          p_schedule_id: body.id,
+        });
+        if (error)
+          return json(
+            {
+              error:
+                "일정을 휴지통으로 옮기지 못했습니다. SQL011 적용을 확인해 주세요.",
+            },
+            409,
+          );
+        return data === "not_found"
+          ? json({ error: "일정을 찾을 수 없습니다." }, 404)
+          : json({ ok: true, status: data });
+      }
       const { data, error } = await client
         .from(table)
         .delete()
