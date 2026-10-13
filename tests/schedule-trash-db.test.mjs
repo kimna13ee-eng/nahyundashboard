@@ -41,8 +41,15 @@ test("격리 DB: 일정 soft delete·12시간 복구·소유권·purge 재시도
     ).rows[0].id;
 
     await db.exec("reset role");
+    // Simulate independent column grants left by a historical migration.
+    await db.exec(`
+      alter table ops_schedules add column deleted_at timestamptz,
+        add column purge_after timestamptz;
+      grant update(id,owner_id,created_at,updated_at,deleted_at,purge_after)
+        on ops_schedules to authenticated;
+    `);
     await db.exec(
-      await readFile("supabase/personal/011_schedule_trash.sql", "utf8"),
+      await readFile("supabase/personal/012_schedule_trash.sql", "utf8"),
     );
     assert.deepEqual(
       (
@@ -57,6 +64,11 @@ test("격리 DB: 일정 soft delete·12시간 복구·소유권·purge 재시도
     await db.exec(
       `set role authenticated;set request.jwt.claim.sub='${OWNER}'`,
     );
+    for (const column of ["id", "owner_id", "created_at", "updated_at", "deleted_at", "purge_after"])
+      await assert.rejects(
+        db.query(`update ops_schedules set ${column}=${column} where id=$1`, [schedule]),
+        /permission denied/i,
+      );
     assert.equal(
       (await db.query("select ops_schedule_soft_delete($1) status", [schedule]))
         .rows[0].status,
@@ -248,7 +260,7 @@ test("격리 DB: 복구와 purge 경쟁의 두 직렬화 결과에서 일정이 
     for (const file of [
       "001_tasks.sql",
       "002_mvp.sql",
-      "011_schedule_trash.sql",
+      "012_schedule_trash.sql",
     ])
       await db.exec(await readFile(`supabase/personal/${file}`, "utf8"));
     await db.exec(

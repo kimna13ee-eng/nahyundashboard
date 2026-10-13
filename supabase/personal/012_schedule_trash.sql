@@ -1,4 +1,4 @@
--- SQL011: schedule trash and 12-hour recovery window.
+-- SQL012: schedule trash and 12-hour recovery window.
 -- Local/isolated validation first. Do not apply to Supabase or register Cron
 -- without separate approval.
 begin;
@@ -29,6 +29,10 @@ create index if not exists ops_schedule_trash
 -- Prevent authenticated clients from bypassing the recovery window.
 revoke delete on public.ops_schedules from authenticated;
 revoke update on public.ops_schedules from authenticated;
+-- Table-level REVOKE does not remove independently granted column privileges.
+revoke update(id,owner_id,title,notes,starts_at,ends_at,timezone,project_id,
+ created_at,updated_at,deleted_at,purge_after)
+ on public.ops_schedules from authenticated;
 grant update(title,notes,starts_at,ends_at,timezone,project_id)
  on public.ops_schedules to authenticated;
 

@@ -21,7 +21,7 @@ const assert = require("node:assert/strict");
     grant usage on schema auth,public to authenticated,anon;
     insert into auth.users values('11111111-1111-4111-8111-111111111111');
   `);
-  for (const file of ["001_tasks.sql", "002_mvp.sql", "011_schedule_trash.sql"])
+  for (const file of ["001_tasks.sql", "002_mvp.sql", "012_schedule_trash.sql"])
     await db.exec(fs.readFileSync(`supabase/personal/${file}`, "utf8"));
   await db.exec(`
     set role authenticated;

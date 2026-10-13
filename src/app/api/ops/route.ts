@@ -70,7 +70,7 @@ async function handle(req: NextRequest) {
         return json(
           {
             error:
-              "DB 조회에 실패했습니다. 001/002/011 마이그레이션 적용과 권한을 확인해 주세요.",
+              "DB 조회에 실패했습니다. SQL012 설치 상태와 조회 권한을 확인해 주세요.",
           },
           503,
         );
@@ -131,7 +131,7 @@ async function handle(req: NextRequest) {
       });
       if (error)
         return json(
-          { error: "일정 복구에 실패했습니다. SQL011 적용을 확인해 주세요." },
+          { error: "일정 복구에 실패했습니다. SQL012 적용을 확인해 주세요." },
           409,
         );
       if (data === "expired")
@@ -155,7 +155,7 @@ async function handle(req: NextRequest) {
           return json(
             {
               error:
-                "일정을 휴지통으로 옮기지 못했습니다. SQL011 적용을 확인해 주세요.",
+                "일정을 휴지통으로 옮기지 못했습니다. SQL012 적용을 확인해 주세요.",
             },
             409,
           );
