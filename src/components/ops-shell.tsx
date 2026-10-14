@@ -16,6 +16,7 @@ import { Phase2Panel } from "./phase2-panel";
 import { AnalyticsPanel } from "./analytics-panel";
 import { ContentAnalyticsPanel } from "./content-analytics-panel";
 import { journalEntries } from "@/lib/journal-report";
+import { dailyTaskSummary } from "@/lib/overview-summary";
 import { JournalExport } from "./journal-export";
 import { attentionTasks, resumeContext } from "@/lib/workflow-context";
 import { calendarLabel, calendarTitle } from "@/lib/mobile-calendar";
@@ -639,6 +640,7 @@ export function OpsShell() {
     </div>
   );
   const today = seoulDate(new Date(tick));
+  const dailySummary = dailyTaskSummary(tasks, today);
   const attention = attentionTasks(tasks, today);
   const todaySchedules = schedules.filter(
     (s) => seoulDate(new Date(text(s.starts_at))) === today,
@@ -965,11 +967,8 @@ export function OpsShell() {
             <>
               <div className="ops-metrics">
                 {[
-                  ["전체 업무", tasks.length],
-                  [
-                    "완료",
-                    tasks.filter((t) => t.status === "completed").length,
-                  ],
+                  ["전체 업무", dailySummary.total],
+                  ["완료", dailySummary.completed],
                   ["My Attention", attention.length],
                   ["자동화 실행", "미연결"],
                 ].map(([label, value]) => (
@@ -981,7 +980,9 @@ export function OpsShell() {
                     <p>
                       {label === "자동화 실행"
                         ? "수신한 실행 기록 없음"
-                        : "실제 DB 조회 데이터 기준"}
+                        : label === "전체 업무" || label === "완료"
+                          ? `${today} · 오늘 등록 또는 마감인 업무`
+                          : "실제 DB 조회 데이터 기준"}
                     </p>
                   </div>
                 ))}
