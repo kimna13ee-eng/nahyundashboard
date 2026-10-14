@@ -54,7 +54,7 @@ export function AnalyticsPanel({
           checked={excludeTests}
           onChange={(e) => setExcludeTests(e.target.checked)}
         />
-        명시적인 검증용 제목의 업무 제외
+        테스트 업무 제외 (미지정은 기존 제목 기준)
       </label>
       {!enabled ? (
         <p>로그인 후 실제 DB 조회가 필요합니다.</p>

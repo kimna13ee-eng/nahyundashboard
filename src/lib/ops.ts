@@ -60,8 +60,17 @@ export function parseResource(resource: Resource, raw: unknown) {
     const minutes = Number(v.estimated_minutes ?? 0);
     if (!Number.isInteger(minutes) || minutes < 0 || minutes > 100000)
       throw new Error("계획 시간은 0~100000분입니다.");
+    if (
+      v.is_test !== undefined &&
+      v.is_test !== null &&
+      typeof v.is_test !== "boolean"
+    )
+      throw new Error("테스트 데이터 구분을 확인해 주세요.");
     return {
       ...task,
+      ...(v.is_test !== undefined
+        ? { is_test: v.is_test as boolean | null }
+        : {}),
       project_id: fk(v.project_id),
       tool: text(v.tool ?? "", 80),
       assignee: text(v.assignee ?? "", 80),

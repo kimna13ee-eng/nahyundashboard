@@ -40,7 +40,7 @@ export function journalReport(
     "",
     `날짜: ${day} (Asia/Seoul)`,
     `선택 날짜 작업 시간: ${(total / 60).toFixed(1)}분 · 작업 세션: ${entries.length}개`,
-    `검증용 제목: ${excludeTests ? "제외" : "포함"}`,
+    `테스트 업무: ${excludeTests ? "제외" : "포함"} (미지정은 기존 제목 기준)`,
     "",
     "조회된 PERSONAL 기록의 수동 요약입니다. 진행 중 구간은 생성 시각까지 계산합니다. 조회 제한이 있으면 전체 기록이 아닙니다.",
     "",

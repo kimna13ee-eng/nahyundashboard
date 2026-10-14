@@ -1,5 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+test("업무 테스트 구분은 boolean/null만 허용하고 미전송 값은 보존", () => {
+  const value = { title: "QA 일반 업무", notes: "", due_date: null, status: "pending", priority: "normal" };
+  for (const is_test of [true, false, null])
+    assert.equal(
+      (parseResource("tasks", { ...value, is_test }) as Record<string, unknown>).is_test,
+      is_test,
+    );
+  assert.equal(Object.hasOwn(parseResource("tasks", value), "is_test"), false);
+  for (const is_test of ["false", "true", 0, {}, []])
+    assert.throws(() => parseResource("tasks", { ...value, is_test }), /구분/);
+});
 import {
   parseResource,
   containsSecret,

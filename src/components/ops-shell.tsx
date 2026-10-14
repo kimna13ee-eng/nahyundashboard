@@ -149,6 +149,7 @@ export function OpsShell() {
   const startSubmit = useRef(false);
   const [contentFocus, setContentFocus] = useState<string | undefined>();
   const [taskClassification, setTaskClassification] = useState(false);
+  const [taskTestClassification, setTaskTestClassification] = useState(false);
   const [libraryWorkflow, setLibraryWorkflow] = useState(false);
   const [workflowReady, setWorkflowReady] = useState(false);
   const [timerGuardReady, setTimerGuardReady] = useState(false);
@@ -258,6 +259,7 @@ export function OpsShell() {
       setWorkflowChecked(true);
       setWorkflowData(workflow.data || {});
       setTaskClassification(result.taskClassification === true);
+      setTaskTestClassification(result.taskTestClassification === true);
       setLibraryWorkflow(result.libraryWorkflow === true);
       setOffset(Date.parse(result.serverNow) - Date.now());
       setTruncated(result.truncated);
@@ -2370,6 +2372,7 @@ export function OpsShell() {
       ) : null}
       {editor ? (
         <ResourceEditor
+          taskTestClassification={taskTestClassification}
           taskClassification={taskClassification}
           workflowReady={workflowReady}
           libraryWorkflow={libraryWorkflow}
@@ -2603,6 +2606,7 @@ function Empty({ label }: { label: string }) {
   );
 }
 function ResourceEditor({
+  taskTestClassification,
   taskClassification,
   workflowReady,
   libraryWorkflow,
@@ -2614,6 +2618,7 @@ function ResourceEditor({
   close,
   save,
 }: {
+  taskTestClassification: boolean;
   taskClassification: boolean;
   workflowReady: boolean;
   libraryWorkflow: boolean;
@@ -2709,6 +2714,13 @@ function ResourceEditor({
       value.kind = row.kind || editor.kind || "prompt";
     }
     if (resource === "tasks") {
+      if (taskTestClassification)
+        value.is_test =
+          value.is_test === "true"
+            ? true
+            : value.is_test === "false"
+              ? false
+              : null;
       if (value.contact_status !== undefined)
         value.follow_up_at = value.follow_up_at
           ? `${value.follow_up_at}:00+09:00`
@@ -2863,6 +2875,30 @@ function ResourceEditor({
               <p>업무 분류는 005 SQL 적용 후 사용할 수 있습니다.</p>
             )}
             {field("estimated_minutes", "계획 시간 (분)", "number")}
+            {taskTestClassification ? (
+              <label>
+                테스트 데이터 구분
+                <select
+                  name="is_test"
+                  aria-label="테스트 데이터 구분"
+                  defaultValue={
+                    row.is_test === true
+                      ? "true"
+                      : row.is_test === false
+                        ? "false"
+                        : ""
+                  }
+                >
+                  <option value="">미지정 (기존 제목 기준)</option>
+                  <option value="false">일반 업무</option>
+                  <option value="true">테스트 업무</option>
+                </select>
+                <small>
+                  테스트 업무는 테스트 제외 집계에서 빠집니다. 일반 업무로
+                  지정하면 제목에 QA 표시가 있어도 포함됩니다.
+                </small>
+              </label>
+            ) : null}
             {field("tool", "연결 도구", "text", 80)}
             {field("assignee", "담당자", "text", 80)}
             {field("result_url", "결과물 URL", "url", 2000)}
