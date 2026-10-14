@@ -1010,10 +1010,13 @@ export function OpsShell() {
                   {todaySchedules.length ? (
                     todaySchedules.map((s) => (
                       <div className="ops-entry" key={s.id}>
-                        <strong>{text(s.title)}</strong>
-                        <small>
-                          {dateTime(s.starts_at)} – {dateTime(s.ends_at)}
-                        </small>
+                        <div className="ops-entry-copy">
+                          <strong>{text(s.title)}</strong>
+                          <small>
+                            {dateTime(s.starts_at)} – {dateTime(s.ends_at)}
+                          </small>
+                        </div>
+                        {scheduleActions(s)}
                       </div>
                     ))
                   ) : (

@@ -39,6 +39,7 @@ const assert = require("node:assert/strict");
     )
   ).rows[0].id;
   await db.query("insert into tasks(title) values('삭제 확인 유지 업무')");
+  await db.query("insert into ops_schedules(title,starts_at,ends_at) values('Overview 삭제 검증',clock_timestamp(),clock_timestamp()+interval '1 hour')");
 
   const { parseResource } = await import("../src/lib/ops.ts");
   const tables = {
@@ -144,7 +145,11 @@ const assert = require("node:assert/strict");
       }
     });
 
-    await page.goto("http://127.0.0.1:3000");
+    await page.goto(process.env.TEST_BASE_URL || "http://127.0.0.1:3000");
+    await page.getByRole("button", { name: "Overview 삭제 검증 휴지통으로 이동", exact: true }).click();
+    await page.getByRole("button", { name: "Overview 삭제 검증 휴지통으로 이동", exact: true }).waitFor({state:"detached"});
+    fs.mkdirSync("work/layout-qa", {recursive:true});
+    await page.screenshot({path:"work/layout-qa/overview-wide.png",fullPage:true});
     const nav = page.locator(".ops-sidebar nav");
     await nav.getByRole("button", { name: "Calendar", exact: true }).click();
     await page
@@ -159,7 +164,7 @@ const assert = require("node:assert/strict");
         exact: true,
       })
       .click();
-    await page.getByText("일정 휴지통 (1)", { exact: true }).click();
+    await page.getByText("일정 휴지통 (2)", { exact: true }).click();
     await page
       .getByRole("button", { name: "휴지통 검증 일정 복구", exact: true })
       .waitFor();
@@ -175,7 +180,7 @@ const assert = require("node:assert/strict");
     await page
       .getByRole("button", { name: "휴지통 검증 일정 복구", exact: true })
       .click();
-    await page.getByText("일정 휴지통 (0)", { exact: true }).waitFor();
+    await page.getByText("일정 휴지통 (1)", { exact: true }).waitFor();
     await page
       .getByRole("button", {
         name: "휴지통 검증 일정 휴지통으로 이동",
@@ -202,6 +207,15 @@ const assert = require("node:assert/strict");
     );
     assert.equal(restored.deleted_at, null);
     assert.equal(restored.purge_after, null);
+    await nav.getByRole("button", {name:"Analytics",exact:true}).click();
+    await page.getByRole("table").first().waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    assert.match(await page.locator("body").evaluate(el => getComputedStyle(el).fontFamily), /Noto|noto/);
+    await page.screenshot({path:"work/layout-qa/analytics-wide.png",fullPage:true});
+    await page.setViewportSize({width:390,height:844});
+    await page.screenshot({path:"work/layout-qa/analytics-mobile.png",fullPage:true});
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);
+    await page.setViewportSize({width:1440,height:1000});
 
     await nav.getByRole("button", { name: "Projects", exact: true }).click();
     await page
