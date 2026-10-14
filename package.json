@@ -12,18 +12,21 @@
     "test:e2e": "node --experimental-strip-types tests/mvp-e2e.cjs",
     "test:e2e:ux": "node tests/ux-e2e.cjs",
     "test:e2e:trash": "node tests/schedule-trash-e2e.cjs",
+    "test:e2e:automations": "node tests/automation-results-e2e.cjs",
     "lint": "eslint src tests/*.test.ts",
-    "test:db": "node --test tests/database.test.mjs tests/phase2-db.test.mjs tests/personal-content-db.test.mjs tests/workflow-db.test.mjs tests/content-history-db.test.mjs tests/prompt-metadata-db.test.mjs tests/stabilization-db.test.mjs tests/schedule-trash-db.test.mjs",
+    "test:db": "node --test tests/database.test.mjs tests/phase2-db.test.mjs tests/personal-content-db.test.mjs tests/workflow-db.test.mjs tests/content-history-db.test.mjs tests/prompt-metadata-db.test.mjs tests/stabilization-db.test.mjs tests/schedule-trash-db.test.mjs tests/automation-results-db.test.mjs",
     "test:demo": "node tests/e2e.cjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.3",
     "lucide-react": "1.54.0",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "server-only": "0.0.1"
+    "server-only": "0.0.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

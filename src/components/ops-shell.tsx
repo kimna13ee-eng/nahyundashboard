@@ -17,6 +17,7 @@ import { AnalyticsPanel } from "./analytics-panel";
 import { ContentAnalyticsPanel } from "./content-analytics-panel";
 import { journalEntries } from "@/lib/journal-report";
 import { dailyTaskSummary } from "@/lib/overview-summary";
+import { AutomationResultsPanel } from "./automation-results-panel";
 import { JournalExport } from "./journal-export";
 import { attentionTasks, resumeContext } from "@/lib/workflow-context";
 import { calendarLabel, calendarTitle } from "@/lib/mobile-calendar";
@@ -150,6 +151,33 @@ export function OpsShell() {
   const startSubmit = useRef(false);
   const [contentFocus, setContentFocus] = useState<string | undefined>();
   const [taskClassification, setTaskClassification] = useState(false);
+  const [automationResults, setAutomationResults] = useState<OpsRow[]>([]);
+  const [automationReady, setAutomationReady] = useState(false);
+  useEffect(() => {
+    if (
+      !user ||
+      space === "FRENGLE" ||
+      !["overview", "automations"].includes(view)
+    )
+      return;
+    let mounted = true;
+    const interval = setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const result = await api("/api/automation-results");
+        if (mounted) {
+          setAutomationResults(result.results || []);
+          setAutomationReady(result.ready === true);
+        }
+      } catch {
+        if (mounted) setAutomationReady(false);
+      }
+    }, 30000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [user, space, view]);
   const [taskTestClassification, setTaskTestClassification] = useState(false);
   const [libraryWorkflow, setLibraryWorkflow] = useState(false);
   const [workflowReady, setWorkflowReady] = useState(false);
@@ -245,15 +273,21 @@ export function OpsShell() {
     const token = ++generation.current;
     setLoading(true);
     try {
-      const [result, workflow] = await Promise.all([
+      const [result, workflow, automation] = await Promise.all([
         api("/api/ops?workspace=PERSONAL"),
         api("/api/workflow?workspace=PERSONAL").catch(() => ({
           ready: false,
           data: {},
         })),
+        api("/api/automation-results").catch(() => ({
+          ready: false,
+          results: [],
+        })),
       ]);
       if (token !== generation.current) return;
       setData(result.data);
+      setAutomationResults(automation.results || []);
+      setAutomationReady(automation.ready === true);
       setTimerGuardReady(result.timerGuardReady === true);
       setDataReady(true);
       setWorkflowReady(workflow.ready === true);
@@ -970,7 +1004,16 @@ export function OpsShell() {
                   ["전체 업무", dailySummary.total],
                   ["완료", dailySummary.completed],
                   ["My Attention", attention.length],
-                  ["자동화 실행", "미연결"],
+                  [
+                    "자동화 실행",
+                    automationReady
+                      ? automationResults.filter(
+                          (r) =>
+                            seoulDate(new Date(String(r.received_at))) ===
+                            today,
+                        ).length
+                      : "미연결",
+                  ],
                 ].map(([label, value]) => (
                   <div className="ops-card" key={label}>
                     <small>{label}</small>
@@ -979,7 +1022,7 @@ export function OpsShell() {
                     </strong>
                     <p>
                       {label === "자동화 실행"
-                        ? "수신한 실행 기록 없음"
+                        ? "오늘 수신한 Metricool 결과 · 최근 100건 기준"
                         : label === "전체 업무" || label === "완료"
                           ? `${today} · 오늘 등록 또는 마감인 업무`
                           : "실제 DB 조회 데이터 기준"}
@@ -1820,18 +1863,11 @@ export function OpsShell() {
             </section>
           ) : null}
           {["automations"].includes(view) ? (
-            <section className="ops-card">
-              {heads(title, "다음 개발 단계")}
-              <Empty
-                label={
-                  view === "automations"
-                    ? "외부 도구 미연결 · 수신한 실행 기록 없음"
-                    : view === "content"
-                      ? "Content Studio는 Phase 2에서 구현합니다."
-                      : "Analytics는 Phase 2에서 구현합니다. 임의의 통계를 표시하지 않습니다."
-                }
-              />
-            </section>
+            <AutomationResultsPanel
+              results={space === "FRENGLE" ? [] : automationResults}
+              ready={Boolean(user) && space !== "FRENGLE" && automationReady}
+              refresh={() => void load()}
+            />
           ) : null}
           {view === "content" ? (
             <Phase2Panel

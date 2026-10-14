@@ -22,6 +22,7 @@ because it appears here.
 | 010 | `supabase/personal/010_stabilization.sql` | 001-009 | Timer guard/readiness and stabilization fields | Project reports explicitly say it was applied and must not be rerun |
 | 011 | Legacy operational identifier `SQL011 PRIVATE_UID`; no tracked SQL file | Existing production schema | Historical reports describe privileges/RLS/capture/preservation and readiness DB checks | Exact DDL and execution record are absent from Git; reserve this ID and verify live state before any related change |
 | 012 | `supabase/personal/012_schedule_trash.sql` | 002 schedule table and the verified 001-011 production state | Schedule soft delete, 12-hour restore, privileged purge function | Local/isolated only; not approved or applied to Supabase; Cron intentionally excluded |
+| 013 | `supabase/personal/013_automation_results.sql` | auth.users and authenticated/anon roles | PERSONAL Metricool result receipt table, owner RLS, immutable receipts and rate guard | Local/isolated only; production apply and OAuth setup pending |
 
 The apparent 011 record predates the schedule-trash work. It first appears in
 the 2026-10-11 release reports, while no corresponding SQL file exists in the
