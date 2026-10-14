@@ -165,6 +165,7 @@ export function Phase2Panel({
     }
   }, [data, initialContentId, resource]);
   const [calendarRecurrence, setCalendarRecurrence] = useState(false);
+  const [recurrenceArchive, setRecurrenceArchive] = useState(false);
   const [personalContent, setPersonalContent] = useState(false);
   const [contentHistory, setContentHistory] = useState(false),
     [versions, setVersions] = useState<OpsRow[]>([]);
@@ -187,6 +188,7 @@ export function Phase2Panel({
       setData(r.data);
       onCalendarData?.(r.data);
       setCalendarRecurrence(r.calendarRecurrence === true);
+      setRecurrenceArchive(r.recurrenceArchive === true);
       setPersonalContent(r.personalContent === true);
       setContentHistory(r.contentHistory === true);
       setVersions(r.versions || []);
@@ -605,6 +607,42 @@ export function Phase2Panel({
       ) : null}
       {list.length > 300 ? (
         <p>한 화면에 최대 300건 표시합니다. 검색으로 범위를 좁혀 주세요.</p>
+      ) : null}
+      {resource === "recurrence" ? (
+        <details className="ops-note">
+          <summary>반복 규칙 보관·복원</summary>
+          <p>
+            보관하면 캘린더에서 숨깁니다. 기존 회차와 수행 이력은 유지됩니다.
+            복원하면 과거 미확인 회차도 다시 표시될 수 있습니다.
+          </p>
+          {!recurrenceArchive ? (
+            <p>현재 연결에서는 반복 규칙 보관을 사용할 수 없습니다.</p>
+          ) : null}
+          {(data.recurrence || []).map((rule) => (
+            <div className="ops-row-actions" key={rule.id}>
+              <span>
+                {String(rule.title)} · {rule.archived_at ? "보관됨" : "사용 중"}
+              </span>
+              <button
+                type="button"
+                disabled={!canWrite || !recurrenceArchive}
+                aria-label={`${rule.title} 반복 규칙 ${rule.archived_at ? "복원" : "보관"}`}
+                onClick={() =>
+                  void save(
+                    {
+                      action: "recurrence_archive",
+                      id: rule.id,
+                      archived: !rule.archived_at,
+                    },
+                    "PATCH",
+                  )
+                }
+              >
+                {rule.archived_at ? "복원" : "보관"}
+              </button>
+            </div>
+          ))}
+        </details>
       ) : null}
       {resource === "recurrence" ? (
         <p className="ops-section-help">

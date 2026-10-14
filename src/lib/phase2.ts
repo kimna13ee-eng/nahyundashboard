@@ -200,6 +200,7 @@ export function occurrences(
     upper = Date.parse(`${to}T00:00:00+09:00`);
   const output: OpsRow[] = [];
   for (const r of rules) {
+    if (r.archived_at) continue;
     if (output.length >= 10000) break;
     const start = Date.parse(String(r.starts_at)),
       duration = Date.parse(String(r.ends_at)) - start;

@@ -53,6 +53,9 @@ async function handle(req: NextRequest) {
         p_index: 1,
       });
       return json({
+        recurrenceArchive: !(
+          await client.from("ops_recurrence").select("archived_at").limit(0)
+        ).error,
         contentHistory: !(
           await client.from("ops_content_versions").select("id").limit(0)
         ).error,
@@ -85,6 +88,31 @@ async function handle(req: NextRequest) {
       });
     }
     const body = await req.json();
+    if (body.action === "recurrence_archive") {
+      if (
+        req.method !== "PATCH" ||
+        !uuid(body.id) ||
+        typeof body.archived !== "boolean"
+      )
+        return json({ error: "반복 일정 보관 요청을 확인해 주세요." }, 400);
+      const result = await client
+        .from("ops_recurrence")
+        .update({
+          archived_at: body.archived ? new Date().toISOString() : null,
+        })
+        .eq("owner_id", user.id)
+        .eq("id", body.id)
+        .select("id")
+        .maybeSingle();
+      return result.error
+        ? json(
+            { error: "반복 일정 보관·복원 실패. 연결과 권한을 확인해 주세요." },
+            409,
+          )
+        : result.data
+          ? json({ ok: true })
+          : json({ error: "반복 일정을 찾을 수 없습니다." }, 404);
+    }
     if (body.action === "content_task") {
       if (!uuid(body.id) || !personalStages.includes(body.step))
         return json({ error: "콘텐츠·단계 확인 필요" }, 400);
