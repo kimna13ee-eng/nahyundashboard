@@ -56,11 +56,12 @@ export function AutomationResultsPanel({
             </details>
           ))
         : null}
-      <h3>FRENGLE 연결 대기</h3>
+      <h3>FRENGLE 자동화</h3>
       <p>
         키워드 검색 자동화 · 사이트 읽고 키워드 추천은 회사 저장소 연결 후
         받습니다. PERSONAL에는 저장하지 않습니다.
       </p>
+      <a href="/frengle">회사 계정 연결 및 자동화 결과 열기</a>
     </section>
   );
 }

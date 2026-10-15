@@ -12,9 +12,17 @@ Overview 실행 수는 오늘 받은 결과 수(최근 100개 조회 범위)이�
 키워드 검색 자동화 및 사이트 읽고 키워드 추천은 사용자 지정 FRENGLE 자료다.
 전용 저장소가 아직 없으므로 수신 불가이며 개인 저장소로 대체하지 않는다.
 
-운영 연결은 미완료: SQL013, OAuth 서버/클라이언트, Render 환경변수,
-ChatGPT MCP 연결 및 예약 작업 도구 지정, 실제 저장 실행이 아직 필요하다.
-기존 예약 작업·프롬프트·일정은 이번에 수정하지 않았다.
+2026-10-15 운영 확인: SQL013 및 Render 설정 후 ChatGPT의
+`MY OPS · PERSONAL Metricool` 연결을 승인했다. 조회 0건 → 테스트 저장 →
+재조회 1건 및 대시보드 Automations 본문/Overview 수신 건수 1을 확인했다.
+테스트 저장 ID는 `3ece8065-527f-47d7-8981-b779380d7fa6`이며 실제 지표가 아니다.
+검증 대화: https://chatgpt.com/c/6ad0491b-4c6c-83ec-abb9-56c1f9bf84dd
+
+기존 `Metricool 데이터 확인` 작업(`6ac23b5f41d081918f6a53b261787517`)은
+일시 중지 상태였다. 원래 조회 지시를 유지하고 실제 PERSONAL 결과만 저장하는
+지시를 추가·저장한 뒤 재개했다. UI의 다음 실행은 3일 후로 표시됐다.
+예약 실행에서 새 도구를 실제로 호출하는지는 아직 검증하지 않았다.
+FRENGLE 두 자동화는 전용 프로젝트 준비 및 별도 수신 구현이 필요하다.
 
 ## 인증 및 저장
 
@@ -65,7 +73,8 @@ source_url은 실제 ChatGPT 대화 주소, reported_at은 실제 결과 작성 
 MCP 초기화/도구 호출/입력 검증, production build/타입 검사/ESLint PASS.
 Edge 격리 UI에서 결과 본문/원본 링크/HTML 무실행/390px 넘침 없음 PASS.
 로컬 HTTP endpoint의 미인증401 및 외부 Origin403 PASS.
-실제 Supabase OAuth/ChatGPT MCP 연결 및 자동 실행은 미검증이다.
+실제 Supabase OAuth/ChatGPT MCP 연결과 테스트 저장·조회·대시보드 반영 PASS.
+예약 실행에 의한 자동 저장은 미검증이다.
 
 공식 문서:
 - https://learn.chatgpt.com/docs/automations
