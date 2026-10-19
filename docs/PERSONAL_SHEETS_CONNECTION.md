@@ -47,5 +47,5 @@ Validation:
 - Running API: eight invalid workspace/tab/parameter checks returned expected
   errors with no-store; POST returned 405.
 
-Deploy the application revision on Render after pushing main. Auto-Deploy is
-disabled; actual deployed panel verification remains pending this manual step.
+Revision ce9b21d was manually deployed on Render. All three production tabs and
+their current row counts were verified 2026-10-19. Auto-Deploy remains disabled.

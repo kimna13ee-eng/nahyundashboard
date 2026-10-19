@@ -1,14 +1,57 @@
 /* Shared content insets and typography across all dashboard views. */
-.editorial .ops-content-analytics { padding: 0 0 20px; }
-.editorial .ops-content-analytics > p { margin-inline: 20px; }
-.editorial .ops-content-analytics > .ops-toolbar { padding: 12px 20px; }
-.editorial .ops-header-utilities { align-items: center; }
-.editorial .ops-recovery-actions details > summary { margin: 0; }
-.editorial .ops-app-recovery > summary { margin: 0; }
-.editorial .ops-connection { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px 20px; padding: 20px; align-items: center; }
-.editorial .ops-connection strong, .editorial .ops-connection p { grid-column: 1; margin: 0; padding: 0; }
-.editorial .ops-connection button { position: relative; inset: auto; grid-column: 2; grid-row: 1 / span 2; align-self: center; margin: 0; }
-.editorial .ops-card > button { margin: 12px 20px 20px; }
+.editorial .ops-content-analytics {
+  padding: 0 0 20px;
+}
+.editorial .ops-content-analytics > p {
+  margin-inline: 20px;
+}
+.editorial .ops-content-analytics > .ops-toolbar {
+  padding: 12px 20px;
+}
+.editorial .ops-header-utilities {
+  align-items: center;
+}
+.editorial .ops-recovery-actions details > summary {
+  margin: 0;
+}
+.editorial .ops-app-recovery > summary {
+  margin: 0;
+}
+.editorial .ops-connection {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 20px;
+  padding: 20px;
+  align-items: center;
+}
+.editorial .ops-connection strong,
+.editorial .ops-connection p {
+  grid-column: 1;
+  margin: 0;
+  padding: 0;
+}
+.editorial .ops-connection :is(button, a) {
+  position: relative;
+  inset: auto;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  margin: 0;
+}
+.editorial .ops-connection > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--action-border, #d4c9df);
+  border-radius: 6px;
+  background: var(--action-bg, #fff);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.editorial .ops-card > button {
+  margin: 12px 20px 20px;
+}
 body,
 button,
 input,
@@ -18,7 +61,7 @@ textarea {
 }
 .editorial,
 .editorial * {
-  letter-spacing: -.01em !important;
+  letter-spacing: -0.01em !important;
   font-family: var(--font-noto-sans-kr), "Noto Sans KR", sans-serif !important;
 }
 .editorial h1,
@@ -28,6 +71,124 @@ textarea {
 }
 .editorial .ops-card {
   --content-inset: 20px;
+}
+/* Card headers, rows, and filter bars share one content edge. */
+.editorial .ops-card:not(.ops-leave-records) > .ops-section-head {
+  padding: 20px var(--content-inset);
+}
+.editorial .ops-card > .ops-toolbar {
+  padding-inline: var(--content-inset);
+}
+.editorial .ops-card > h2 {
+  padding-inline: var(--content-inset);
+}
+.editorial .ops-card:not(.ops-leave-records) > .ops-note,
+.editorial .ops-card > .ops-list > .ops-note {
+  margin-inline: 0;
+  padding-inline: var(--content-inset);
+}
+.editorial .ops-card > .ops-entry,
+.editorial .ops-card > .ops-list > .ops-entry,
+.editorial .ops-card > .ops-recurrence-row {
+  padding-inline: var(--content-inset);
+}
+.editorial .ops-card > .ops-resource-toolbar {
+  margin-inline: var(--content-inset);
+}
+.editorial .ops-card > .ops-toolbar > button,
+.editorial .ops-resource-toolbar > button,
+.editorial .ops-analytics-toolbar > button {
+  min-height: 34px;
+}
+.editorial .ops-card > label:has(> input[type="checkbox"]),
+.editorial .ops-analytics-toolbar > label:has(> input[type="checkbox"]),
+.editorial .ops-form > label:has(> input[type="checkbox"]),
+.editorial .ops-form fieldset > label:has(> input[type="checkbox"]) {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.6;
+}
+.editorial .ops-card > label > input[type="checkbox"],
+.editorial .ops-analytics-toolbar > label > input[type="checkbox"],
+.editorial .ops-form > label > input[type="checkbox"],
+.editorial .ops-form fieldset > label > input[type="checkbox"] {
+  appearance: auto;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 0;
+  padding: 0;
+  margin: 2px 0 0;
+  flex: 0 0 16px;
+  accent-color: #67517f;
+}
+/* Journal export is a section within a card, separate from analytics tables. */
+.editorial .ops-journal-export {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 0 var(--content-inset) 20px;
+}
+.editorial .ops-journal-export-heading {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.editorial .ops-journal-export-heading h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.editorial .ops-journal-export p {
+  margin: 0;
+  color: var(--action-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-journal-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.editorial .ops-journal-option input[type="checkbox"] {
+  appearance: auto;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 0;
+  padding: 0;
+  margin: 2px 0 0;
+  flex: 0 0 16px;
+  accent-color: #67517f;
+}
+.editorial .ops-journal-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.editorial .ops-journal-export-actions button {
+  min-height: 34px;
+  margin: 0;
+}
+.editorial .ops-journal-preview {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.editorial .ops-journal-preview textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  line-height: 1.7;
 }
 .editorial .ops-card > p,
 .editorial .ops-card > details,
@@ -43,6 +204,10 @@ textarea {
 }
 .editorial .ops-card > p {
   line-height: 1.65;
+}
+.editorial .ops-card > h2 + p {
+  margin-inline: 0;
+  padding-inline: var(--content-inset);
 }
 .editorial .ops-card > p.ops-section-help {
   padding: 12px;
@@ -161,17 +326,62 @@ textarea {
 .editorial .ops-analytics-table tbody tr:last-child td {
   border-bottom: 0;
 }
-.editorial .ops-task-progress { display: block; margin-top: 4px; overflow-wrap: anywhere; }
-.editorial .ops-process-editor { min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--action-border, #ded9d1); border-radius: 10px; }
-.editorial .ops-process-editor textarea { width: 100%; resize: vertical; }
-.editorial .ops-process-checklist { display: grid; gap: 8px; margin-top: 14px; }
-.editorial .ops-process-checklist label { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 6px; background: #f7f5f1; overflow-wrap: anywhere; }
-.editorial .ops-process-checklist input { width: 16px; height: 16px; min-height: 0; margin: 3px 0 0; flex: 0 0 auto; accent-color: #443b59; }
-.editorial .ops-process-checklist label:has(input:checked) span { color: #827c86; text-decoration: line-through; }
-.editorial .ops-process-current { margin-bottom: 0; font-weight: 500; }
+.editorial .ops-task-progress {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-process-editor {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--action-border, #ded9d1);
+  border-radius: 10px;
+}
+.editorial .ops-process-editor textarea {
+  width: 100%;
+  resize: vertical;
+}
+.editorial .ops-process-checklist {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.editorial .ops-process-checklist label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f7f5f1;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-process-checklist input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 3px 0 0;
+  flex: 0 0 auto;
+  accent-color: #443b59;
+}
+.editorial .ops-process-checklist label:has(input:checked) span {
+  color: #827c86;
+  text-decoration: line-through;
+}
+.editorial .ops-process-current {
+  margin-bottom: 0;
+  font-weight: 500;
+}
 @media (max-width: 640px) {
-  .editorial button, .editorial summary { background: var(--action-bg); border-color: var(--action-border); }
-  .editorial button::before, .editorial summary::before { content: none; }
+  .editorial button,
+  .editorial summary {
+    background: var(--action-bg);
+    border-color: var(--action-border);
+  }
+  .editorial button::before,
+  .editorial summary::before {
+    content: none;
+  }
   .editorial .ops-analytics-metrics {
     grid-template-columns: 1fr;
   }
@@ -186,5 +396,21 @@ textarea {
   .editorial .ops-analytics-metrics,
   .editorial .ops-analytics-toolbar {
     margin-inline: 16px;
+  }
+  .editorial .ops-journal-export-actions button,
+  .editorial .ops-card > .ops-toolbar > button,
+  .editorial .ops-resource-toolbar > button,
+  .editorial .ops-analytics-toolbar > button {
+    min-height: 44px;
+  }
+  .editorial .ops-journal-export-actions button {
+    flex: 1 1 180px;
+  }
+  .editorial .ops-card > .ops-toolbar input:not([type="checkbox"]),
+  .editorial .ops-card > .ops-toolbar select,
+  .editorial .ops-resource-toolbar > input,
+  .editorial .ops-analytics-toolbar input:not([type="checkbox"]),
+  .editorial .ops-analytics-toolbar select {
+    min-height: 44px;
   }
 }

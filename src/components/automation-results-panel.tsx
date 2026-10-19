@@ -1,67 +1,175 @@
 "use client";
+import Link from "next/link";
+import { ArrowUpRight, RefreshCw } from "lucide-react";
 import type { OpsRow } from "@/lib/ops";
+import {
+  automationReceiptIso,
+  automationReceiptRows,
+  automationReceiptTime,
+  automationSourceLabel,
+  chatGptSourceUrl,
+  type AutomationWorkspace,
+} from "@/lib/automation-receipts";
+import "@/app/automation-results.css";
+
+export function AutomationReceiptList({
+  results,
+  workspace,
+  limit,
+}: {
+  results: OpsRow[];
+  workspace: AutomationWorkspace;
+  limit?: number;
+}) {
+  const rows = automationReceiptRows(results, workspace, limit);
+  return (
+    <div className="ops-automation-list">
+      {rows.map((result) => {
+        const title = String(result.title || "자동화 결과");
+        const sourceUrl = chatGptSourceUrl(result.source_url);
+        return (
+          <article className="ops-automation-receipt" key={result.id}>
+            <header>
+              <div className="ops-automation-copy">
+                <span className="ops-automation-source">
+                  {automationSourceLabel(result.source)}
+                </span>
+                <h3>
+                  {sourceUrl ? (
+                    <a
+                      href={sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {title}
+                    </a>
+                  ) : (
+                    title
+                  )}
+                </h3>
+                <p className="ops-automation-received">
+                  <time dateTime={automationReceiptIso(result.received_at)}>
+                    {automationReceiptTime(result.received_at)}
+                  </time>{" "}
+                  수신
+                </p>
+              </div>
+              {sourceUrl ? (
+                <a
+                  className="ops-automation-chat"
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${title} · ChatGPT 대화 열기`}
+                >
+                  ChatGPT 대화 열기{" "}
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </a>
+              ) : (
+                <span className="ops-automation-no-link">
+                  원본 대화 링크 없음
+                </span>
+              )}
+            </header>
+            <details className="ops-automation-body">
+              <summary>결과 내용 보기</summary>
+              <p className="ops-automation-reported">
+                작업 보고: {automationReceiptTime(result.reported_at)}
+              </p>
+              <div>{String(result.body || "저장된 내용이 없습니다.")}</div>
+            </details>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 export function AutomationResultsPanel({
   results,
   ready,
   refresh,
+  enabled = true,
+  loading = false,
+  compact = false,
+  onViewAll,
 }: {
   results: OpsRow[];
   ready: boolean;
   refresh: () => void;
+  enabled?: boolean;
+  loading?: boolean;
+  compact?: boolean;
+  onViewAll?: () => void;
 }) {
+  const rows =
+    enabled && ready ? automationReceiptRows(results, "PERSONAL") : [];
   return (
-    <section className="ops-card">
+    <section
+      className={`ops-card ops-automation-results${compact ? " compact" : ""}`}
+    >
       <div className="ops-section-head">
         <div>
-          <h2>ChatGPT 자동화 결과</h2>
-          <p>PERSONAL · Metricool 데이터 확인</p>
+          <h2>{compact ? "최근 자동화 결과" : "자동화 데이터"}</h2>
+          <p>
+            PERSONAL · Metricool 데이터 확인{" "}
+            {enabled && ready ? `· ${rows.length}건 수신` : ""}
+          </p>
         </div>
-        <button onClick={refresh}>결과 새로고침</button>
+        <div className="ops-automation-actions">
+          {compact && onViewAll ? (
+            <button type="button" onClick={onViewAll}>
+              전체 결과 보기
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={!enabled || loading}
+          >
+            <RefreshCw size={14} aria-hidden="true" />{" "}
+            {loading ? "확인 중" : "결과 새로고침"}
+          </button>
+        </div>
       </div>
-      <p>
-        ChatGPT 도구가 전달하고 서버가 저장한 결과만 표시합니다. 목록이 비어
-        있어도 예약 작업이 실패했다는 뜻은 아닙니다.
+      {!enabled ? (
+        <p className="ops-automation-state" role="status">
+          PERSONAL 계정으로 로그인하면 개인 자동화 결과를 볼 수 있습니다.
+        </p>
+      ) : loading && !ready ? (
+        <p className="ops-automation-state" role="status">
+          자동화 결과를 불러오는 중입니다.
+        </p>
+      ) : !ready ? (
+        <p className="ops-automation-state" role="status">
+          자동화 결과를 확인하지 못했습니다. 결과 새로고침으로 다시 확인해
+          주세요.
+        </p>
+      ) : !rows.length ? (
+        <p className="ops-automation-state">
+          아직 수신한 Metricool 결과가 없습니다. ChatGPT에서 결과가 전달되면
+          여기에 표시됩니다.
+        </p>
+      ) : (
+        <AutomationReceiptList
+          results={rows}
+          workspace="PERSONAL"
+          limit={compact ? 3 : undefined}
+        />
+      )}
+      <p className="ops-automation-help">
+        저장된 결과만 표시합니다. 수신 내역이 없다고 예약 작업이 실패한 것은
+        아닙니다.
       </p>
-      {!ready ? (
-        <p role="status">결과 저장소 연결이 필요합니다.</p>
-      ) : !results.length ? (
-        <p>아직 전달된 실행 결과가 없습니다.</p>
-      ) : null}
-      {ready
-        ? results.map((result) => (
-            <details className="ops-note" key={result.id}>
-              <summary>
-                {String(result.title)} ·{" "}
-                {new Date(String(result.received_at)).toLocaleString("ko-KR", {
-                  timeZone: "Asia/Seoul",
-                })}{" "}
-                수신
-              </summary>
-              <p>
-                작업 보고 시각:{" "}
-                {new Date(String(result.reported_at)).toLocaleString("ko-KR", {
-                  timeZone: "Asia/Seoul",
-                })}
-              </p>
-              <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                {String(result.body)}
-              </p>
-              <a
-                href={String(result.source_url)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                ChatGPT 원본 열기
-              </a>
-            </details>
-          ))
-        : null}
-      <h3>FRENGLE 자동화</h3>
-      <p>
-        키워드 검색 자동화 · 사이트 읽고 키워드 추천은 회사 저장소 연결 후
-        받습니다. PERSONAL에는 저장하지 않습니다.
-      </p>
-      <a href="/frengle">회사 계정 연결 및 자동화 결과 열기</a>
+      <aside className="ops-automation-company">
+        <div>
+          <h3>FRENGLE 자동화 결과</h3>
+          <p>출근 업무 체크 · 키워드 검색 · 사이트 소재 추천</p>
+        </div>
+        <Link href="/frengle">
+          회사 결과 보기 <ArrowUpRight size={14} aria-hidden="true" />
+        </Link>
+      </aside>
     </section>
   );
 }

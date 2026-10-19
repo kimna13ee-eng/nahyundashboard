@@ -38,7 +38,13 @@ export function AnalyticsPanel({
   const switches = (data.session_events || []).filter(
     (e) => e.kind === "switch" && ids.has(String(e.session_id)),
   );
-  const categoryTimes = taskCategorySeconds(tasks, sessions, intervals, date, now);
+  const categoryTimes = taskCategorySeconds(
+    tasks,
+    sessions,
+    intervals,
+    date,
+    now,
+  );
   const fmt = (seconds: number) => `${(seconds / 3600).toFixed(2)}시간`;
   return (
     <section className="ops-card">
@@ -105,14 +111,14 @@ export function AnalyticsPanel({
             </div>
           ) : (
             <p>
-              새 업무 분류 저장소가 준비되면 콘텐츠·영업·디자인·기타별 작업 시간을
-              표시합니다.
+              새 업무 분류 저장소가 준비되면 콘텐츠·영업·디자인·기타별 작업
+              시간을 표시합니다.
             </p>
           )}
           {taskProcessReady ? (
             <p>
-              현재 업무 분류를 기준으로 과거 작업 시간도 집계합니다. 분류를 지정하지
-              않은 기존 업무는 기타로 집계합니다.
+              현재 업무 분류를 기준으로 과거 작업 시간도 집계합니다. 분류를
+              지정하지 않은 기존 업무는 기타로 집계합니다.
             </p>
           ) : null}
           <h3>프로젝트별 전체 작업 시간</h3>
@@ -198,8 +204,8 @@ export function AnalyticsPanel({
             </table>
           </div>
           <p>
-            외부 자동화는 미연결입니다. 조회 제한이 있는 경우 전체 통계가
-            아닙니다.
+            자동화 수신 결과는 작업 시간에 합산하지 않습니다. 조회 제한이 있는
+            경우 전체 통계가 아닙니다.
           </p>
         </>
       )}

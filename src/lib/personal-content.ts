@@ -41,6 +41,9 @@ export function parsePersonalContent(raw: unknown) {
     throw new Error("개인 콘텐츠 입력을 확인해 주세요.");
   const v = raw as Record<string, unknown>,
     out: Record<string, unknown> = {};
+  if (v.calendar_hidden !== undefined && typeof v.calendar_hidden !== "boolean")
+    throw new Error("캘린더 표시 여부를 확인해 주세요.");
+  out.calendar_hidden = v.calendar_hidden ?? false;
   for (const [key, choices] of Object.entries({
     type: contentTypes,
     step: personalStages,
@@ -124,6 +127,7 @@ export function parsePersonalContent(raw: unknown) {
 export function contentCalendar(content: OpsRow[]) {
   return content.flatMap((c) => {
     const p = c.personal_details as Record<string, unknown> | undefined;
+    if (p?.calendar_hidden === true) return [];
     return [
       ["shoot", "콘텐츠 촬영", p?.shoot_at],
       ["edit", "콘텐츠 편집", p?.edit_at],

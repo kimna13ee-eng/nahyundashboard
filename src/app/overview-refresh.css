@@ -1,0 +1,254 @@
+.editorial .ops-overview-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.editorial .ops-overview-metrics > .ops-card {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+}
+.editorial .ops-overview-metrics > .ops-automation-metric {
+  align-items: flex-start;
+  width: 100%;
+  min-height: 0;
+  margin: 0 0 20px;
+  border-color: #e8e4df;
+  border-radius: 14px;
+  background: var(--paper, #fff);
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+}
+.editorial .ops-overview-metric-note {
+  display: none;
+}
+.editorial .ops-overview-metrics > .ops-card > small,
+.editorial .ops-overview-metrics .ops-automation-metric > small {
+  display: block;
+  font-size: 11px;
+  line-height: 18px;
+}
+.editorial .ops-overview-metrics > .ops-card > strong,
+.editorial .ops-overview-metrics .ops-automation-metric > strong {
+  display: block;
+  margin: 18px 0;
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+.editorial .ops-overview-metrics > .ops-card > p {
+  margin: auto 0 0;
+  padding: 0;
+  line-height: 16px;
+}
+.editorial .ops-automation-metric > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 10px;
+  color: #81718d;
+  font-size: 11px;
+  line-height: 16px;
+}
+.editorial .ops-task {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px var(--content-inset, 20px);
+}
+.editorial .ops-task-complete {
+  width: 100%;
+  min-width: 58px;
+  min-height: 36px;
+  align-self: center;
+  color: #6b547c;
+  background: #f7f3fa;
+}
+.editorial .ops-task-title {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.editorial .ops-task-title > strong,
+.editorial .ops-task-title > small {
+  display: block;
+  white-space: normal;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-task > .ops-badge,
+.editorial .ops-task > .ops-actions {
+  margin: 0;
+}
+.editorial .ops-task-record {
+  font-size: 11px;
+}
+.editorial .ops-task-detail-title {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: inherit;
+  font-weight: inherit;
+  text-align: left;
+}
+.editorial .ops-overview-completed .ops-task-complete {
+  background: #f0f4f1;
+  color: #5f7a68;
+}
+.editorial .ops-week-table-wrap {
+  overflow-x: auto;
+  padding-bottom: 1px;
+}
+.editorial .ops-week-table {
+  width: 100%;
+  min-width: 450px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+.editorial .ops-week-table th,
+.editorial .ops-week-table td {
+  padding: 14px 20px;
+  border-bottom: 1px solid #ece8e4;
+  vertical-align: middle;
+  line-height: 1.7;
+}
+.editorial .ops-week-table thead th {
+  background: #f8f6f3;
+  color: #83778c;
+  font-size: 11px;
+  font-weight: 500;
+}
+.editorial .ops-week-table th:first-child {
+  width: 105px;
+}
+.editorial .ops-week-table th:last-child {
+  width: 160px;
+}
+.editorial .ops-week-table tbody th {
+  font-weight: 500;
+  vertical-align: top;
+}
+.editorial .ops-week-table small {
+  display: block;
+  font-size: 10px;
+  color: #968b9e;
+}
+.editorial .ops-week-table td:last-child {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: #75697e;
+}
+.editorial .ops-week-table .is-today th {
+  background: #f4eef7;
+  color: #735284;
+}
+.editorial .ops-week-item {
+  display: inline;
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-week-item:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.editorial .ops-week-trash {
+  margin-top: 7px;
+  min-height: 28px;
+  padding: 3px 7px;
+  font-size: 10px;
+}
+.editorial .ops-week-empty {
+  color: #b0a8b5;
+  font-size: 11px;
+}
+.editorial .ops-week-notice {
+  margin: 0;
+  padding: 0 20px 16px;
+  color: #9a7b50;
+  font-size: 11px;
+  line-height: 1.7;
+}
+@media (max-width: 640px) {
+  .editorial .ops-week-table {
+    min-width: 0;
+    table-layout: fixed;
+  }
+  .editorial .ops-week-table th,
+  .editorial .ops-week-table td {
+    padding: 12px;
+  }
+  .editorial .ops-week-table th:first-child {
+    width: 75px;
+  }
+  .editorial .ops-week-table th:last-child {
+    width: 118px;
+  }
+  .editorial .ops-week-notice {
+    padding-inline: 16px;
+  }
+}
+@media (max-width: 760px) {
+  .editorial .ops-overview-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .editorial .ops-overview-metrics > .ops-card {
+    min-height: 0;
+    margin: 0 0 10px;
+    padding: 12px;
+  }
+  .editorial .ops-overview-metrics > .ops-card > small {
+    font-size: 10px;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .editorial .ops-overview-metrics > .ops-card > strong {
+    margin: 8px 0 0;
+    font-size: 24px;
+    line-height: 32px;
+  }
+  .editorial .ops-overview-metrics > .ops-card > p,
+  .editorial .ops-overview-metrics > .ops-automation-metric > span {
+    display: none;
+  }
+  .editorial .ops-overview-metric-note {
+    display: block;
+    margin: 0 0 18px;
+    color: #95899d;
+    font-size: 10px;
+    line-height: 1.6;
+  }
+  .editorial .ops-task {
+    grid-template-columns: 68px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+  .editorial .ops-task-complete {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .editorial .ops-task-title {
+    grid-column: 2 / 4;
+    grid-row: 1;
+  }
+  .editorial .ops-task > .ops-badge {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+  .editorial .ops-task > .ops-actions {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+  }
+}

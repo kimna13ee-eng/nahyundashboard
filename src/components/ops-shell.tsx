@@ -17,10 +17,16 @@ import { AnalyticsPanel } from "./analytics-panel";
 import { ContentAnalyticsPanel } from "./content-analytics-panel";
 import { PersonalSheetsPanel } from "./personal-sheets-panel";
 import { journalEntries } from "@/lib/journal-report";
-import { dailyTaskSummary } from "@/lib/overview-summary";
+import {
+  dailyTaskGroups,
+  dailyTaskSummary,
+  seoulWeek,
+  taskCompletionTime,
+  weeklyScheduleRows,
+  weeklyScheduleTime,
+} from "@/lib/overview-summary";
 import { AutomationResultsPanel } from "./automation-results-panel";
 import { JournalExport } from "./journal-export";
-import { attentionTasks } from "@/lib/workflow-context";
 import { calendarLabel, calendarTitle } from "@/lib/mobile-calendar";
 import { contentCalendar } from "@/lib/personal-content";
 import { WorkflowInbox, ParkFields, parkForm } from "./workflow-inbox";
@@ -52,7 +58,6 @@ import {
   Pause,
   Square,
   ArrowUpRight,
-  Check,
   Command,
   Star,
   Copy,
@@ -516,7 +521,7 @@ export function OpsShell() {
     (menu) => menu.id !== "personal-sheets" || space === "PERSONAL",
   );
   const title = menus.find((m) => m.id === view)?.label || "Overview";
-  const taskActions = (t: OpsRow) => (
+  const taskActions = (t: OpsRow, showRecord = true) => (
     <div className="ops-actions">
       <button
         className="ops-icon"
@@ -527,14 +532,19 @@ export function OpsShell() {
       >
         <Play size={15} />
       </button>
-      <button
-        className="ops-icon"
-        aria-label={`${t.title} 수정`}
-        disabled={!canWrite}
-        onClick={() => setEditor({ resource: "tasks", row: t })}
-      >
-        <Pencil size={15} />
-      </button>
+      {showRecord ? (
+        <button
+          className="ops-task-record"
+          aria-label={`${t.title} 작업 기록`}
+          onClick={() => {
+            setDetail(t.id);
+            setTab("Overview");
+            setView("projects");
+          }}
+        >
+          기록
+        </button>
+      ) : null}
       <button
         className="ops-icon ops-danger"
         aria-label={`${t.title} 삭제`}
@@ -551,9 +561,9 @@ export function OpsShell() {
         list.map((t) => (
           <div className="ops-task" key={t.id}>
             <button
-              className="ops-check"
+              className="ops-task-complete"
               disabled={!canWrite}
-              aria-label={`${t.title} 완료 전환`}
+              aria-label={`${t.title} ${t.status === "completed" ? "완료 취소" : "완료"}`}
               onClick={() => {
                 // Only a click invokes this callback; the request ref is never read during render.
                 // eslint-disable-next-line react-hooks/refs
@@ -571,15 +581,13 @@ export function OpsShell() {
                 );
               }}
             >
-              <Check size={16} />
+              {t.status === "completed" ? "완료 취소" : "완료"}
             </button>
             <button
               className="ops-task-title"
-              onClick={() => {
-                setDetail(t.id);
-                setTab("Overview");
-                setView("projects");
-              }}
+              disabled={!canWrite}
+              aria-label={`${t.title} 수정`}
+              onClick={() => setEditor({ resource: "tasks", row: t })}
             >
               <strong>{text(t.title)}</strong>
               <small>
@@ -587,6 +595,11 @@ export function OpsShell() {
                   "독립 업무"}{" "}
                 · {text(t.due_date) || "마감일 없음"}
                 {` · ${taskCategoryLabels[t.task_category as keyof typeof taskCategoryLabels] || "기타"}`}
+                {t.status === "completed" && taskCompletionTime(t) ? (
+                  <span className="ops-task-progress">
+                    완료 {dateTime(taskCompletionTime(t))}
+                  </span>
+                ) : null}
                 {Array.isArray(t.process_steps) && t.process_steps.length ? (
                   <span className="ops-task-progress">
                     현재 단계:{" "}
@@ -678,12 +691,10 @@ export function OpsShell() {
       </button>
     </div>
   );
-  const today = seoulDate(new Date(tick));
+  const today = seoulDate(new Date(tick + offset));
   const dailySummary = dailyTaskSummary(tasks, today);
-  const attention = attentionTasks(tasks, today);
-  const todaySchedules = schedules.filter(
-    (s) => seoulDate(new Date(text(s.starts_at))) === today,
-  );
+  const todayTasks = dailyTaskGroups(tasks, today);
+  const overviewWeek = seoulWeek(today);
   const filteredTasks = tasks.filter(
     (t) =>
       (project === "all" || t.project_id === project) &&
@@ -692,22 +703,112 @@ export function OpsShell() {
   const [calendarExtra, setCalendarExtra] = useState<{
     key: string;
     data: OpsData;
-  }>({ key: "", data: {} });
+    ready: boolean;
+    error: string;
+    truncated: string[];
+  }>({ key: "", data: {}, ready: false, error: "", truncated: [] });
   const calendarKey = (user?.email || "signed-out") + ":" + space;
   const receiveCalendarData = useCallback(
     (data: OpsData) => {
-      setCalendarExtra({ key: calendarKey, data });
+      setCalendarExtra({
+        key: calendarKey,
+        data,
+        ready: true,
+        error: "",
+        truncated: [],
+      });
     },
     [calendarKey],
   );
+  useEffect(() => {
+    if (!user || space === "FRENGLE" || view !== "overview") return;
+    const controller = new AbortController();
+    let requestSequence = 0;
+    let activeRequest: AbortController | null = null;
+    async function refreshOverviewCalendar(): Promise<boolean> {
+      const sequence = ++requestSequence;
+      activeRequest?.abort();
+      const requestController = new AbortController();
+      activeRequest = requestController;
+      try {
+        const response = await fetch("/api/phase2?workspace=PERSONAL", {
+          cache: "no-store",
+          signal: AbortSignal.any([
+            controller.signal,
+            requestController.signal,
+            AbortSignal.timeout(20000),
+          ]),
+        });
+        const result = await response.json();
+        if (!response.ok)
+          throw new Error(
+            result.error || "반복·콘텐츠 일정을 불러오지 못했습니다.",
+          );
+        if (controller.signal.aborted || sequence !== requestSequence)
+          return false;
+        setCalendarExtra({
+          key: calendarKey,
+          data: result.data || {},
+          ready: true,
+          error: "",
+          truncated: result.truncated || [],
+        });
+        return true;
+      } catch (cause) {
+        if (controller.signal.aborted || sequence !== requestSequence)
+          return false;
+        setCalendarExtra({
+          key: calendarKey,
+          data: {},
+          ready: false,
+          error:
+            cause instanceof Error
+              ? cause.message
+              : "반복·콘텐츠 일정을 불러오지 못했습니다.",
+          truncated: [],
+        });
+        return false;
+      } finally {
+        if (sequence === requestSequence) activeRequest = null;
+      }
+    }
+    const refresh = (event: Event) => {
+      if (backgroundBusy.current || document.querySelector("dialog[open]"))
+        return;
+      const promise = refreshOverviewCalendar();
+      (
+        event as CustomEvent<{ waits?: Promise<boolean>[] }>
+      ).detail?.waits?.push(promise);
+      void promise;
+    };
+    window.addEventListener("myops:refresh", refresh);
+    void refreshOverviewCalendar();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible" && !activeRequest)
+        void refreshOverviewCalendar();
+    }, 30000);
+    return () => {
+      controller.abort();
+      activeRequest?.abort();
+      window.removeEventListener("myops:refresh", refresh);
+      window.clearInterval(interval);
+    };
+  }, [calendarKey, user, space, view]);
   const extra =
     calendarExtra.key === calendarKey && user && space !== "FRENGLE"
       ? calendarExtra.data
       : {};
-  const recurrenceFrom = day.slice(0, 7) + "-01";
-  const recurrenceTo = new Date(Date.parse(day + "T00:00:00Z") + 370 * 86400000)
-    .toISOString()
-    .slice(0, 10);
+  const calendarAnchor = view === "overview" ? today : day;
+  const recurrenceFrom =
+    view === "overview"
+      ? overviewWeek.from
+      : calendarAnchor.slice(0, 7) + "-01";
+  const recurrenceTo =
+    view === "overview"
+      ? overviewWeek.to
+      : new Date(Date.parse(calendarAnchor + "T00:00:00Z") + 370 * 86400000)
+          .toISOString()
+          .slice(0, 10);
   const journalRows = journalEntries(
     space === "FRENGLE" ? {} : data,
     day,
@@ -715,7 +816,7 @@ export function OpsShell() {
     excludeJournalTests,
   );
   const inRange = (s: OpsRow) => scheduleOverlaps(s, day, calendarView);
-  const calendarItems: (OpsRow & { source: string })[] = [
+  const allCalendarItems: (OpsRow & { source: string })[] = [
     ...occurrences(
       extra.recurrence || [],
       extra.exceptions || [],
@@ -740,9 +841,18 @@ export function OpsShell() {
         source: "업무 마감",
         task: t,
       })),
-  ]
+  ];
+  const calendarItems = allCalendarItems
     .filter(inRange)
     .sort((a, b) => text(a.starts_at).localeCompare(text(b.starts_at)));
+  const weeklyItems = weeklyScheduleRows(allCalendarItems, today);
+  function openWeeklyItem(item: OpsRow) {
+    if (item.source === "일정") {
+      setEditor({ resource: "schedules", row: item });
+    } else if (item.source === "업무 마감" && item.task) {
+      setEditor({ resource: "tasks", row: item.task as OpsRow });
+    } else setCalendarDetail(item);
+  }
   function dayShift(delta: number) {
     if (calendarView === "month") {
       const shifted = new Date(
@@ -944,18 +1054,18 @@ export function OpsShell() {
           <div className="ops-connection">
             <strong>
               {space === "FRENGLE"
-                ? "FRENGLE은 아직 연결되지 않았습니다."
+                ? "FRENGLE · 회사 전용 포털"
                 : space === "ALL"
                   ? "ALL · 현재 연결 가능한 PERSONAL 데이터만 표시합니다."
                   : "PERSONAL · 개인 프로젝트 전용"}
             </strong>
             <p>
               {space === "FRENGLE"
-                ? "회사 실제 자료와 메타데이터를 개인 DB에 저장하지 않습니다."
+                ? "회사 자동화 데이터는 별도 저장소와 회사 전용 포털에서 확인하세요."
                 : configured === false
                   ? "환경변수가 없습니다. 샘플 데이터와 임의의 통계를 표시하지 않습니다."
                   : user
-                    ? "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 외부 도구는 미연결입니다."
+                    ? "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 자동화 데이터에는 수신된 결과를 표시합니다."
                     : "설정에서 개인 계정으로 로그인하세요. 로그인 전에는 실제 데이터를 표시하지 않습니다."}
             </p>
             {user && dataReady && space !== "FRENGLE" && !timerGuardReady ? (
@@ -964,9 +1074,15 @@ export function OpsShell() {
                 새로고침해 주세요.
               </p>
             ) : null}
-            <button onClick={() => move("settings")}>
-              설정 <ArrowUpRight size={14} />
-            </button>
+            {space === "FRENGLE" ? (
+              <Link href="/frengle">
+                회사 포털 열기 <ArrowUpRight size={14} />
+              </Link>
+            ) : (
+              <button onClick={() => move("settings")}>
+                설정 <ArrowUpRight size={14} />
+              </button>
+            )}
           </div>
           {error ? (
             <p className="ops-alert bad" role="alert">
@@ -998,13 +1114,12 @@ export function OpsShell() {
           ) : null}
           {view === "overview" ? (
             <>
-              <div className="ops-metrics">
+              <div className="ops-metrics ops-overview-metrics">
                 {[
                   ["전체 업무", dailySummary.total],
-                  ["완료", dailySummary.completed],
-                  ["My Attention", attention.length],
+                  ["오늘 완료", todayTasks.completed.length],
                   [
-                    "자동화 실행",
+                    "자동화 데이터",
                     automationReady
                       ? automationResults.filter(
                           (r) =>
@@ -1013,67 +1128,180 @@ export function OpsShell() {
                         ).length
                       : "미연결",
                   ],
-                ].map(([label, value]) => (
-                  <div className="ops-card" key={label}>
-                    <small>{label}</small>
-                    <strong>
-                      {user && space !== "FRENGLE" && !error ? value : "—"}
-                    </strong>
-                    <p>
-                      {label === "자동화 실행"
-                        ? "오늘 수신한 Metricool 결과 · 최근 100건 기준"
-                        : label === "전체 업무" || label === "완료"
-                          ? `${today} · 오늘 등록 또는 마감인 업무`
-                          : "실제 DB 조회 데이터 기준"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <div className="ops-two">
-                <section className="ops-card">
-                  {heads(
-                    "오늘의 업무",
-                    `마감일 ${today} · 미완료`,
-                    create("tasks", "업무 등록", { dueDate: today }),
-                  )}
-                  {taskList(
-                    tasks.filter(
-                      (t) => t.due_date === today && t.status !== "completed",
-                    ),
-                  )}
-                </section>
-                <section className="ops-card">
-                  {heads(
-                    "오늘의 일정",
-                    "서울 시간 기준",
-                    create("schedules", "일정 등록", {
-                      scheduleDate: today,
-                    }),
-                  )}
-                  {todaySchedules.length ? (
-                    todaySchedules.map((s) => (
-                      <div className="ops-entry" key={s.id}>
-                        <div className="ops-entry-copy">
-                          <strong>{text(s.title)}</strong>
-                          <small>
-                            {dateTime(s.starts_at)} – {dateTime(s.ends_at)}
-                          </small>
-                        </div>
-                        {scheduleActions(s)}
-                      </div>
-                    ))
+                ].map(([label, value]) => {
+                  const contents = (
+                    <>
+                      <small>{label}</small>
+                      <strong>
+                        {user && space !== "FRENGLE" && !error ? value : "—"}
+                      </strong>
+                      {label === "자동화 데이터" ? (
+                        <span>
+                          수신 결과 확인 <ArrowUpRight size={14} />
+                        </span>
+                      ) : null}
+                      <p>
+                        {label === "자동화 데이터"
+                          ? "오늘 수신한 Metricool 결과 · 최근 100건 기준"
+                          : label === "오늘 완료"
+                            ? `${today} · 오늘 완료한 업무`
+                            : `${today} · 오늘 등록 또는 마감인 업무`}
+                      </p>
+                    </>
+                  );
+                  return label === "자동화 데이터" ? (
+                    <button
+                      className="ops-card ops-automation-metric"
+                      key={label}
+                      aria-label="자동화 데이터 · 수신 결과 확인"
+                      onClick={() => move("automations")}
+                    >
+                      {contents}
+                    </button>
                   ) : (
-                    <Empty label="오늘 등록된 일정이 없습니다." />
-                  )}
-                </section>
+                    <div className="ops-card" key={label}>
+                      {contents}
+                    </div>
+                  );
+                })}
               </div>
-              <section className="ops-card">
+              <p className="ops-overview-metric-note">
+                {today} · 전체: 오늘 등록·마감 · 완료: 오늘 완료 · 자동화: 수신
+                결과
+              </p>
+              <section className="ops-card ops-overview-today">
                 {heads(
-                  "My Attention",
-                  "실패 · 오늘 마감 및 지연 · 승인 대기 · 후속 날짜 · 14일 이상 미갱신",
+                  "오늘의 업무",
+                  `${today} · 오늘 등록하거나 오늘 마감인 미완료 업무`,
+                  create("tasks", "업무 등록", { dueDate: today }),
                 )}
-                {taskList(attention)}
+                {taskList(todayTasks.pending)}
               </section>
+              <section className="ops-card ops-overview-completed">
+                {heads("오늘 완료 업무", `${today} · 실제 완료한 날짜 기준`)}
+                {todayTasks.completed.length ? (
+                  taskList(todayTasks.completed)
+                ) : (
+                  <Empty label="오늘 완료한 업무가 없습니다." />
+                )}
+              </section>
+              <section className="ops-card ops-overview-week">
+                {heads(
+                  "이번 주 일정",
+                  `${overviewWeek.from}–${overviewWeek.days[6]} · 월요일부터 일요일 · 한국시간`,
+                  create("schedules", "일정 등록", { scheduleDate: today }),
+                )}
+                {user &&
+                space !== "FRENGLE" &&
+                (calendarExtra.key !== calendarKey || !calendarExtra.ready) ? (
+                  <p className="ops-week-notice" role="status">
+                    {calendarExtra.key === calendarKey && calendarExtra.error
+                      ? "반복·콘텐츠 일정을 불러오지 못했습니다. 일반 일정과 업무 마감만 표시합니다."
+                      : "반복·콘텐츠 일정을 불러오는 중입니다."}
+                  </p>
+                ) : null}
+                {calendarExtra.key === calendarKey &&
+                calendarExtra.truncated.length ? (
+                  <p className="ops-week-notice">
+                    일부 일정의 조회 범위를 초과해 전체 항목이 표시되지 않을 수
+                    있습니다.
+                  </p>
+                ) : null}
+                <div className="ops-week-table-wrap">
+                  <table className="ops-week-table">
+                    <caption className="sr-only">
+                      이번 주 일정. 요일, 항목, 시간 순서
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">요일</th>
+                        <th scope="col">항목</th>
+                        <th scope="col">시간</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weeklyItems.flatMap(({ day: weekDay, weekday, items }) =>
+                        (items.length ? items : [null]).map((item, index) => (
+                          <tr
+                            key={`${weekDay}:${item?.id || "empty"}`}
+                            className={
+                              weekDay === today ? "is-today" : undefined
+                            }
+                          >
+                            {index === 0 ? (
+                              <th
+                                scope="row"
+                                rowSpan={Math.max(1, items.length)}
+                              >
+                                <span>
+                                  {weekday}
+                                  {weekDay === today ? " · 오늘" : ""}
+                                </span>
+                                <small>
+                                  {weekDay.slice(5).replace("-", "/")}
+                                </small>
+                              </th>
+                            ) : null}
+                            <td>
+                              {item ? (
+                                <>
+                                  <button
+                                    className="ops-week-item"
+                                    disabled={
+                                      !canWrite &&
+                                      ["일정", "업무 마감"].includes(
+                                        text(item.source),
+                                      )
+                                    }
+                                    onClick={() => openWeeklyItem(item)}
+                                  >
+                                    {text(item.title)}
+                                  </button>
+                                  <small>{text(item.source)}</small>
+                                  {item.source === "일정" ? (
+                                    <button
+                                      className="ops-week-trash ops-danger"
+                                      aria-label={`${item.title} 휴지통으로 이동`}
+                                      disabled={!canWrite}
+                                      onClick={() =>
+                                        void mutate(
+                                          {
+                                            resource: "schedules",
+                                            id: item.id,
+                                          },
+                                          "DELETE",
+                                        )
+                                      }
+                                    >
+                                      <Trash2 size={14} />
+                                      삭제
+                                    </button>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <span className="ops-week-empty">
+                                  등록된 일정 없음
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              {item ? weeklyScheduleTime(item, weekDay) : "—"}
+                            </td>
+                          </tr>
+                        )),
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              <AutomationResultsPanel
+                results={automationResults}
+                ready={automationReady}
+                enabled={Boolean(user) && space !== "FRENGLE"}
+                compact
+                onViewAll={() => move("automations")}
+                refresh={() => void load()}
+              />
               <section className="ops-card">
                 {heads(
                   "Quick Start / 중단한 업무",
@@ -1236,8 +1464,18 @@ export function OpsShell() {
                   <ChevronLeft size={18} />
                   목록
                 </button>
-                <h2>{text(selected.title)}</h2>
-                {taskActions(selected)}
+                <h2>
+                  <button
+                    className="ops-task-detail-title"
+                    disabled={!canWrite}
+                    onClick={() =>
+                      setEditor({ resource: "tasks", row: selected })
+                    }
+                  >
+                    {text(selected.title)}
+                  </button>
+                </h2>
+                {taskActions(selected, false)}
               </div>
               <div className="ops-tabs">
                 {[
@@ -1886,6 +2124,7 @@ export function OpsShell() {
             <AutomationResultsPanel
               results={space === "FRENGLE" ? [] : automationResults}
               ready={Boolean(user) && space !== "FRENGLE" && automationReady}
+              enabled={Boolean(user) && space !== "FRENGLE"}
               refresh={() => void load()}
             />
           ) : null}
@@ -2050,14 +2289,14 @@ export function OpsShell() {
             <section className="ops-card">
               <h2>Daily Report</h2>
               <p>
-                회사 공유 보고서는 FRENGLE 데이터만 대상으로 합니다. 현재 회사
-                저장소가 미연결이라 내보낼 항목이 없습니다.
+                회사 공유 보고서 내보내기는 준비 중입니다. 자동화 데이터는
+                FRENGLE 회사 전용 포털에서 확인하세요.
               </p>
               <p>
                 PERSONAL 프로젝트·내부 메모·특이사항·업무 시간·연차·비밀정보는
                 제외합니다.
               </p>
-              <button disabled>검토 후 회사 보고서 내보내기 · 미연결</button>
+              <button disabled>회사 보고서 내보내기 · 준비 중</button>
             </section>
           ) : null}
           <footer>

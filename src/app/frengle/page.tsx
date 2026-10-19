@@ -2,11 +2,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { OpsRow } from "@/lib/ops";
 import Link from "next/link";
+import { AutomationReceiptList } from "@/components/automation-results-panel";
+import { automationReceiptRows } from "@/lib/automation-receipts";
 export default function Frengle() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [user, setUser] = useState<string | null>(null);
   const [results, setResults] = useState<OpsRow[]>([]);
+  const [resultsReady, setResultsReady] = useState(false);
   const [status, setStatus] = useState("로그인 상태 확인 중");
   const [busy, setBusy] = useState(false);
   async function load() {
@@ -18,11 +21,14 @@ export default function Frengle() {
       if (!response.ok) throw new Error(session.error);
       setUser(session.user?.email || null);
       if (!session.configured) {
+        setResults([]);
+        setResultsReady(false);
         setStatus("FRENGLE 서버 연결 설정이 필요합니다.");
         return;
       }
       if (!session.user) {
         setResults([]);
+        setResultsReady(false);
         setStatus("회사 저장소 전용 계정으로 로그인하세요.");
         return;
       }
@@ -31,10 +37,12 @@ export default function Frengle() {
       });
       const data = await received.json();
       if (!received.ok) throw new Error(data.error);
-      setResults(data.results);
+      setResults(data.results || []);
+      setResultsReady(data.ready === true);
       setStatus("FRENGLE 결과 저장소 연결됨");
     } catch (e) {
       setResults([]);
+      setResultsReady(false);
       setStatus(e instanceof Error ? e.message : "연결 확인 실패");
     }
   }
@@ -129,38 +137,27 @@ export default function Frengle() {
         </form>
       )}
       {user ? (
-        <section className="ops-card">
+        <section className="ops-card ops-automation-results">
           <div className="ops-section-head">
             <h2>ChatGPT 자동화 결과</h2>
             <button onClick={() => void load()}>결과 새로고침</button>
           </div>
-          {!results.length ? <p>아직 수신한 결과가 없습니다.</p> : null}
-          {results.map((r) => (
-            <details className="ops-note" key={r.id}>
-              <summary>
-                {String(r.title)} ·{" "}
-                {r.source === "frengle_keywords"
-                  ? "키워드 검색"
-                  : r.source === "frengle_work_check" ? "출근 업무 체크" : "사이트 추천"}
-              </summary>
-              <p>
-                수신:{" "}
-                {new Date(String(r.received_at)).toLocaleString("ko-KR", {
-                  timeZone: "Asia/Seoul",
-                })}
-              </p>
-              <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                {String(r.body)}
-              </p>
-              <a
-                href={String(r.source_url)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                ChatGPT 원본 열기
-              </a>
-            </details>
-          ))}
+          {!resultsReady ? (
+            <p className="ops-automation-state">
+              회사 자동화 결과를 확인하지 못했습니다. 결과 새로고침으로 다시
+              확인해 주세요.
+            </p>
+          ) : !automationReceiptRows(results, "FRENGLE").length ? (
+            <p className="ops-automation-state">
+              아직 수신한 회사 자동화 결과가 없습니다.
+            </p>
+          ) : (
+            <AutomationReceiptList results={results} workspace="FRENGLE" />
+          )}
+          <p className="ops-automation-help">
+            저장된 회사 결과만 표시합니다. 결과 제목이나 ChatGPT 대화 열기를
+            누르면 원본 대화로 이동합니다.
+          </p>
         </section>
       ) : null}
     </main>

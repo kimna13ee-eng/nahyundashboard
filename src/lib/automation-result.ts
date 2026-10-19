@@ -1,4 +1,5 @@
 import { containsSecret } from "./ops.ts";
+import { chatGptSourceUrl } from "./automation-receipts.ts";
 export function parseAutomationResult(raw: unknown) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw new Error("결과 입력을 확인해 주세요.");
@@ -20,12 +21,7 @@ export function parseAutomationResult(raw: unknown) {
     title = text("title", 120),
     body = text("body", 50000);
   const source_url = text("source_url", 2000);
-  const url = new URL(source_url);
-  if (
-    url.protocol !== "https:" ||
-    url.hostname !== "chatgpt.com" ||
-    !/^\/(c\/[^/]+|scheduled)$/.test(url.pathname)
-  )
+  if (!chatGptSourceUrl(source_url))
     throw new Error("ChatGPT 원본 주소를 확인해 주세요.");
   const reported = v.reported_at;
   if (

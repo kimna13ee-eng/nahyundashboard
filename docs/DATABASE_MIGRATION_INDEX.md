@@ -25,7 +25,8 @@ because it appears here.
 | 013 | `supabase/personal/013_automation_results.sql` | auth.users and authenticated/anon roles | PERSONAL Metricool result receipt table, owner RLS, immutable receipts and rate guard | Local/isolated only; production apply and OAuth setup pending |
 | 014 | `supabase/personal/014_task_process.sql` | Existing PERSONAL tasks and owner policies | Four task categories and durable process checklist, preserving old columns and timers | PERSONAL SQL and live task controls verified 2026-10-19 |
 | 015 | `supabase/personal/015_leave_accrual.sql` | Existing 002/003 and owner auth | Personal hire date and historical usage settings for calculated accrual | PERSONAL and live balance/history verified 2026-10-19 |
-| 016 | `supabase/personal/016_personal_sheet_sources.sql` | Existing auth users and ops_stamp | Owner-only read configuration for three PERSONAL content sheet tabs | PERSONAL applied and owner source connected 2026-10-19; UI deployment pending |
+| 016 | `supabase/personal/016_personal_sheet_sources.sql` | Existing auth users and ops_stamp | Owner-only read configuration for three PERSONAL content sheet tabs | PERSONAL applied and all three deployed tabs verified 2026-10-19 |
+| 017 | `supabase/personal/017_task_completion.sql` | Existing PERSONAL tasks with updated_at | Server completion timestamp preserved across edits, cleared on reopen | Transition/owner-isolation tests passed; PERSONAL applied 2026-10-19 |
 
 The apparent 011 record predates the schedule-trash work. It first appears in
 the 2026-10-11 release reports, while no corresponding SQL file exists in the

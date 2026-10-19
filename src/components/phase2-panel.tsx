@@ -765,14 +765,16 @@ function Phase2ResourcePanel({
               if (
                 resource === "content" &&
                 personalContent &&
-                needsPersonalContentType(
+                (needsPersonalContentType(
                   f,
                   (
                     editor.personal_details as
                       | Record<string, unknown>
                       | undefined
                   )?.type,
-                )
+                ) ||
+                  (!f.get("personal:type") &&
+                    !f.has("content:calendar_visible")))
               ) {
                 setError(
                   "개인 콘텐츠 입력을 저장하려면 콘텐츠 유형을 선택해 주세요. 입력 내용은 유지됩니다.",
@@ -820,6 +822,7 @@ function Phase2ResourcePanel({
                     ? `${details[key]}:00+09:00`
                     : null;
                 value.personal_details = details;
+                details.calendar_hidden = !f.has("content:calendar_visible");
                 details.sponsored = f.has("personal:sponsored");
                 details.performance_checks = [24, 72, 168].filter((h) =>
                   f.has(`personal:check:${h}`),
@@ -946,6 +949,24 @@ function Phase2ResourcePanel({
               <fieldset disabled={busy || !personalContent}>
                 <legend>PERSONAL 인스타그램 콘텐츠</legend>
                 {error ? <p role="alert">{error}</p> : null}
+                <label>
+                  <input
+                    type="checkbox"
+                    name="content:calendar_visible"
+                    defaultChecked={
+                      (
+                        editor.personal_details as
+                          | Record<string, unknown>
+                          | undefined
+                      )?.calendar_hidden !== true
+                    }
+                  />
+                  캘린더에 표시
+                </label>
+                <small>
+                  표시를 끄면 촬영·편집·발행·성과 점검 일정을 숨깁니다. 원고와
+                  발행 이력은 보존됩니다.
+                </small>
                 <PersonalChecklist
                   value={String(
                     (
