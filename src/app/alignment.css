@@ -161,6 +161,14 @@ textarea {
 .editorial .ops-analytics-table tbody tr:last-child td {
   border-bottom: 0;
 }
+.editorial .ops-task-progress { display: block; margin-top: 4px; overflow-wrap: anywhere; }
+.editorial .ops-process-editor { min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--action-border, #ded9d1); border-radius: 10px; }
+.editorial .ops-process-editor textarea { width: 100%; resize: vertical; }
+.editorial .ops-process-checklist { display: grid; gap: 8px; margin-top: 14px; }
+.editorial .ops-process-checklist label { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 6px; background: #f7f5f1; overflow-wrap: anywhere; }
+.editorial .ops-process-checklist input { width: 16px; height: 16px; min-height: 0; margin: 3px 0 0; flex: 0 0 auto; accent-color: #443b59; }
+.editorial .ops-process-checklist label:has(input:checked) span { color: #827c86; text-decoration: line-through; }
+.editorial .ops-process-current { margin-bottom: 0; font-weight: 500; }
 @media (max-width: 640px) {
   .editorial button, .editorial summary { background: var(--action-bg); border-color: var(--action-border); }
   .editorial button::before, .editorial summary::before { content: none; }

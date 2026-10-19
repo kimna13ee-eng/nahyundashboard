@@ -1,5 +1,6 @@
 "use client";
-import { workKindSeconds } from "@/lib/work-kind";
+import { taskCategorySeconds } from "@/lib/work-kind";
+import { taskCategories, taskCategoryLabels } from "@/lib/task-process";
 import { isVerificationRecord } from "@/lib/content-analytics";
 import { useState } from "react";
 import {
@@ -8,13 +9,14 @@ import {
   type OpsData,
 } from "@/lib/ops";
 export function AnalyticsPanel({
-  taskClassification,
+  taskProcessReady = false,
   data,
   enabled,
   now,
   day,
 }: {
   taskClassification: boolean;
+  taskProcessReady?: boolean;
   data: OpsData;
   enabled: boolean;
   now: number;
@@ -36,7 +38,7 @@ export function AnalyticsPanel({
   const switches = (data.session_events || []).filter(
     (e) => e.kind === "switch" && ids.has(String(e.session_id)),
   );
-  const kindTimes = workKindSeconds(tasks, sessions, intervals, date, now);
+  const categoryTimes = taskCategorySeconds(tasks, sessions, intervals, date, now);
   const fmt = (seconds: number) => `${(seconds / 3600).toFixed(2)}시간`;
   return (
     <section className="ops-card">
@@ -82,7 +84,7 @@ export function AnalyticsPanel({
             </div>
           </div>
           <h3>선택 날짜 업무 분류별 작업 시간</h3>
-          {taskClassification ? (
+          {taskProcessReady ? (
             <div className="ops-table-wrap">
               <table className="ops-analytics-table">
                 <thead>
@@ -92,28 +94,27 @@ export function AnalyticsPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {(
-                    [
-                      ["계획 업무", kindTimes.planned],
-                      ["돌발 업무", kindTimes.unexpected],
-                      ["미분류", kindTimes.unclassified],
-                    ] as const
-                  ).map(([label, seconds]) => (
-                    <tr key={label}>
-                      <td>{label}</td>
-                      <td>{fmt(seconds)}</td>
+                  {taskCategories.map((category) => (
+                    <tr key={category}>
+                      <td>{taskCategoryLabels[category]}</td>
+                      <td>{fmt(categoryTimes[category])}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <p>업무 분류 DB 미적용: 005 SQL 적용 후 집계합니다.</p>
+            <p>
+              새 업무 분류 저장소가 준비되면 콘텐츠·영업·디자인·기타별 작업 시간을
+              표시합니다.
+            </p>
           )}
-          <p>
-            현재 업무 분류를 기준으로 과거 작업 시간도 집계합니다. 기존 업무는
-            미분류이며 자동 추정하지 않습니다.
-          </p>
+          {taskProcessReady ? (
+            <p>
+              현재 업무 분류를 기준으로 과거 작업 시간도 집계합니다. 분류를 지정하지
+              않은 기존 업무는 기타로 집계합니다.
+            </p>
+          ) : null}
           <h3>프로젝트별 전체 작업 시간</h3>
           <div className="ops-table-wrap">
             <table className="ops-analytics-table">
@@ -157,14 +158,13 @@ export function AnalyticsPanel({
               </tbody>
             </table>
           </div>
-          <h3>업무별 계획 대비 실제 (전체 기간)</h3>
+          <h3>업무별 전체 작업 시간</h3>
           <div className="ops-table-wrap">
             <table className="ops-analytics-table">
               <thead>
                 <tr>
                   <th scope="col">업무</th>
-                  <th scope="col">계획</th>
-                  <th scope="col">실제</th>
+                  <th scope="col">작업 시간</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,7 +175,6 @@ export function AnalyticsPanel({
                   return (
                     <tr key={t.id}>
                       <td>{String(t.title)}</td>
-                      <td>{Number(t.estimated_minutes || 0)}분</td>
                       <td>
                         {(
                           intervalSeconds(
@@ -192,7 +191,7 @@ export function AnalyticsPanel({
                 })}
                 {!tasks.length ? (
                   <tr>
-                    <td colSpan={3}>집계할 업무가 없습니다.</td>
+                    <td colSpan={2}>집계할 업무가 없습니다.</td>
                   </tr>
                 ) : null}
               </tbody>

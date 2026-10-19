@@ -1,4 +1,5 @@
 import { parseTask } from "./domain.ts";
+import { parseTaskCategory, parseProcessSteps } from "./task-process.ts";
 export type Resource =
   | "projects"
   | "tasks"
@@ -68,14 +69,22 @@ export function parseResource(resource: Resource, raw: unknown) {
       throw new Error("테스트 데이터 구분을 확인해 주세요.");
     return {
       ...task,
+      ...(v.task_category !== undefined
+        ? { task_category: parseTaskCategory(v.task_category) }
+        : {}),
+      ...(v.process_steps !== undefined
+        ? { process_steps: parseProcessSteps(v.process_steps) }
+        : {}),
       ...(v.is_test !== undefined
         ? { is_test: v.is_test as boolean | null }
         : {}),
       project_id: fk(v.project_id),
-      tool: text(v.tool ?? "", 80),
-      assignee: text(v.assignee ?? "", 80),
+      ...(v.tool !== undefined ? { tool: text(v.tool, 80) } : {}),
+      ...(v.assignee !== undefined ? { assignee: text(v.assignee, 80) } : {}),
       result_url: link(v.result_url),
-      estimated_minutes: minutes,
+      ...(v.estimated_minutes !== undefined
+        ? { estimated_minutes: minutes }
+        : {}),
       ...(v.work_kind !== undefined
         ? {
             work_kind: choice(v.work_kind, [

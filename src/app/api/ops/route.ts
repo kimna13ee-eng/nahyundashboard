@@ -80,6 +80,12 @@ async function handle(req: NextRequest) {
         .limit(0);
       const guardCapability = await client.rpc("ops_timer_guard_ready");
       return json({
+        taskProcessReady: !(
+          await client
+            .from("tasks")
+            .select("task_category,process_steps")
+            .limit(0)
+        ).error,
         taskTestClassification: !(
           await client.from("tasks").select("is_test").limit(0)
         ).error,

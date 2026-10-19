@@ -19,12 +19,17 @@ import { journalEntries } from "@/lib/journal-report";
 import { dailyTaskSummary } from "@/lib/overview-summary";
 import { AutomationResultsPanel } from "./automation-results-panel";
 import { JournalExport } from "./journal-export";
-import { attentionTasks, resumeContext } from "@/lib/workflow-context";
+import { attentionTasks } from "@/lib/workflow-context";
 import { calendarLabel, calendarTitle } from "@/lib/mobile-calendar";
 import { contentCalendar } from "@/lib/personal-content";
 import { WorkflowInbox, ParkFields, parkForm } from "./workflow-inbox";
 import { quickStartContext } from "@/lib/quick-start";
-import { savedSnapshot, contactStates } from "@/lib/workflow";
+import {
+  taskCategoryLabels,
+  parseProcessSteps,
+  processSummary,
+} from "@/lib/task-process";
+import { TaskProcessEditor } from "./task-process-editor";
 import {
   addSeoulMinutes,
   scheduleDefaults,
@@ -151,6 +156,7 @@ export function OpsShell() {
   const startSubmit = useRef(false);
   const [contentFocus, setContentFocus] = useState<string | undefined>();
   const [taskClassification, setTaskClassification] = useState(false);
+  const [taskProcessReady, setTaskProcessReady] = useState(false);
   const [automationResults, setAutomationResults] = useState<OpsRow[]>([]);
   const [automationReady, setAutomationReady] = useState(false);
   useEffect(() => {
@@ -234,24 +240,6 @@ export function OpsShell() {
   const [quickLog, setQuickLog] = useState(false);
   const [resumeTask, setResumeTask] = useState<string | null>(null);
   const resumeTarget = tasks.find((t) => t.id === resumeTask);
-  const savedContext = resumeTarget
-    ? resumeContext(
-        resumeTarget,
-        notes,
-        events,
-        sessions.find((s) => s.task_id === resumeTask && s.status === "PARKED")
-          ?.id,
-      )
-    : null;
-  const snapshot =
-    space !== "FRENGLE" && user
-      ? savedSnapshot(
-          workflowData.contexts || [],
-          sessions.find(
-            (s) => s.task_id === resumeTask && s.status === "PARKED",
-          )?.id,
-        )
-      : undefined;
   const staleInterval = active
     ? longRunningInterval(intervals, active.id, tick + offset)
     : undefined;
@@ -294,6 +282,7 @@ export function OpsShell() {
       setWorkflowChecked(true);
       setWorkflowData(workflow.data || {});
       setTaskClassification(result.taskClassification === true);
+      setTaskProcessReady(result.taskProcessReady === true);
       setTaskTestClassification(result.taskTestClassification === true);
       setLibraryWorkflow(result.libraryWorkflow === true);
       setOffset(Date.parse(result.serverNow) - Date.now());
@@ -592,9 +581,20 @@ export function OpsShell() {
                 {text(projects.find((p) => p.id === t.project_id)?.title) ||
                   "독립 업무"}{" "}
                 · {text(t.due_date) || "마감일 없음"}
-                {t.contact_status && t.contact_status !== "none"
-                  ? ` · ${contactStates[t.contact_status as keyof typeof contactStates]} · 후속 ${t.follow_up_at ? dateTime(t.follow_up_at) : "날짜 미지정"}`
-                  : ""}
+                {` · ${taskCategoryLabels[t.task_category as keyof typeof taskCategoryLabels] || "기타"}`}
+                {Array.isArray(t.process_steps) && t.process_steps.length ? (
+                  <span className="ops-task-progress">
+                    현재 단계:{" "}
+                    {processSummary(parseProcessSteps(t.process_steps)).current
+                      ?.title || "전체 단계 완료"}{" "}
+                    ·{" "}
+                    {
+                      processSummary(parseProcessSteps(t.process_steps))
+                        .completed
+                    }
+                    /{t.process_steps.length} 완료
+                  </span>
+                ) : null}
               </small>
             </button>
             <span className={`ops-badge ${text(t.status)}`}>
@@ -1263,20 +1263,41 @@ export function OpsShell() {
                     <p>
                       상태: {statusLabels[selected.status as Status]} ·
                       우선순위: {text(selected.priority)} · 분류:{" "}
-                      {selected.work_kind === "unexpected"
-                        ? "돌발 업무"
-                        : selected.work_kind === "planned"
-                          ? "계획 업무"
-                          : "미분류"}
+                      {taskCategoryLabels[
+                        selected.task_category as keyof typeof taskCategoryLabels
+                      ] || "기타"}
                     </p>
-                    <p>
-                      담당자: {text(selected.assignee) || "미지정"} · 도구:{" "}
-                      {text(selected.tool) || "미지정"}
-                    </p>
-                    <p>
-                      계획: {text(selected.estimated_minutes)}분 · 승인:{" "}
-                      {text(selected.approval)}
-                    </p>
+                    {taskProcessReady ? (
+                      <form
+                        className="ops-form"
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          const f = new FormData(e.currentTarget);
+                          await mutate(
+                            {
+                              resource: "tasks",
+                              id: selected.id,
+                              value: {
+                                ...selected,
+                                process_steps: JSON.parse(
+                                  String(f.get("process_steps") || "[]"),
+                                ),
+                              },
+                            },
+                            "PATCH",
+                          );
+                        }}
+                      >
+                        <TaskProcessEditor
+                          key={
+                            selected.id + JSON.stringify(selected.process_steps)
+                          }
+                          value={selected.process_steps}
+                          disabled={busy}
+                        />
+                        <button disabled={!canWrite}>진행 단계 저장</button>
+                      </form>
+                    ) : null}
                     <pre>{text(selected.notes) || "등록된 메모 없음"}</pre>
                     <h3>미완료 다음 액션</h3>
                     {notes
@@ -1889,6 +1910,7 @@ export function OpsShell() {
             <>
               <AnalyticsPanel
                 taskClassification={taskClassification}
+                taskProcessReady={taskProcessReady}
                 data={space === "FRENGLE" ? {} : data}
                 enabled={Boolean(user) && !error && space !== "FRENGLE"}
                 now={tick + offset}
@@ -2174,9 +2196,9 @@ export function OpsShell() {
           </div>
         </OpsDialog>
       ) : null}
-      {resumeTarget && savedContext ? (
+      {resumeTarget ? (
         <OpsDialog
-          title="Context Resume · 작업 시작 / 이어하기"
+          title="작업 시작 / 이어하기"
           busy={busy}
           close={() => setResumeTask(null)}
         >
@@ -2190,6 +2212,23 @@ export function OpsShell() {
               startSubmit.current = true;
               try {
                 const form = new FormData(e.currentTarget);
+                if (
+                  taskProcessReady &&
+                  !(await mutate(
+                    {
+                      resource: "tasks",
+                      id: resumeTarget.id,
+                      value: {
+                        ...resumeTarget,
+                        process_steps: JSON.parse(
+                          String(form.get("process_steps") || "[]"),
+                        ),
+                      },
+                    },
+                    "PATCH",
+                  ))
+                )
+                  return;
                 for (const [kind, body] of [
                   [
                     "general",
@@ -2241,14 +2280,11 @@ export function OpsShell() {
           >
             <fieldset disabled={busy}>
               <legend>이번 업무에서 진행할 내용 (선택)</legend>
-              <label>
-                현재 작업 단계
-                <input
-                  name="start_stage"
-                  maxLength={500}
-                  placeholder="예: 릴스 컷 편집"
-                />
-              </label>
+              {taskProcessReady ? (
+                <TaskProcessEditor value={resumeTarget.process_steps} />
+              ) : (
+                <p>단계 저장을 사용하려면 저장소 설정을 완료해 주세요.</p>
+              )}
               <label>
                 특이사항 / 작업 메모
                 <textarea
@@ -2257,98 +2293,7 @@ export function OpsShell() {
                   placeholder="예: 첫 장면 자막을 수정해야 합니다."
                 />
               </label>
-              <label>
-                다음 액션
-                <input
-                  name="start_next"
-                  maxLength={2000}
-                  placeholder="예: 썸네일 검수 요청"
-                />
-              </label>
-              <label>
-                관련 파일 또는 결과 URL
-                <input
-                  name="start_file"
-                  maxLength={250}
-                  placeholder="예: 편집 파일 경로 또는 https://…"
-                />
-              </label>
-              <p>
-                입력 내용은 업무 메모로 먼저 저장합니다. 타이머 실패 시 저장된
-                메모는 유지됩니다.
-              </p>
             </fieldset>
-            <p>
-              {snapshot ? (
-                "중단 당시 저장한 맥락입니다."
-              ) : (
-                <>
-                  현재 저장된 맥락입니다. 중단 당시의 별도 스냅샷은 아직
-                  저장하지 않습니다.
-                </>
-              )}
-            </p>
-            <h4>지난 작업에서 어디까지 진행했는지</h4>
-            <p>
-              {snapshot
-                ? text(snapshot.last_note) || "작성한 메모 없음"
-                : savedContext.latest
-                  ? text(savedContext.latest.body)
-                  : "작성한 메모 없음"}
-            </p>
-            <p>
-              마지막 작업 단계: {text(snapshot?.last_stage) || "기록 없음"} ·
-              마지막 파일: {text(snapshot?.last_file) || "기록 없음"}
-            </p>
-            <p>
-              업무 상태:{" "}
-              {statusLabels[resumeTarget.status as Status] ||
-                text(resumeTarget.status)}{" "}
-              · 도구: {text(snapshot?.tool ?? resumeTarget.tool) || "기록 없음"}
-            </p>
-            {(snapshot?.result_url ?? resumeTarget.result_url) ? (
-              <a
-                href={text(snapshot?.result_url ?? resumeTarget.result_url)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                저장된 결과물 열기
-              </a>
-            ) : (
-              <p>파일·결과 링크 기록 없음</p>
-            )}
-            <h4>현재 남아 있는 이슈</h4>
-            {((snapshot?.issues as OpsRow[] | undefined) || savedContext.issues)
-              .length ? (
-              (
-                (snapshot?.issues as OpsRow[] | undefined) ||
-                savedContext.issues
-              ).map((n) => <p key={n.id}>{text(n.body)}</p>)
-            ) : (
-              <p>미완료 이슈 기록 없음</p>
-            )}
-            <h4>다음에 해야 하는 일</h4>
-            <p>{text(snapshot?.next_action)}</p>
-            {(
-              (snapshot?.next_actions as OpsRow[] | undefined) ||
-              savedContext.next
-            ).length ? (
-              (
-                (snapshot?.next_actions as OpsRow[] | undefined) ||
-                savedContext.next
-              ).map((n) => <p key={n.id}>{text(n.body)}</p>)
-            ) : (
-              <p>미완료 다음 액션 기록 없음</p>
-            )}
-            <p>
-              중단 시각:{" "}
-              {snapshot
-                ? dateTime(snapshot.paused_at)
-                : savedContext.interruption
-                  ? dateTime(savedContext.interruption.created_at)
-                  : "기록 없음"}{" "}
-              · 중단 사유: {text(snapshot?.reason) || "별도 기록 없음"}
-            </p>
             {active && active.task_id !== resumeTarget.id ? (
               <p>
                 시작하면 현재 업무 «{text(activeTask?.title)}»는 PARKED로
@@ -2364,11 +2309,7 @@ export function OpsShell() {
                 className="ops-primary"
                 disabled={!canWrite || !timerGuardReady}
               >
-                {busy
-                  ? "처리 중…"
-                  : snapshot
-                    ? "메모 저장 후 이어하기"
-                    : "메모 저장 후 업무 시작"}
+                {busy ? "처리 중…" : "작업 시작 / 이어하기"}
               </button>
             </OpsFormActions>
           </form>
@@ -2413,8 +2354,7 @@ export function OpsShell() {
       {editor ? (
         <ResourceEditor
           taskTestClassification={taskTestClassification}
-          taskClassification={taskClassification}
-          workflowReady={workflowReady}
+          taskProcessReady={taskProcessReady}
           libraryWorkflow={libraryWorkflow}
           promptVersions={rows("prompt_versions")}
           editor={editor}
@@ -2647,8 +2587,7 @@ function Empty({ label }: { label: string }) {
 }
 function ResourceEditor({
   taskTestClassification,
-  taskClassification,
-  workflowReady,
+  taskProcessReady,
   libraryWorkflow,
   promptVersions,
   editor,
@@ -2659,8 +2598,7 @@ function ResourceEditor({
   save,
 }: {
   taskTestClassification: boolean;
-  taskClassification: boolean;
-  workflowReady: boolean;
+  taskProcessReady: boolean;
   libraryWorkflow: boolean;
   promptVersions: OpsRow[];
   editor: Editor;
@@ -2766,7 +2704,8 @@ function ResourceEditor({
           ? `${value.follow_up_at}:00+09:00`
           : null;
       value.due_date = value.due_date || null;
-      value.estimated_minutes = Number(value.estimated_minutes || 0);
+      if (taskProcessReady)
+        value.process_steps = JSON.parse(String(value.process_steps || "[]"));
     }
     if (resource === "schedules") {
       try {
@@ -2876,45 +2815,21 @@ function ResourceEditor({
                 defaultValue={text(row.due_date || editor.dueDate)}
               />
             </label>
-            {workflowReady ? (
+            {taskProcessReady ? (
               <>
                 {select(
-                  "contact_status",
-                  "후속 상태",
-                  Object.entries(contactStates),
-                  "none",
+                  "task_category",
+                  "업무 분류",
+                  Object.entries(taskCategoryLabels),
+                  "other",
                 )}
-                <label>
-                  다음 후속 날짜 (서울 시간)
-                  <input
-                    name="follow_up_at"
-                    type="datetime-local"
-                    defaultValue={
-                      row.follow_up_at ? localDateTime(row.follow_up_at) : ""
-                    }
-                  />
-                </label>
-                <p>
-                  비민감 업무 메타데이터만 입력하세요. 고객 명단이나 회사 자료는
-                  저장하지 않습니다.
-                </p>
+                <TaskProcessEditor value={row.process_steps} />
               </>
-            ) : null}
-            {taskClassification ? (
-              select(
-                "work_kind",
-                "업무 분류",
-                [
-                  ["unclassified", "미분류"],
-                  ["planned", "계획 업무"],
-                  ["unexpected", "돌발 업무"],
-                ],
-                "unclassified",
-              )
             ) : (
-              <p>업무 분류는 005 SQL 적용 후 사용할 수 있습니다.</p>
+              <p>
+                업무 분류와 단계 저장을 사용하려면 저장소 설정을 완료해 주세요.
+              </p>
             )}
-            {field("estimated_minutes", "계획 시간 (분)", "number")}
             {taskTestClassification ? (
               <label>
                 테스트 데이터 구분
@@ -2939,8 +2854,6 @@ function ResourceEditor({
                 </small>
               </label>
             ) : null}
-            {field("tool", "연결 도구", "text", 80)}
-            {field("assignee", "담당자", "text", 80)}
             {field("result_url", "결과물 URL", "url", 2000)}
             {select(
               "approval",
