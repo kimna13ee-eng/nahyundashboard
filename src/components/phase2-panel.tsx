@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { OpsDialog } from "./ops-dialog";
 import { OpsFormActions } from "./ops-form-actions";
 import { RecurringScheduleRow } from "./recurring-schedule-row";
+import { LeavePanel } from "./leave-panel";
 import "./leave-record.css";
 import { occurrences, type Phase2Resource } from "@/lib/phase2";
 import { scheduleOverlaps, type OpsData, type OpsRow } from "@/lib/ops";
@@ -123,16 +124,7 @@ async function request(method: string, body?: unknown) {
     );
   return result;
 }
-export function Phase2Panel({
-  resource,
-  enabled,
-  projects,
-  day,
-  calendarView = "month",
-  onCalendarData,
-  onOpenTask,
-  initialContentId,
-}: {
+type Phase2PanelProps = {
   resource: Exclude<Phase2Resource, "exceptions">;
   enabled: boolean;
   projects: OpsRow[];
@@ -141,7 +133,24 @@ export function Phase2Panel({
   onCalendarData?: (data: OpsData) => void;
   onOpenTask?: (id: string) => void;
   initialContentId?: string;
-}) {
+};
+export function Phase2Panel(props: Phase2PanelProps) {
+  return props.resource === "leave" ? (
+    <LeavePanel enabled={props.enabled} />
+  ) : (
+    <Phase2ResourcePanel {...props} />
+  );
+}
+function Phase2ResourcePanel({
+  resource,
+  enabled,
+  projects,
+  day,
+  calendarView = "month",
+  onCalendarData,
+  onOpenTask,
+  initialContentId,
+}: Phase2PanelProps) {
   const [data, setData] = useState<OpsData>({}),
     [ready, setReady] = useState(false),
     [loading, setLoading] = useState(true),

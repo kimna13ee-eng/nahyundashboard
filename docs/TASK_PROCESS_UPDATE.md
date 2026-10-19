@@ -37,4 +37,5 @@ Local in-memory UI fixture (`tests/task-process-preview.mjs`) verified:
 Overview first incomplete step; removed form fields and context report;
 stage-write failure prevents timer start; retry saves stage before timer;
 category change and cut/paste reorder preserve checks/IDs/hidden old fields.
-No real user data was used for UI testing. Production DB apply is pending.
+No real user data was used for UI testing. PERSONAL SQL014 and the matching
+production editor/start dialog were verified on 2026-10-19.

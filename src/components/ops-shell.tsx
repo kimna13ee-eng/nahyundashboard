@@ -73,7 +73,6 @@ import { statusLabels, type Status } from "@/lib/domain";
 type Space = "ALL" | "PERSONAL" | "FRENGLE";
 const menus = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "inbox", label: "Quick Inbox", icon: NotebookPen },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "automations", label: "Automations", icon: Workflow },
@@ -815,17 +814,6 @@ export function OpsShell() {
           </div>
           <div className="ops-header-primary" aria-label="빠른 업무 액션">
             {" "}
-            <button
-              className="ops-primary"
-              disabled={!canWrite}
-              onClick={() => {
-                setCaptureOpen(true);
-                setView("inbox");
-              }}
-            >
-              <Plus size={15} />
-              Quick Capture
-            </button>
             <button
               disabled={!canWrite || !tasks.length}
               onClick={() => {
@@ -2628,6 +2616,7 @@ function ResourceEditor({
     row.ends_at ? localDateTime(row.ends_at) : defaults.endsAt,
   );
   const [scheduleEndEdited, setScheduleEndEdited] = useState(Boolean(row.id));
+  const submitting = useRef(false);
   const scheduleError =
     resource === "schedules"
       ? scheduleRangeError(scheduleStart, scheduleEnd)
@@ -2680,46 +2669,56 @@ function ResourceEditor({
   );
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget),
-      value: Record<string, unknown> = { ...Object.fromEntries(f) };
-    if (resource === "task_notes") {
-      value.task_id = editor.taskId || row.task_id;
-      value.pinned = f.has("pinned");
-      value.done = f.has("done");
-    }
-    if (resource === "library_items") {
-      value.favorite = f.has("favorite");
-      value.kind = row.kind || editor.kind || "prompt";
-    }
-    if (resource === "tasks") {
-      if (taskTestClassification)
-        value.is_test =
-          value.is_test === "true"
-            ? true
-            : value.is_test === "false"
-              ? false
-              : null;
-      if (value.contact_status !== undefined)
-        value.follow_up_at = value.follow_up_at
-          ? `${value.follow_up_at}:00+09:00`
-          : null;
-      value.due_date = value.due_date || null;
-      if (taskProcessReady)
-        value.process_steps = JSON.parse(String(value.process_steps || "[]"));
-    }
-    if (resource === "schedules") {
-      try {
-        value.starts_at = new Date(
-          text(value.starts_at) + ":00+09:00",
-        ).toISOString();
-        value.ends_at = new Date(
-          text(value.ends_at) + ":00+09:00",
-        ).toISOString();
-      } catch {
-        return;
+    if (busy || submitting.current) return;
+    submitting.current = true;
+    try {
+      const f = new FormData(e.currentTarget),
+        value: Record<string, unknown> = { ...Object.fromEntries(f) };
+      if (resource === "task_notes") {
+        value.task_id = editor.taskId || row.task_id;
+        value.pinned = f.has("pinned");
+        value.done = f.has("done");
       }
+      if (resource === "library_items") {
+        value.favorite = f.has("favorite");
+        value.kind = row.kind || editor.kind || "prompt";
+      }
+      if (resource === "tasks") {
+        if (taskTestClassification)
+          value.is_test =
+            value.is_test === "true"
+              ? true
+              : value.is_test === "false"
+                ? false
+                : null;
+        if (value.contact_status !== undefined)
+          value.follow_up_at = value.follow_up_at
+            ? `${value.follow_up_at}:00+09:00`
+            : null;
+        value.due_date = value.due_date || null;
+        if (taskProcessReady)
+          value.process_steps = JSON.parse(String(value.process_steps || "[]"));
+      }
+      if (resource === "schedules") {
+        try {
+          value.starts_at = new Date(
+            text(value.starts_at) + ":00+09:00",
+          ).toISOString();
+          value.ends_at = new Date(
+            text(value.ends_at) + ":00+09:00",
+          ).toISOString();
+        } catch {
+          return;
+        }
+      }
+      const saved = await save(
+        { resource, id: row.id, value },
+        row.id ? "PATCH" : "POST",
+      );
+      if (saved) close();
+    } finally {
+      submitting.current = false;
     }
-    await save({ resource, id: row.id, value }, row.id ? "PATCH" : "POST");
   }
   return (
     <OpsDialog
