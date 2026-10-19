@@ -87,7 +87,7 @@ export default function Frengle() {
     >
       <Link href="/">MY OPS 대시보드</Link>
       <h1>FRENGLE 자동화</h1>
-      <p>키워드 검색 · 사이트 읽고 키워드 추천</p>
+      <p>출근 업무 체크 · 키워드 검색 · 사이트 읽고 키워드 추천</p>
       <p>
         회사 결과는 FRENGLE 저장소에만 저장합니다. PERSONAL 로그인과 별도로
         연결합니다.
@@ -141,7 +141,7 @@ export default function Frengle() {
                 {String(r.title)} ·{" "}
                 {r.source === "frengle_keywords"
                   ? "키워드 검색"
-                  : "사이트 추천"}
+                  : r.source === "frengle_work_check" ? "출근 업무 체크" : "사이트 추천"}
               </summary>
               <p>
                 수신:{" "}

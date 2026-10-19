@@ -13,9 +13,9 @@ export function frengleAutomationMcp(client: SupabaseClient, ownerId: string) {
     {
       title: "FRENGLE 자동화 결과 저장",
       description:
-        "FRENGLE 키워드 검색·사이트 추천 결과만 회사 저장소에 저장합니다. PERSONAL Metricool은 받지 않습니다. 같은 실행의 재시도에는 같은 run_key를 사용하세요.",
+        "FRENGLE 키워드 검색·사이트 추천·출근 업무 체크 결과를 회사 저장소에 저장합니다. PERSONAL Metricool은 받지 않습니다. 같은 실행의 재시도에는 같은 run_key를 사용하세요.",
       inputSchema: {
-        source: z.enum(["frengle_keywords", "frengle_site_recommendations"]),
+        source: z.enum(["frengle_keywords", "frengle_site_recommendations", "frengle_work_check"]),
         run_key: z.string().min(1).max(160),
         title: z.string().min(1).max(120),
         body: z.string().min(1).max(50000),

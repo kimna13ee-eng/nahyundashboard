@@ -19,6 +19,12 @@ test('FRENGLE membership, owner isolation, source separation and immutable recei
   await db.exec(`reset role; insert into ops_company_members(user_id) values('${owner}'); set role authenticated;`);
   await insert('frengle_keywords','run1');
   await insert('frengle_site_recommendations','run1');
+  await assert.rejects(insert('frengle_work_check','work1'),/check constraint/i);
+  await db.exec('reset role;');
+  await db.exec(await readFile('supabase/frengle/002_work_check_results.sql','utf8'));
+  await db.exec('set role authenticated;');
+  await insert('frengle_work_check','work1');
+  assert.equal((await db.query('select count(*)::int n from ops_automation_results')).rows[0].n,3);
   await assert.rejects(insert('metricool_personal','run2'),/check constraint/i);
   await assert.rejects(insert('frengle_keywords','run1'),/duplicate|unique/i);
   await assert.rejects(db.query("update ops_automation_results set body='changed'"),/permission denied/i);

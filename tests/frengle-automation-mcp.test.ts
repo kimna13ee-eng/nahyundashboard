@@ -47,6 +47,12 @@ test("MCP 초기화·도구 목록·회사 결과 저장 및 잘못된 원본 �
     assert.notEqual(result.isError, true);
     assert.equal(stored?.owner_id, "owner");
     assert.equal(stored?.source, "frengle_keywords");
+    const work = await client.callTool({
+      name: "save_frengle_result",
+      arguments: { ...args, source: "frengle_work_check", run_key: "work1" },
+    });
+    assert.notEqual(work.isError, true);
+    assert.equal(stored?.source, "frengle_work_check");
     const wrongSource = await client.callTool({
       name: "save_frengle_result",
       arguments: { ...args, source: "metricool_personal" },
