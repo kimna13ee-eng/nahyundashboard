@@ -15,6 +15,7 @@ import { occurrences } from "@/lib/phase2";
 import { Phase2Panel } from "./phase2-panel";
 import { AnalyticsPanel } from "./analytics-panel";
 import { ContentAnalyticsPanel } from "./content-analytics-panel";
+import { PersonalSheetsPanel } from "./personal-sheets-panel";
 import { journalEntries } from "@/lib/journal-report";
 import { dailyTaskSummary } from "@/lib/overview-summary";
 import { AutomationResultsPanel } from "./automation-results-panel";
@@ -41,6 +42,7 @@ import {
   FolderKanban,
   Workflow,
   PanelsTopLeft,
+  FileSpreadsheet,
   NotebookPen,
   Library,
   ChartNoAxesCombined,
@@ -77,6 +79,7 @@ const menus = [
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "automations", label: "Automations", icon: Workflow },
   { id: "content", label: "Content Studio", icon: PanelsTopLeft },
+  { id: "personal-sheets", label: "콘텐츠 시트", icon: FileSpreadsheet },
   { id: "journal", label: "Work Journal", icon: NotebookPen },
   { id: "library", label: "Library", icon: Library },
   { id: "analytics", label: "Analytics", icon: ChartNoAxesCombined },
@@ -509,6 +512,9 @@ export function OpsShell() {
     setSearch("");
     setNotice("");
   }
+  const visibleMenus = menus.filter(
+    (menu) => menu.id !== "personal-sheets" || space === "PERSONAL",
+  );
   const title = menus.find((m) => m.id === view)?.label || "Overview";
   const taskActions = (t: OpsRow) => (
     <div className="ops-actions">
@@ -764,7 +770,7 @@ export function OpsShell() {
         </Link>
         <span className="ops-caption">MY OPERATING SPACE</span>
         <nav aria-label="주 메뉴">
-          {menus.map((m) => (
+          {visibleMenus.map((m) => (
             <button
               key={m.id}
               aria-current={view === m.id ? "page" : undefined}
@@ -803,6 +809,11 @@ export function OpsShell() {
                 disabled={busy}
                 onChange={(e) => {
                   setSpace(e.target.value as Space);
+                  if (
+                    view === "personal-sheets" &&
+                    e.target.value !== "PERSONAL"
+                  )
+                    setView("overview");
                   setDetail(null);
                 }}
               >
@@ -1894,6 +1905,16 @@ export function OpsShell() {
               day={day}
             />
           ) : null}
+          {view === "personal-sheets" && space === "PERSONAL" ? (
+            <PersonalSheetsPanel
+              key={"personal-sheets:" + (user?.email || "signed-out") + space}
+              enabled={
+                Boolean(user) &&
+                authState === "AUTHENTICATED" &&
+                configured === true
+              }
+            />
+          ) : null}
           {view === "analytics" ? (
             <>
               <AnalyticsPanel
@@ -2082,7 +2103,7 @@ export function OpsShell() {
         )}
       </div>
       <nav className="ops-mobile-nav" aria-label="모바일 메뉴">
-        {menus
+        {visibleMenus
           .filter((m) =>
             ["overview", "calendar", "projects", "journal", "library"].includes(
               m.id,
@@ -2169,7 +2190,7 @@ export function OpsShell() {
           close={() => setMoreMenu(false)}
         >
           <div className="ops-more-menu">
-            {menus.map((m) => (
+            {visibleMenus.map((m) => (
               <button
                 key={m.id}
                 onClick={() => {
