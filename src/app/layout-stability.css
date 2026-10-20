@@ -1,0 +1,66 @@
+/* Keep the viewport width stable as pages and refresh states change height. */
+html {
+  scrollbar-gutter: stable;
+}
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
+}
+
+.editorial .ops-main-shell,
+.editorial .ops-main,
+.editorial .ops-card,
+.editorial .ops-two > *,
+.editorial .ops-project-grid > * {
+  min-width: 0;
+}
+.editorial .ops-main {
+  width: 100%;
+}
+.editorial .ops-two {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+}
+
+/* Refresh feedback must not add rows to the sticky header. */
+.editorial .ops-recovery-status {
+  position: fixed;
+  right: 24px;
+  bottom: 96px;
+  z-index: 40;
+  width: min(360px, calc(100vw - 48px));
+  pointer-events: none;
+}
+.editorial .ops-recovery-status:not(:empty) {
+  display: grid;
+  gap: 6px;
+  padding: 12px 16px;
+  border: 1px solid #ded7e3;
+  border-radius: 8px;
+  background: #f7f4fa;
+  color: #62556e;
+  box-shadow: 0 4px 18px #30293414;
+}
+.editorial .ops-recovery-status p {
+  max-width: none;
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .editorial .ops-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .editorial .ops-project-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .editorial .ops-project-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .editorial .ops-recovery-status {
+    right: 12px;
+    bottom: calc(160px + env(safe-area-inset-bottom));
+    width: min(360px, calc(100vw - 24px));
+  }
+}

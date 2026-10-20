@@ -1184,7 +1184,15 @@ export function OpsShell() {
               {notice}
             </p>
           ) : null}
-          {loading ? <p className="ops-alert">DB에서 불러오는 중…</p> : null}
+          {loading ? (
+            <p
+              className={dataReady ? "sr-only" : "ops-alert"}
+              role="status"
+              aria-live="polite"
+            >
+              DB에서 불러오는 중…
+            </p>
+          ) : null}
           {staleInterval ? (
             <div className="ops-alert" role="status">
               <p>

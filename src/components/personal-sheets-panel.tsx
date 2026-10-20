@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowUpRight, RefreshCw, Search } from "lucide-react";
 import { OpsDialog } from "./ops-dialog";
 import {
@@ -179,9 +179,19 @@ function SheetView({ tab }: { tab: SheetDefinition }) {
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <button type="button" disabled={loading} onClick={refresh}>
-          <RefreshCw size={15} aria-hidden="true" />
-          {loading ? "조회 중" : "새로고침"}
+        <button
+          type="button"
+          disabled={loading}
+          onClick={refresh}
+          aria-label={loading ? "시트 새로고침 · 조회 중" : "시트 새로고침"}
+          aria-busy={loading}
+        >
+          <RefreshCw
+            size={15}
+            className={loading ? "ops-spinning" : ""}
+            aria-hidden="true"
+          />
+          새로고침
         </button>
         {sourceUrl ? (
           <a href={sourceUrl} target="_blank" rel="noopener noreferrer">
@@ -238,10 +248,33 @@ function SheetView({ tab }: { tab: SheetDefinition }) {
             role="region"
             aria-label={`${tab.label} 시트 표. 가로 스크롤 가능`}
           >
-            <table className={`ops-sheet-table${isGrid ? " is-grid" : ""}`}>
+            <table
+              className={`ops-sheet-table${isGrid ? " is-grid" : ""}`}
+              style={
+                {
+                  "--sheet-data-columns": Math.max(
+                    0,
+                    result.columns.length - (isGrid ? 0 : 1),
+                  ),
+                } as CSSProperties
+              }
+            >
               <caption className="sr-only">
                 {result.sheetTitle} 읽기 전용 표
               </caption>
+              <colgroup>
+                {isGrid ? <col className="ops-sheet-key-column" /> : null}
+                {result.columns.map((_, index) => (
+                  <col
+                    key={index}
+                    className={
+                      index === 0 && !isGrid
+                        ? "ops-sheet-key-column"
+                        : "ops-sheet-data-column"
+                    }
+                  />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
                   {isGrid ? <th scope="col">행</th> : null}
