@@ -43,6 +43,14 @@ import {
   processSummary,
 } from "@/lib/task-process";
 import { TaskProcessEditor } from "./task-process-editor";
+import { ProjectProcessEditor } from "./project-process-editor";
+import { projectCategoryLabels } from "@/lib/project-process";
+import {
+  isProjectProcess,
+  isArchivedProjectProcess,
+  projectProcessSteps,
+  orderedProjectTasks,
+} from "@/lib/project-process-view";
 import {
   addSeoulMinutes,
   scheduleDefaults,
@@ -193,9 +201,11 @@ export function OpsShell({
   const [linkedSchedule, setLinkedSchedule] = useState<string | null>(null);
   const noteWrites = useRef(new Set<string>());
   const startSubmit = useRef(false);
+  const completionSubmit = useRef(false);
   const [contentFocus, setContentFocus] = useState<string | undefined>();
   const [taskClassification, setTaskClassification] = useState(false);
   const [taskProcessReady, setTaskProcessReady] = useState(false);
+  const [projectProcessReady, setProjectProcessReady] = useState(false);
   const [scheduleCategoryReady, setScheduleCategoryReady] = useState(false);
   const [automationResults, setAutomationResults] = useState<OpsRow[]>([]);
   const [automationReady, setAutomationReady] = useState(false);
@@ -269,9 +279,11 @@ export function OpsShell({
     setTimerGuardReady(false);
     setAutomationResults([]);
     setAutomationReady(false);
+    setProjectProcessReady(false);
   }, []);
   const rows = (name: string) => data[name] || [];
   const tasks = rows("tasks"),
+    listedTasks = tasks.filter((task) => !isArchivedProjectProcess(task)),
     projects = rows("projects"),
     notes = rows("task_notes"),
     sessions = rows("work_sessions"),
@@ -331,6 +343,7 @@ export function OpsShell({
       setWorkflowData(workflow.data || {});
       setTaskClassification(result.taskClassification === true);
       setTaskProcessReady(result.taskProcessReady === true);
+      setProjectProcessReady(result.projectProcessReady === true);
       setScheduleCategoryReady(result.scheduleCategoryReady === true);
       setTaskTestClassification(result.taskTestClassification === true);
       setLibraryWorkflow(result.libraryWorkflow === true);
@@ -619,13 +632,62 @@ export function OpsShell({
     view === "legacy-content"
       ? "기존 콘텐츠 기록"
       : menus.find((m) => m.id === view)?.label || "Overview";
+  function openTaskEditor(task: OpsRow) {
+    if (isProjectProcess(task)) {
+      const parent = projects.find((p) => p.id === task.project_id);
+      if (parent) setEditor({ resource: "projects", row: parent });
+    } else setEditor({ resource: "tasks", row: task });
+  }
+  function taskCategoryLabel(task: OpsRow) {
+    if (isProjectProcess(task)) {
+      const parent = projects.find((p) => p.id === task.project_id);
+      return (
+        projectCategoryLabels[
+          parent?.project_category as keyof typeof projectCategoryLabels
+        ] || "기타"
+      );
+    }
+    return (
+      taskCategoryLabels[
+        task.task_category as keyof typeof taskCategoryLabels
+      ] || "기타"
+    );
+  }
+  async function toggleTaskCompletion(task: OpsRow) {
+    if (completionSubmit.current) return;
+    completionSubmit.current = true;
+    try {
+      if (active?.task_id === task.id && task.status !== "completed") {
+        if (!(await timer("finish", task.id, "", {}, active.id))) return;
+      }
+      await mutate(
+        {
+          resource: "tasks",
+          id: task.id,
+          value: {
+            ...task,
+            status: task.status === "completed" ? "pending" : "completed",
+          },
+        },
+        "PATCH",
+      );
+    } finally {
+      completionSubmit.current = false;
+    }
+  }
   const taskActions = (t: OpsRow, showRecord = true) => (
     <div className="ops-actions">
       <button
         className="ops-icon"
         title="작업 시작 / 재개"
         aria-label={`${t.title} 작업 시작`}
-        disabled={!canWrite || !timerGuardReady || active?.task_id === t.id}
+        disabled={
+          !canWrite ||
+          !timerGuardReady ||
+          active?.task_id === t.id ||
+          isArchivedProjectProcess(t) ||
+          (isProjectProcess(t) && t.status === "completed")
+        }
         onClick={() => setResumeTask(t.id)}
       >
         <Play size={15} />
@@ -643,14 +705,16 @@ export function OpsShell({
           기록
         </button>
       ) : null}
-      <button
-        className="ops-icon ops-danger"
-        aria-label={`${t.title} 삭제`}
-        disabled={!canWrite}
-        onClick={() => setDeleteTarget({ resource: "tasks", row: t })}
-      >
-        <Trash2 size={15} />
-      </button>
+      {!isProjectProcess(t) ? (
+        <button
+          className="ops-icon ops-danger"
+          aria-label={`${t.title} 삭제`}
+          disabled={!canWrite}
+          onClick={() => setDeleteTarget({ resource: "tasks", row: t })}
+        >
+          <Trash2 size={15} />
+        </button>
+      ) : null}
     </div>
   );
   const taskList = (list: OpsRow[]) => (
@@ -660,23 +724,12 @@ export function OpsShell({
           <div className="ops-task" key={t.id}>
             <button
               className="ops-task-complete"
-              disabled={!canWrite}
+              disabled={!canWrite || isArchivedProjectProcess(t)}
               aria-label={`${t.title} ${t.status === "completed" ? "완료 취소" : "완료"}`}
               onClick={() => {
                 // Only a click invokes this callback; the request ref is never read during render.
                 // eslint-disable-next-line react-hooks/refs
-                void mutate(
-                  {
-                    resource: "tasks",
-                    id: t.id,
-                    value: {
-                      ...t,
-                      status:
-                        t.status === "completed" ? "pending" : "completed",
-                    },
-                  },
-                  "PATCH",
-                );
+                void toggleTaskCompletion(t);
               }}
             >
               {t.status === "completed" ? "완료 취소" : "완료"}
@@ -685,20 +738,24 @@ export function OpsShell({
               className="ops-task-title"
               disabled={!canWrite}
               aria-label={`${t.title} 수정`}
-              onClick={() => setEditor({ resource: "tasks", row: t })}
+              onClick={() => openTaskEditor(t)}
             >
               <strong>{text(t.title)}</strong>
               <small>
                 {text(projects.find((p) => p.id === t.project_id)?.title) ||
-                  "독립 업무"}{" "}
-                · {text(t.due_date) || "마감일 없음"}
-                {` · ${taskCategoryLabels[t.task_category as keyof typeof taskCategoryLabels] || "기타"}`}
+                  "기존 업무"}{" "}
+                · {taskCategoryLabel(t)}
+                {isProjectProcess(t)
+                  ? ` · ${Number(t.project_step_order) + 1}단계`
+                  : ` · ${text(t.due_date) || "마감일 없음"}`}
                 {t.status === "completed" && taskCompletionTime(t) ? (
                   <span className="ops-task-progress">
                     완료 {dateTime(taskCompletionTime(t))}
                   </span>
                 ) : null}
-                {Array.isArray(t.process_steps) && t.process_steps.length ? (
+                {!isProjectProcess(t) &&
+                Array.isArray(t.process_steps) &&
+                t.process_steps.length ? (
                   <span className="ops-task-progress">
                     현재 단계:{" "}
                     {processSummary(parseProcessSteps(t.process_steps)).current
@@ -720,7 +777,7 @@ export function OpsShell({
           </div>
         ))
       ) : (
-        <Empty label="등록된 업무가 없습니다." />
+        <Empty label="표시할 프로세스나 기존 업무가 없습니다." />
       )}
     </div>
   );
@@ -740,7 +797,7 @@ export function OpsShell({
   ) => (
     <button
       className="ops-primary"
-      disabled={!canWrite}
+      disabled={!canWrite || (resource === "projects" && !projectProcessReady)}
       onClick={() => setEditor({ resource, ...options })}
     >
       <Plus size={15} />
@@ -793,10 +850,12 @@ export function OpsShell({
   const dailySummary = dailyTaskSummary(tasks, today);
   const todayTasks = dailyTaskGroups(tasks, today);
   const overviewWeek = seoulWeek(today);
-  const filteredTasks = tasks.filter(
-    (t) =>
-      (project === "all" || t.project_id === project) &&
-      text(t.title).toLowerCase().includes(search.toLowerCase()),
+  const filteredTasks = orderedProjectTasks(
+    listedTasks.filter(
+      (t) =>
+        (project === "all" || t.project_id === project) &&
+        text(t.title).toLowerCase().includes(search.toLowerCase()),
+    ),
   );
   const [calendarExtra, setCalendarExtra] = useState<{
     key: string;
@@ -926,7 +985,7 @@ export function OpsShell({
     ...schedules.map(
       (s) => ({ ...s, source: "일정" }) as OpsRow & { source: string },
     ),
-    ...tasks
+    ...listedTasks
       .filter((t) => t.due_date)
       .map((t) => ({
         id: `due-${t.id}`,
@@ -954,7 +1013,7 @@ export function OpsShell({
     if (item.source === "일정") {
       setEditor({ resource: "schedules", row: item });
     } else if (item.source === "업무 마감" && item.task) {
-      setEditor({ resource: "tasks", row: item.task as OpsRow });
+      openTaskEditor(item.task as OpsRow);
     } else setCalendarDetail(item);
   }
   function dayShift(delta: number) {
@@ -1254,7 +1313,7 @@ export function OpsShell({
                           ? `오늘 수신한 ${space === "PERSONAL" ? "Metricool" : "회사 자동화"} 결과 · 최근 100건 기준`
                           : label === "오늘 완료"
                             ? `${today} · 오늘 완료한 업무`
-                            : `${today} · 오늘 등록 또는 마감인 업무`}
+                            : `${today} · 미완료 프로세스와 오늘의 기존 업무`}
                       </p>
                     </>
                   );
@@ -1275,14 +1334,14 @@ export function OpsShell({
                 })}
               </div>
               <p className="ops-overview-metric-note">
-                {today} · 전체: 오늘 등록·마감 · 완료: 오늘 완료 · 자동화: 수신
-                결과
+                {today} · 전체: 미완료 프로세스와 오늘 등록·마감 업무 · 완료:
+                오늘 완료 · 자동화: 수신 결과
               </p>
               <section className="ops-card ops-overview-today">
                 {heads(
-                  "오늘의 업무",
-                  `${today} · 오늘 등록하거나 오늘 마감인 미완료 업무`,
-                  create("tasks", "업무 등록", { dueDate: today }),
+                  "오늘 할 일",
+                  `${today} · 미완료 프로세스는 매일 표시 · 기존 업무는 오늘 등록·마감 기준`,
+                  create("projects", "프로젝트 등록"),
                 )}
                 {taskList(todayTasks.pending)}
               </section>
@@ -1443,7 +1502,12 @@ export function OpsShell({
                   .filter((s) => s.status === "PARKED")
                   .map((s) => {
                     const task = tasks.find((t) => t.id === s.task_id);
-                    if (!task) return null;
+                    if (
+                      !task ||
+                      isArchivedProjectProcess(task) ||
+                      (isProjectProcess(task) && task.status === "completed")
+                    )
+                      return null;
                     const context = quickStartContext(
                       task,
                       s,
@@ -1500,7 +1564,15 @@ export function OpsShell({
                       </div>
                     );
                   })}
-                {sessions.every((s) => s.status !== "PARKED") ? (
+                {!sessions.some(
+                  (s) =>
+                    s.status === "PARKED" &&
+                    listedTasks.some(
+                      (t) =>
+                        t.id === s.task_id &&
+                        !(isProjectProcess(t) && t.status === "completed"),
+                    ),
+                ) ? (
                   <Empty label="중단한 업무가 없습니다." />
                 ) : null}
               </section>
@@ -1510,26 +1582,35 @@ export function OpsShell({
             <>
               <div className="ops-toolbar">
                 {create("projects", "프로젝트 등록")}
-                {create("tasks", "업무 등록")}
                 <input
-                  aria-label="업무 검색"
-                  placeholder="업무 검색"
+                  aria-label="프로세스·기존 업무 검색"
+                  placeholder="프로세스·기존 업무 검색"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              {!projectProcessReady ? (
+                <p className="ops-alert">
+                  프로젝트 분류와 프로세스를 사용하려면 저장소 설정을 완료한 뒤
+                  새로고침해 주세요.
+                </p>
+              ) : null}
               <div className="ops-project-grid">
                 <button
                   className={`ops-project ${project === "all" ? "selected" : ""}`}
                   onClick={() => setProject("all")}
                 >
-                  <strong>모든 업무</strong>
-                  <small>{tasks.length}개</small>
+                  <strong>전체 프로세스·업무</strong>
+                  <small>{listedTasks.length}개</small>
                 </button>
                 {projects.map((p) => {
-                  const list = tasks.filter((t) => t.project_id === p.id),
+                  const list = listedTasks.filter((t) => t.project_id === p.id),
                     done = list.filter((t) => t.status === "completed").length,
-                    ids = new Set(list.map((t) => t.id)),
+                    ids = new Set(
+                      tasks
+                        .filter((t) => t.project_id === p.id)
+                        .map((t) => t.id),
+                    ),
                     sids = new Set(
                       sessions
                         .filter((s) => ids.has(text(s.task_id)))
@@ -1542,6 +1623,11 @@ export function OpsShell({
                         onClick={() => setProject(p.id)}
                       >
                         <strong>{text(p.title)}</strong>
+                        <span className="ops-project-category">
+                          {projectCategoryLabels[
+                            p.project_category as keyof typeof projectCategoryLabels
+                          ] || "기타"}
+                        </span>
                         <small>
                           {done}/{list.length} 완료 ·{" "}
                           {list.length
@@ -1569,8 +1655,8 @@ export function OpsShell({
               </div>
               <section className="ops-card">
                 {heads(
-                  "프로젝트 업무",
-                  "업무 상세에서 메모·작업 기록·결과물을 관리합니다.",
+                  "프로젝트 프로세스",
+                  "프로젝트에서 단계를 등록하고, 이름을 눌러 수정하세요. 기존 업무도 함께 표시합니다.",
                 )}
                 {taskList(filteredTasks)}
               </section>
@@ -1587,9 +1673,7 @@ export function OpsShell({
                   <button
                     className="ops-task-detail-title"
                     disabled={!canWrite}
-                    onClick={() =>
-                      setEditor({ resource: "tasks", row: selected })
-                    }
+                    onClick={() => openTaskEditor(selected)}
                   >
                     {text(selected.title)}
                   </button>
@@ -1619,11 +1703,9 @@ export function OpsShell({
                     <p>
                       상태: {statusLabels[selected.status as Status]} ·
                       우선순위: {text(selected.priority)} · 분류:{" "}
-                      {taskCategoryLabels[
-                        selected.task_category as keyof typeof taskCategoryLabels
-                      ] || "기타"}
+                      {taskCategoryLabel(selected)}
                     </p>
-                    {taskProcessReady ? (
+                    {taskProcessReady && !isProjectProcess(selected) ? (
                       <form
                         className="ops-form"
                         onSubmit={async (e) => {
@@ -1670,7 +1752,9 @@ export function OpsShell({
                 ) : null}
                 {tab === "Tasks"
                   ? taskList(
-                      tasks.filter((t) => t.project_id === selected.project_id),
+                      listedTasks.filter(
+                        (t) => t.project_id === selected.project_id,
+                      ),
                     )
                   : null}
                 {tab === "Notes" ? (
@@ -2654,6 +2738,7 @@ export function OpsShell({
                 const form = new FormData(e.currentTarget);
                 if (
                   taskProcessReady &&
+                  !isProjectProcess(resumeTarget) &&
                   !(await mutate(
                     {
                       resource: "tasks",
@@ -2720,7 +2805,17 @@ export function OpsShell({
           >
             <fieldset disabled={busy}>
               <legend>이번 업무에서 진행할 내용 (선택)</legend>
-              {taskProcessReady ? (
+              {isProjectProcess(resumeTarget) ? (
+                <p>
+                  프로젝트:{" "}
+                  {text(
+                    projects.find((p) => p.id === resumeTarget.project_id)
+                      ?.title,
+                  )}{" "}
+                  · {Number(resumeTarget.project_step_order) + 1}단계 ·{" "}
+                  {text(resumeTarget.title)}
+                </p>
+              ) : taskProcessReady ? (
                 <TaskProcessEditor value={resumeTarget.process_steps} />
               ) : (
                 <p>단계 저장을 사용하려면 저장소 설정을 완료해 주세요.</p>
@@ -2797,10 +2892,13 @@ export function OpsShell({
           scheduleCategoryReady={scheduleCategoryReady}
           taskTestClassification={taskTestClassification}
           taskProcessReady={taskProcessReady}
+          projectProcessReady={projectProcessReady}
           libraryWorkflow={libraryWorkflow}
           promptVersions={rows("prompt_versions")}
           editor={editor}
           projects={projects}
+          tasks={tasks}
+          tasksTruncated={truncated.includes("tasks")}
           busy={busy}
           error={error}
           close={() => setEditor(null)}
@@ -3032,10 +3130,13 @@ function ResourceEditor({
   scheduleCategoryReady,
   taskTestClassification,
   taskProcessReady,
+  projectProcessReady,
   libraryWorkflow,
   promptVersions,
   editor,
   projects,
+  tasks,
+  tasksTruncated,
   busy,
   error,
   close,
@@ -3045,10 +3146,13 @@ function ResourceEditor({
   scheduleCategoryReady: boolean;
   taskTestClassification: boolean;
   taskProcessReady: boolean;
+  projectProcessReady: boolean;
   libraryWorkflow: boolean;
   promptVersions: OpsRow[];
   editor: Editor;
   projects: OpsRow[];
+  tasks: OpsRow[];
+  tasksTruncated: boolean;
   busy: boolean;
   error: string;
   close: () => void;
@@ -3085,6 +3189,8 @@ function ResourceEditor({
     resource === "schedules"
       ? scheduleRangeError(scheduleStart, scheduleEnd)
       : "";
+  const projectIncomplete =
+    resource === "projects" && Boolean(row.id) && tasksTruncated;
   const field = (name: string, label: string, type = "text", max = 120) => (
     <label>
       {label}
@@ -3133,7 +3239,7 @@ function ResourceEditor({
   );
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (busy || submitting.current) return;
+    if (busy || submitting.current || projectIncomplete) return;
     submitting.current = true;
     try {
       const f = new FormData(e.currentTarget),
@@ -3163,6 +3269,10 @@ function ResourceEditor({
         if (taskProcessReady)
           value.process_steps = JSON.parse(String(value.process_steps || "[]"));
       }
+      if (resource === "projects" && projectProcessReady) {
+        value.process_steps = JSON.parse(String(value.process_steps || "[]"));
+        value.expected_updated_at = row.updated_at || null;
+      }
       if (resource === "schedules") {
         try {
           value.starts_at = new Date(
@@ -3191,6 +3301,12 @@ function ResourceEditor({
       close={close}
     >
       <form onSubmit={submit} className="ops-form">
+        {projectIncomplete ? (
+          <p role="alert" className="ops-alert bad">
+            전체 프로세스를 불러오지 못해 저장을 잠시 막았습니다. 누락된 단계를
+            보관하지 않도록 전체 데이터 조회가 필요합니다.
+          </p>
+        ) : null}
         {resource !== "task_notes" ? field("title", "제목") : null}
         {resource === "library_items" && libraryWorkflow ? (
           <>
@@ -3237,6 +3353,14 @@ function ResourceEditor({
         ) : null}
         {resource === "projects" ? (
           <>
+            {projectProcessReady
+              ? select(
+                  "project_category",
+                  "프로젝트 분류",
+                  Object.entries(projectCategoryLabels),
+                  "other",
+                )
+              : null}
             {area("description", "설명", 2000)}
             {select(
               "status",
@@ -3247,6 +3371,23 @@ function ResourceEditor({
                 ["completed", "완료"],
               ],
               "planning",
+            )}
+            {projectProcessReady ? (
+              <ProjectProcessEditor
+                key={
+                  text(row.id) +
+                  JSON.stringify(projectProcessSteps(tasks, row.id)) +
+                  JSON.stringify(projectProcessSteps(tasks, row.id, true))
+                }
+                initialSteps={projectProcessSteps(tasks, row.id)}
+                archivedSteps={projectProcessSteps(tasks, row.id, true)}
+                disabled={busy}
+              />
+            ) : (
+              <p>
+                프로젝트 분류와 프로세스를 사용하려면 저장소 설정을 완료해
+                주세요.
+              </p>
             )}
           </>
         ) : null}
@@ -3501,7 +3642,7 @@ function ResourceEditor({
           </button>
           <button
             className="ops-primary"
-            disabled={busy || Boolean(scheduleError)}
+            disabled={busy || Boolean(scheduleError) || projectIncomplete}
           >
             {busy ? "저장 중…" : "저장"}
           </button>

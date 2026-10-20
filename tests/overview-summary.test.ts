@@ -8,6 +8,7 @@ import {
   weeklyScheduleRows,
   weeklyScheduleTime,
 } from "../src/lib/overview-summary.ts";
+import { projectProcessSteps } from "../src/lib/project-process-view.ts";
 test("오늘 등록 또는 마감 업무를 서울 날짜로 중복 없이 집계", () => {
   const tasks = [
     {
@@ -88,6 +89,92 @@ test("오늘 업무는 등록 또는 마감 미완료, 완료는 실제 완료 �
     "2026-10-19T01:00:00Z",
   );
   assert.equal(taskCompletionTime({ id: "bad", updated_at: "invalid" }), null);
+});
+
+test("프로젝트의 미완료 단계는 날짜와 관계없이 매일 표시하고 보관 단계는 제외", () => {
+  const tasks = [
+    {
+      id: "a",
+      project_id: "p",
+      project_step_id: "a",
+      project_step_order: 1,
+      status: "pending",
+      created_at: "2026-09-01T00:00:00Z",
+    },
+    {
+      id: "b",
+      project_id: "p",
+      project_step_id: "b",
+      project_step_order: 0,
+      status: "running",
+      due_date: "2026-11-01",
+    },
+    {
+      id: "c",
+      project_id: "p",
+      project_step_id: "c",
+      project_step_order: 2,
+      status: "completed",
+      completed_at: "2026-10-19T15:00:00Z",
+    },
+    {
+      id: "old",
+      project_id: "p",
+      project_step_id: "old",
+      status: "completed",
+      completed_at: "2026-10-19T14:59:59Z",
+    },
+    {
+      id: "archive",
+      project_id: "p",
+      project_step_id: "archive",
+      project_step_archived_at: "2026-10-19T12:00:00Z",
+      status: "pending",
+      due_date: "2026-10-20",
+    },
+    {
+      id: "archived-done",
+      project_id: "p",
+      project_step_id: "archived-done",
+      project_step_archived_at: "2026-10-20T03:00:00Z",
+      status: "completed",
+      completed_at: "2026-10-20T01:00:00Z",
+    },
+    { id: "legacy", status: "pending", created_at: "2026-09-01T00:00:00Z" },
+    { id: "legacy-today", status: "pending", due_date: "2026-10-20" },
+  ];
+  const today = dailyTaskGroups(tasks, "2026-10-20");
+  assert.deepEqual(
+    today.pending.map((t) => t.id),
+    ["b", "a", "legacy-today"],
+  );
+  assert.deepEqual(
+    today.completed.map((t) => t.id),
+    ["archived-done", "c"],
+  );
+  assert.deepEqual(dailyTaskSummary(tasks, "2026-10-20"), {
+    total: 5,
+    completed: 2,
+  });
+  const tomorrow = dailyTaskGroups(tasks, "2026-10-21");
+  assert.deepEqual(
+    tomorrow.pending.map((t) => t.id),
+    ["b", "a"],
+  );
+  assert.deepEqual(tomorrow.completed, []);
+  assert.deepEqual(
+    projectProcessSteps(tasks, "p").map((s) => [s.id, s.done]),
+    [
+      ["b", false],
+      ["old", true],
+      ["a", false],
+      ["c", true],
+    ],
+  );
+  assert.deepEqual(
+    projectProcessSteps(tasks, "p", true).map((s) => s.id),
+    ["archive", "archived-done"],
+  );
 });
 
 test("이번 주는 월요일부터 일요일, 선택 날짜와 관계없이 오늘을 기준으로 계산", () => {

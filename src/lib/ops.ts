@@ -1,5 +1,6 @@
 import { parseTask } from "./domain.ts";
 import { parseTaskCategory, parseProcessSteps } from "./task-process.ts";
+import { parseProjectCategory } from "./project-process.ts";
 import {
   parseScheduleCategory,
   parseScheduleVideoUrl,
@@ -128,6 +129,9 @@ export function parseResource(resource: Resource, raw: unknown) {
       title: text(v.title, 120, true),
       description: text(v.description ?? "", 2000),
       status: choice(v.status, ["planning", "active", "completed"]),
+      ...(v.project_category !== undefined
+        ? { project_category: parseProjectCategory(v.project_category) }
+        : {}),
     };
   if (resource === "task_notes")
     return {

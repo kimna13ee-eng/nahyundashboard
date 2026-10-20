@@ -14,7 +14,7 @@
     "test:e2e:trash": "node tests/schedule-trash-e2e.cjs",
     "test:e2e:automations": "node tests/automation-results-e2e.cjs",
     "lint": "eslint src tests/*.test.ts",
-    "test:db": "node --test tests/database.test.mjs tests/phase2-db.test.mjs tests/personal-content-db.test.mjs tests/workflow-db.test.mjs tests/content-history-db.test.mjs tests/prompt-metadata-db.test.mjs tests/stabilization-db.test.mjs tests/schedule-trash-db.test.mjs tests/automation-results-db.test.mjs tests/task-process-db.test.mjs tests/leave-db.test.mjs tests/personal-sheets-db.test.mjs tests/task-completion-db.test.mjs tests/schedule-category-db.test.mjs tests/exercise-push-db.test.mjs tests/frengle-core-db.test.mjs tests/company-task-transfer-db.test.mjs",
+    "test:db": "node --test tests/database.test.mjs tests/phase2-db.test.mjs tests/personal-content-db.test.mjs tests/workflow-db.test.mjs tests/content-history-db.test.mjs tests/prompt-metadata-db.test.mjs tests/stabilization-db.test.mjs tests/schedule-trash-db.test.mjs tests/automation-results-db.test.mjs tests/task-process-db.test.mjs tests/leave-db.test.mjs tests/personal-sheets-db.test.mjs tests/task-completion-db.test.mjs tests/schedule-category-db.test.mjs tests/exercise-push-db.test.mjs tests/frengle-core-db.test.mjs tests/company-task-transfer-db.test.mjs tests/project-process-db.test.mjs",
     "test:demo": "node tests/e2e.cjs"
   },
   "dependencies": {

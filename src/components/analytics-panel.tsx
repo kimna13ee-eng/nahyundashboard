@@ -1,6 +1,9 @@
 "use client";
-import { taskCategorySeconds } from "@/lib/work-kind";
-import { taskCategories, taskCategoryLabels } from "@/lib/task-process";
+import {
+  analyticsCategories,
+  analyticsCategoryLabels,
+  analyticsCategorySeconds,
+} from "@/lib/work-kind";
 import { isVerificationRecord } from "@/lib/content-analytics";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
@@ -41,12 +44,13 @@ export function AnalyticsPanel({
   const switches = (data.session_events || []).filter(
     (e) => e.kind === "switch" && ids.has(String(e.session_id)),
   );
-  const categoryTimes = taskCategorySeconds(
+  const categoryTimes = analyticsCategorySeconds(
     tasks,
     sessions,
     intervals,
     date,
     now,
+    data.projects || [],
   );
   const fmt = (seconds: number) => `${(seconds / 3600).toFixed(2)}시간`;
   return (
@@ -94,20 +98,20 @@ export function AnalyticsPanel({
               <strong>{switches.length}회</strong>
             </div>
           </div>
-          <h3>선택 날짜 업무 분류별 작업 시간</h3>
+          <h3>선택 날짜 분류별 작업 시간</h3>
           {taskProcessReady ? (
             <div className="ops-table-wrap">
               <table className="ops-analytics-table">
                 <thead>
                   <tr>
-                    <th scope="col">업무 분류</th>
+                    <th scope="col">분류</th>
                     <th scope="col">선택 날짜 작업 시간</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {taskCategories.map((category) => (
+                  {analyticsCategories.map((category) => (
                     <tr key={category}>
-                      <td>{taskCategoryLabels[category]}</td>
+                      <td>{analyticsCategoryLabels[category]}</td>
                       <td>{fmt(categoryTimes[category])}</td>
                     </tr>
                   ))}
@@ -116,14 +120,15 @@ export function AnalyticsPanel({
             </div>
           ) : (
             <p>
-              새 업무 분류 저장소가 준비되면 콘텐츠·영업·디자인·기타별 작업
+              분류 설정을 준비하면 콘텐츠·개발·운영·영업·디자인·기타별 작업
               시간을 표시합니다.
             </p>
           )}
           {taskProcessReady ? (
             <p>
-              현재 업무 분류를 기준으로 과거 작업 시간도 집계합니다. 분류를
-              지정하지 않은 기존 업무는 기타로 집계합니다.
+              프로젝트 프로세스는 현재 프로젝트 분류로, 기존 업무는 저장된 업무
+              분류로 집계합니다. 완료하거나 보관한 단계의 작업 기록도 포함하며,
+              분류 미지정은 기타로 표시합니다.
             </p>
           ) : null}
           <h3>프로젝트별 전체 작업 시간</h3>

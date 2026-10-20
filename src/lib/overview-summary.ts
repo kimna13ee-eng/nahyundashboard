@@ -1,4 +1,9 @@
 import { scheduleOverlaps, seoulDate, type OpsRow } from "./ops.ts";
+import {
+  isArchivedProjectProcess,
+  isProjectProcess,
+  orderedProjectTasks,
+} from "./project-process-view.ts";
 
 export function taskCompletionTime(task: OpsRow) {
   // A missing column means the completion-timestamp migration is not installed.
@@ -13,7 +18,9 @@ export function dailyTaskGroups(tasks: OpsRow[], day: string) {
     const created = Date.parse(String(task.created_at));
     return (
       task.status !== "completed" &&
-      (task.due_date === day ||
+      !isArchivedProjectProcess(task) &&
+      (isProjectProcess(task) ||
+        task.due_date === day ||
         (Number.isFinite(created) && seoulDate(new Date(created)) === day))
     );
   });
@@ -28,7 +35,7 @@ export function dailyTaskGroups(tasks: OpsRow[], day: string) {
       (a, b) =>
         Date.parse(taskCompletionTime(b)!) - Date.parse(taskCompletionTime(a)!),
     );
-  return { pending, completed };
+  return { pending: orderedProjectTasks(pending), completed };
 }
 
 export function seoulWeek(day: string) {
@@ -80,6 +87,12 @@ export function weeklyScheduleTime(item: OpsRow, day: string) {
 
 export function dailyTaskSummary(tasks: OpsRow[], day: string) {
   const daily = tasks.filter((task) => {
+    if (isProjectProcess(task)) {
+      const at = taskCompletionTime(task);
+      return task.status === "completed"
+        ? Boolean(at && seoulDate(new Date(at)) === day)
+        : !isArchivedProjectProcess(task);
+    }
     const created = Date.parse(String(task.created_at));
     return (
       task.due_date === day ||

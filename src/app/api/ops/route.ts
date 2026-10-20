@@ -6,6 +6,11 @@ import {
 } from "@/lib/workspaces/server";
 import { parseResource, resources, uuid, type Resource } from "@/lib/ops";
 import { parseTimerRequest, timerRpcFailure } from "@/lib/timer-request";
+import {
+  parseProjectCategory,
+  parseProjectProcessInput,
+  projectProcessFailure,
+} from "@/lib/project-process";
 const tables: Record<string, string> = {
   projects: "ops_projects",
   tasks: "tasks",
@@ -64,7 +69,18 @@ async function handle(req: NextRequest) {
         .select("work_kind")
         .limit(0);
       const guardCapability = await client.rpc("ops_timer_guard_ready");
+      const projectCapability = await Promise.all([
+        client.from("ops_projects").select("project_category").limit(0),
+        client
+          .from("tasks")
+          .select("project_step_id,project_step_order,project_step_archived_at")
+          .limit(0),
+        client.rpc("ops_project_process_ready"),
+      ]);
       return json({
+        projectProcessReady:
+          projectCapability.every((result) => !result.error) &&
+          projectCapability[2].data === true,
         scheduleCategoryReady: !(
           await client
             .from("ops_schedules")
@@ -111,6 +127,9 @@ async function handle(req: NextRequest) {
         parseTimerRequest(body),
       );
       if (error) {
+        const projectFailure = projectProcessFailure(error);
+        if (projectFailure)
+          return json({ error: projectFailure.error }, projectFailure.status);
         const failure = timerRpcFailure(error);
         return json(failure.body, failure.status);
       }
@@ -171,6 +190,9 @@ async function handle(req: NextRequest) {
         .eq("owner_id", user.id)
         .select("id")
         .maybeSingle();
+      const projectFailure = projectProcessFailure(error);
+      if (projectFailure)
+        return json({ error: projectFailure.error }, projectFailure.status);
       return error
         ? json(
             {
@@ -183,7 +205,46 @@ async function handle(req: NextRequest) {
           ? json({ ok: true })
           : json({ error: "항목을 찾을 수 없습니다." }, 404);
     }
-    const value = parseResource(resource, body.value);
+    const raw =
+      body.value && typeof body.value === "object" && !Array.isArray(body.value)
+        ? (body.value as Record<string, unknown>)
+        : null;
+    if (resource === "projects" && raw && Object.hasOwn(raw, "process_steps")) {
+      const value = parseProjectProcessInput(raw);
+      const { data, error } = await client.rpc("ops_project_save", {
+        p_id: req.method === "POST" ? null : body.id,
+        p_title: value.title,
+        p_description: value.description,
+        p_status: value.status,
+        p_category: value.project_category,
+        p_steps: value.process_steps,
+        p_expected_updated_at: value.expected_updated_at,
+      });
+      if (error) {
+        const failure = projectProcessFailure(error);
+        return json(
+          {
+            error:
+              failure?.error ||
+              "프로젝트 프로세스 저장 기능의 연결과 권한을 확인해 주세요.",
+          },
+          failure?.status || 409,
+        );
+      }
+      return json({ row: { id: data } }, req.method === "POST" ? 201 : 200);
+    }
+    // A category-only edit of a legacy project must not replace its checklist
+    // or other metadata. Full legacy requests retain their previous contract.
+    const value =
+      resource === "projects" &&
+      req.method === "PATCH" &&
+      raw &&
+      raw.project_category !== undefined &&
+      raw.title === undefined &&
+      raw.description === undefined &&
+      raw.status === undefined
+        ? { project_category: parseProjectCategory(raw.project_category) }
+        : parseResource(resource, body.value);
     const q =
       req.method === "POST"
         ? client.from(table).insert({ ...value, owner_id: user.id })
@@ -193,6 +254,9 @@ async function handle(req: NextRequest) {
             .eq("id", body.id)
             .eq("owner_id", user.id);
     const { data, error } = await q.select("*").maybeSingle();
+    const projectFailure = projectProcessFailure(error);
+    if (projectFailure)
+      return json({ error: projectFailure.error }, projectFailure.status);
     return error
       ? json(
           {

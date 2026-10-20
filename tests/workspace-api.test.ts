@@ -54,7 +54,14 @@ const rowId = "33333333-3333-4333-8333-333333333333";
 function project(id: string) {
   const queries: QueryRecord[] = [];
   const rpcs: string[] = [];
-  const state = { member: true, signedIn: true };
+  const rpcCalls: { name: string; args?: Record<string, unknown> }[] = [];
+  const state = {
+    member: true,
+    signedIn: true,
+    projectProcessReady: true,
+    mutationError: null as { message: string; code?: string } | null,
+    rpcError: null as { message: string; code?: string } | null,
+  };
   class Query {
     record: QueryRecord;
     constructor(table: string) {
@@ -102,7 +109,7 @@ function project(id: string) {
               ? { user_id: id }
               : null
             : { id: rowId, ...this.record.value },
-        error: null,
+        error: this.record.value ? state.mutationError : null,
       };
     }
   }
@@ -116,15 +123,23 @@ function project(id: string) {
       }),
     },
     from: (table: string) => new Query(table),
-    rpc: async (name: string) => {
+    rpc: async (name: string, args?: Record<string, unknown>) => {
       rpcs.push(name);
+      rpcCalls.push({ name, args });
       return {
-        data: name === "ops_recurrence_at" ? "2026-02-28T00:00:00Z" : true,
-        error: null,
+        data:
+          name === "ops_recurrence_at"
+            ? "2026-02-28T00:00:00Z"
+            : name === "ops_project_save"
+              ? rowId
+              : name === "ops_project_process_ready"
+                ? state.projectProcessReady
+                : true,
+        error: name === "ops_project_save" ? state.rpcError : null,
       };
     },
   } as unknown as SupabaseClient;
-  return { client, queries, rpcs, state };
+  return { client, queries, rpcs, rpcCalls, state };
 }
 
 function setup() {
@@ -313,4 +328,141 @@ test("PERSONAL은 개인 저장소를 유지하고 중복 workspace로 선택을
   );
   assert.equal(f.personal.queries.length, before);
   assert.deepEqual(f.company.queries, []);
+});
+
+test("프로젝트 단계 저장은 선택한 공간의 원자 RPC만 호출하고 owner 입력을 무시", async () => {
+  for (const workspace of ["PERSONAL", "FRENGLE"] as const) {
+    const f = setup();
+    const target = workspace === "PERSONAL" ? f.personal : f.company;
+    const timestamp = "2026-10-20T09:10:11.123456+09:00";
+    const value = {
+      title: "프로젝트",
+      description: "기획",
+      status: "active",
+      project_category: "development",
+      process_steps: [{ id: "stable", title: "자료 수집", done: true }],
+      expected_updated_at: timestamp,
+      owner_id: "untrusted",
+    };
+    const response = await ops.PATCH(
+      request(`/api/ops?workspace=${workspace}`, "PATCH", {
+        resource: "projects",
+        id: rowId,
+        value,
+      }),
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { row: { id: rowId } });
+    assert.deepEqual(target.rpcCalls, [
+      {
+        name: "ops_project_save",
+        args: {
+          p_id: rowId,
+          p_title: value.title,
+          p_description: value.description,
+          p_status: value.status,
+          p_category: value.project_category,
+          p_steps: value.process_steps,
+          p_expected_updated_at: timestamp,
+        },
+      },
+    ]);
+    assert.equal(
+      target.queries.some((query) => query.value),
+      false,
+    );
+    assert.deepEqual(
+      (workspace === "PERSONAL" ? f.company : f.personal).queries,
+      [],
+    );
+  }
+});
+
+test("잘못된 프로젝트 목록은 RPC 이전에 차단하고 분류만 수정할 때 기존 단계는 유지", async () => {
+  const f = setup();
+  const duplicate = { id: "a", title: "단계", done: false };
+  const invalid = await ops.POST(
+    request("/api/ops?workspace=FRENGLE", "POST", {
+      resource: "projects",
+      value: {
+        title: "프로젝트",
+        description: "",
+        status: "active",
+        project_category: "content",
+        process_steps: [duplicate, duplicate],
+      },
+    }),
+  );
+  assert.equal(invalid.status, 400);
+  assert.deepEqual(f.company.rpcs, []);
+  const category = await ops.PATCH(
+    request("/api/ops?workspace=FRENGLE", "PATCH", {
+      resource: "projects",
+      id: rowId,
+      value: { project_category: "operations" },
+    }),
+  );
+  assert.equal(category.status, 200);
+  assert.deepEqual(f.company.queries.find((query) => query.value)?.value, {
+    project_category: "operations",
+  });
+  assert.equal(
+    f.company.queries.some((query) => query.table === "tasks"),
+    false,
+  );
+  assert.deepEqual(f.company.rpcs, []);
+});
+
+test("프로젝트 기능 readiness와 진행 타이머·동시편집 실패를 실제 handler가 전달", async () => {
+  const f = setup();
+  let response = await ops.GET(request("/api/ops?workspace=FRENGLE"));
+  assert.equal((await response.json()).projectProcessReady, true);
+  f.company.state.projectProcessReady = false;
+  response = await ops.GET(request("/api/ops?workspace=FRENGLE"));
+  assert.equal((await response.json()).projectProcessReady, false);
+  for (const [message, expected] of [
+    ["Project step has an active timer", "진행 중인 타이머를 먼저 마쳐주세요."],
+    [
+      "Project changed since editing",
+      "프로젝트가 다른 화면에서 변경됐습니다. 다시 열어 확인해 주세요.",
+    ],
+  ]) {
+    f.company.state.rpcError = { message };
+    const failed = await ops.PATCH(
+      request("/api/ops?workspace=FRENGLE", "PATCH", {
+        resource: "projects",
+        id: rowId,
+        value: {
+          title: "프로젝트",
+          description: "",
+          status: "active",
+          project_category: "other",
+          process_steps: [],
+        },
+      }),
+    );
+    assert.equal(failed.status, 409);
+    assert.equal((await failed.json()).error, expected);
+  }
+  f.company.state.mutationError = {
+    message: "Project step has an active timer",
+  };
+  const directTask = await ops.PATCH(
+    request("/api/ops?workspace=FRENGLE", "PATCH", {
+      resource: "tasks",
+      id: rowId,
+      value: {
+        title: "단계",
+        notes: "메모",
+        status: "completed",
+        priority: "normal",
+        due_date: null,
+      },
+    }),
+  );
+  assert.equal(directTask.status, 409);
+  assert.equal(
+    (await directTask.json()).error,
+    "진행 중인 타이머를 먼저 마쳐주세요.",
+  );
 });
