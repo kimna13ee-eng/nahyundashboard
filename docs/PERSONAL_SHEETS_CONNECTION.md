@@ -96,8 +96,21 @@ This compares the user's recorded Reels against their own metric records;
 new records, changed observations or a partial response can change the baseline.
 
 The graph defaults to each post's score on a fixed 0–100 axis and also offers
-the six original count metrics. It shows the latest 12 posts in publication order with a selectable
-metric; its detail view retains the post's real numbers and source link.
+the six original count metrics. It ranks all loaded posts by the selected metric,
+showing the top three first with the remaining posts behind an expand/collapse
+button. Missing values sort last; ties use the newest publication date then ID.
+The optional table follows the same ranking. Headline totals and the average
+continue to include the full loaded set, regardless of the collapsed rows.
+The detail view retains the post's real numbers and source link.
 Sheet refresh time and metric observation date are separate. This view refreshes
 the values recorded in the sheet; it does not claim to query live Instagram
 statistics. The Content Studio shortcut opens the performance tab directly.
+
+PERSONAL Overview is content-focused: work summary counts, today's task lists,
+completed tasks and Quick Start are omitted there. Projects and task records
+remain available in Projects, and FRENGLE retains its work Overview and task
+registration. The idle timer is omitted on the PERSONAL Overview, while an
+active timer keeps its controls and bottom clearance. Weekly schedules and
+automation receipts remain below performance, side by side on wide screens.
+The scoped Overview style uses the existing cream/lavender palette and Noto
+Sans KR; no source data or database migrations are changed by this layout.

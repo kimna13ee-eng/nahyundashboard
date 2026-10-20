@@ -19,6 +19,7 @@ import { AnalyticsPanel } from "./analytics-panel";
 import { ContentAnalyticsPanel } from "./content-analytics-panel";
 import { PersonalSheetsPanel } from "./personal-sheets-panel";
 import { PersonalPerformancePanel } from "./personal-performance-panel";
+import "./personal-overview.css";
 import type { PersonalSheetTab } from "@/lib/personal-sheet-tabs";
 import {
   YogaReminderPanel,
@@ -636,6 +637,7 @@ export function OpsShell({
     view === "legacy-content"
       ? "기존 콘텐츠 기록"
       : menus.find((m) => m.id === view)?.label || "Overview";
+  const isPersonalOverview = space === "PERSONAL" && view === "overview";
   function openTaskEditor(task: OpsRow) {
     if (isProjectProcess(task)) {
       const parent = projects.find((p) => p.id === task.project_id);
@@ -1039,7 +1041,9 @@ export function OpsShell({
     );
   }
   return (
-    <div className="editorial">
+    <div
+      className={`editorial${isPersonalOverview ? " is-personal-overview" : ""}${isPersonalOverview && active ? " has-active-timer" : ""}`}
+    >
       <aside className="ops-sidebar">
         <Link
           href={space === "FRENGLE" ? "/frengle" : "/"}
@@ -1107,18 +1111,20 @@ export function OpsShell({
               </select>
             </label>
           </div>
-          <div className="ops-header-primary" aria-label="빠른 업무 액션">
-            {" "}
-            <button
-              disabled={!canWrite || !tasks.length}
-              onClick={() => {
-                setError("");
-                setQuickLog(true);
-              }}
-            >
-              Quick Log
-            </button>
-          </div>
+          {!isPersonalOverview ? (
+            <div className="ops-header-primary" aria-label="빠른 업무 액션">
+              {" "}
+              <button
+                disabled={!canWrite || !tasks.length}
+                onClick={() => {
+                  setError("");
+                  setQuickLog(true);
+                }}
+              >
+                Quick Log
+              </button>
+            </div>
+          ) : null}
           <div className="ops-header-utilities" aria-label="앱 관리">
             {" "}
             {space === "PERSONAL" ? (
@@ -1233,13 +1239,17 @@ export function OpsShell({
             <strong>
               {space === "FRENGLE"
                 ? "FRENGLE · 회사 업무 전용"
-                : "PERSONAL · 개인 프로젝트 전용"}
+                : isPersonalOverview
+                  ? "PERSONAL · CONTENT WORKSPACE"
+                  : "PERSONAL · 개인 프로젝트 전용"}
             </strong>
             <p>
               {configured === false
                 ? "환경변수가 없습니다. 샘플 데이터와 임의의 통계를 표시하지 않습니다."
                 : user
-                  ? "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 자동화 데이터에는 수신된 결과를 표시합니다."
+                  ? isPersonalOverview
+                    ? "콘텐츠 성과와 개인 일정을 한곳에서 확인하세요."
+                    : "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 자동화 데이터에는 수신된 결과를 표시합니다."
                   : `설정에서 ${space} 계정으로 로그인하세요. 로그인 전에는 실제 데이터를 표시하지 않습니다.`}
             </p>
             {user && dataReady && !timerGuardReady ? (
@@ -1289,7 +1299,11 @@ export function OpsShell({
             </p>
           ) : null}
           {view === "overview" ? (
-            <>
+            <div
+              className={
+                isPersonalOverview ? "ops-personal-overview-grid" : undefined
+              }
+            >
               {space === "PERSONAL" ? (
                 <PersonalPerformancePanel
                   key={"performance:" + (user?.email || "signed-out")}
@@ -1304,82 +1318,89 @@ export function OpsShell({
                   }}
                 />
               ) : null}
-              <div className="ops-metrics ops-overview-metrics">
-                {[
-                  ["전체 업무", dailySummary.total],
-                  ["오늘 완료", todayTasks.completed.length],
-                  [
-                    "자동화 데이터",
-                    automationReady
-                      ? automationResults.filter(
-                          (r) =>
-                            seoulDate(new Date(String(r.received_at))) ===
-                            today,
-                        ).length
-                      : "미연결",
-                  ],
-                ].map(([label, value]) => {
-                  const contents = (
-                    <>
-                      <small>{label}</small>
-                      <strong>{user && !error ? value : "—"}</strong>
-                      {label === "자동화 데이터" ? (
-                        <span>
-                          수신 결과 확인 <ArrowUpRight size={14} />
-                        </span>
-                      ) : null}
-                      <p>
-                        {label === "자동화 데이터"
-                          ? `오늘 수신한 ${space === "PERSONAL" ? "Metricool" : "회사 자동화"} 결과 · 최근 100건 기준`
-                          : label === "오늘 완료"
-                            ? `${today} · 오늘 완료한 업무`
-                            : `${today} · 미완료 프로세스와 오늘의 기존 업무`}
-                      </p>
-                    </>
-                  );
-                  return label === "자동화 데이터" ? (
-                    <button
-                      className="ops-card ops-automation-metric"
-                      key={label}
-                      aria-label="자동화 데이터 · 수신 결과 확인"
-                      onClick={() => move("automations")}
-                    >
-                      {contents}
-                    </button>
-                  ) : (
-                    <div className="ops-card" key={label}>
-                      {contents}
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="ops-overview-metric-note">
-                {today} · 전체: 미완료 프로세스와 진행 중·오늘 등록·마감 업무 ·
-                완료: 오늘 완료 · 자동화: 수신 결과
-              </p>
-              <section className="ops-card ops-overview-today">
-                {heads(
-                  "오늘 할 일",
-                  `${today} · 미완료 프로세스와 진행 중 업무는 매일 표시 · 그 외 오늘 등록·마감 기준`,
-                  <div
-                    className="ops-overview-create-actions"
-                    role="group"
-                    aria-label="오늘 할 일 등록"
-                  >
-                    {create("tasks", "업무 등록", { dueDate: today })}
-                    {create("projects", "프로젝트 등록")}
-                  </div>,
-                )}
-                {taskList(todayTasks.pending)}
-              </section>
-              <section className="ops-card ops-overview-completed">
-                {heads("오늘 완료 업무", `${today} · 실제 완료한 날짜 기준`)}
-                {todayTasks.completed.length ? (
-                  taskList(todayTasks.completed)
-                ) : (
-                  <Empty label="오늘 완료한 업무가 없습니다." />
-                )}
-              </section>
+              {space === "FRENGLE" ? (
+                <>
+                  <div className="ops-metrics ops-overview-metrics">
+                    {[
+                      ["전체 업무", dailySummary.total],
+                      ["오늘 완료", todayTasks.completed.length],
+                      [
+                        "자동화 데이터",
+                        automationReady
+                          ? automationResults.filter(
+                              (r) =>
+                                seoulDate(new Date(String(r.received_at))) ===
+                                today,
+                            ).length
+                          : "미연결",
+                      ],
+                    ].map(([label, value]) => {
+                      const contents = (
+                        <>
+                          <small>{label}</small>
+                          <strong>{user && !error ? value : "—"}</strong>
+                          {label === "자동화 데이터" ? (
+                            <span>
+                              수신 결과 확인 <ArrowUpRight size={14} />
+                            </span>
+                          ) : null}
+                          <p>
+                            {label === "자동화 데이터"
+                              ? "오늘 수신한 회사 자동화 결과 · 최근 100건 기준"
+                              : label === "오늘 완료"
+                                ? `${today} · 오늘 완료한 업무`
+                                : `${today} · 미완료 프로세스와 오늘의 기존 업무`}
+                          </p>
+                        </>
+                      );
+                      return label === "자동화 데이터" ? (
+                        <button
+                          className="ops-card ops-automation-metric"
+                          key={label}
+                          aria-label="자동화 데이터 · 수신 결과 확인"
+                          onClick={() => move("automations")}
+                        >
+                          {contents}
+                        </button>
+                      ) : (
+                        <div className="ops-card" key={label}>
+                          {contents}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="ops-overview-metric-note">
+                    {today} · 전체: 미완료 프로세스와 진행 중·오늘 등록·마감
+                    업무 · 완료: 오늘 완료 · 자동화: 수신 결과
+                  </p>
+                  <section className="ops-card ops-overview-today">
+                    {heads(
+                      "오늘 할 일",
+                      `${today} · 미완료 프로세스와 진행 중 업무는 매일 표시 · 그 외 오늘 등록·마감 기준`,
+                      <div
+                        className="ops-overview-create-actions"
+                        role="group"
+                        aria-label="오늘 할 일 등록"
+                      >
+                        {create("tasks", "업무 등록", { dueDate: today })}
+                        {create("projects", "프로젝트 등록")}
+                      </div>,
+                    )}
+                    {taskList(todayTasks.pending)}
+                  </section>
+                  <section className="ops-card ops-overview-completed">
+                    {heads(
+                      "오늘 완료 업무",
+                      `${today} · 실제 완료한 날짜 기준`,
+                    )}
+                    {todayTasks.completed.length ? (
+                      taskList(todayTasks.completed)
+                    ) : (
+                      <Empty label="오늘 완료한 업무가 없습니다." />
+                    )}
+                  </section>
+                </>
+              ) : null}
               <section className="ops-card ops-overview-week">
                 {heads(
                   "이번 주 일정",
@@ -1507,103 +1528,106 @@ export function OpsShell({
                 onViewAll={() => move("automations")}
                 refresh={() => void load()}
               />
-              <section className="ops-card">
-                {heads(
-                  "Quick Start / 중단한 업무",
-                  "미완료 다음 액션을 확인하고 이어서 작업하세요.",
-                )}
-                {activeTask ? (
-                  <div className="ops-entry">
-                    <strong>진행 중: {text(activeTask.title)}</strong>
-                    <button
-                      onClick={() => {
-                        setView("projects");
-                        setDetail(activeTask.id);
-                      }}
-                    >
-                      진행 중인 업무로 돌아가기
-                    </button>
-                  </div>
-                ) : null}
-                {sessions
-                  .filter((s) => s.status === "PARKED")
-                  .map((s) => {
-                    const task = tasks.find((t) => t.id === s.task_id);
-                    if (
-                      !task ||
-                      isArchivedProjectProcess(task) ||
-                      (isProjectProcess(task) && task.status === "completed")
-                    )
-                      return null;
-                    const context = quickStartContext(
-                      task,
-                      s,
-                      notes,
-                      events,
-                      workflowData.contexts || [],
-                    );
-                    return (
-                      <div className="ops-entry" key={s.id}>
-                        <strong>
-                          {text(tasks.find((t) => t.id === s.task_id)?.title)}
-                        </strong>
-                        <p>
-                          {context.historical
-                            ? "중단 당시 다음 액션"
-                            : "저장된 다음 액션"}
-                          : {context.next.join(" · ") || "기록 없음"}
-                        </p>
-                        {context.lastNote ? (
-                          <p>마지막 메모: {context.lastNote}</p>
-                        ) : null}
-                        {context.issue ? (
+              {space === "FRENGLE" ? (
+                <section className="ops-card">
+                  {heads(
+                    "Quick Start / 중단한 업무",
+                    "미완료 다음 액션을 확인하고 이어서 작업하세요.",
+                  )}
+                  {activeTask ? (
+                    <div className="ops-entry">
+                      <strong>진행 중: {text(activeTask.title)}</strong>
+                      <button
+                        onClick={() => {
+                          setView("projects");
+                          setDetail(activeTask.id);
+                        }}
+                      >
+                        진행 중인 업무로 돌아가기
+                      </button>
+                    </div>
+                  ) : null}
+                  {sessions
+                    .filter((s) => s.status === "PARKED")
+                    .map((s) => {
+                      const task = tasks.find((t) => t.id === s.task_id);
+                      if (
+                        !task ||
+                        isArchivedProjectProcess(task) ||
+                        (isProjectProcess(task) && task.status === "completed")
+                      )
+                        return null;
+                      const context = quickStartContext(
+                        task,
+                        s,
+                        notes,
+                        events,
+                        workflowData.contexts || [],
+                      );
+                      return (
+                        <div className="ops-entry" key={s.id}>
+                          <strong>
+                            {text(tasks.find((t) => t.id === s.task_id)?.title)}
+                          </strong>
                           <p>
-                            최근 특이사항{context.issueDone ? " (해결됨)" : ""}:{" "}
-                            {context.issue}
+                            {context.historical
+                              ? "중단 당시 다음 액션"
+                              : "저장된 다음 액션"}
+                            : {context.next.join(" · ") || "기록 없음"}
                           </p>
-                        ) : null}
-                        <p>
-                          마지막 중단:{" "}
-                          {context.parkedAt
-                            ? new Date(context.parkedAt).toLocaleString(
-                                "ko-KR",
-                                { timeZone: "Asia/Seoul" },
-                              )
-                            : "시각 기록 없음"}{" "}
-                          · 사유: {context.reason || "기록 없음"}
-                        </p>
-                        {context.resultUrl ? (
-                          <a
-                            href={context.resultUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          {context.lastNote ? (
+                            <p>마지막 메모: {context.lastNote}</p>
+                          ) : null}
+                          {context.issue ? (
+                            <p>
+                              최근 특이사항
+                              {context.issueDone ? " (해결됨)" : ""}:{" "}
+                              {context.issue}
+                            </p>
+                          ) : null}
+                          <p>
+                            마지막 중단:{" "}
+                            {context.parkedAt
+                              ? new Date(context.parkedAt).toLocaleString(
+                                  "ko-KR",
+                                  { timeZone: "Asia/Seoul" },
+                                )
+                              : "시각 기록 없음"}{" "}
+                            · 사유: {context.reason || "기록 없음"}
+                          </p>
+                          {context.resultUrl ? (
+                            <a
+                              href={context.resultUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              연결된 결과물 열기
+                            </a>
+                          ) : null}
+                          <button
+                            disabled={!canWrite || !timerGuardReady}
+                            onClick={() => setResumeTask(text(s.task_id))}
                           >
-                            연결된 결과물 열기
-                          </a>
-                        ) : null}
-                        <button
-                          disabled={!canWrite || !timerGuardReady}
-                          onClick={() => setResumeTask(text(s.task_id))}
-                        >
-                          <Play size={15} />
-                          이어하기
-                        </button>
-                      </div>
-                    );
-                  })}
-                {!sessions.some(
-                  (s) =>
-                    s.status === "PARKED" &&
-                    listedTasks.some(
-                      (t) =>
-                        t.id === s.task_id &&
-                        !(isProjectProcess(t) && t.status === "completed"),
-                    ),
-                ) ? (
-                  <Empty label="중단한 업무가 없습니다." />
-                ) : null}
-              </section>
-            </>
+                            <Play size={15} />
+                            이어하기
+                          </button>
+                        </div>
+                      );
+                    })}
+                  {!sessions.some(
+                    (s) =>
+                      s.status === "PARKED" &&
+                      listedTasks.some(
+                        (t) =>
+                          t.id === s.task_id &&
+                          !(isProjectProcess(t) && t.status === "completed"),
+                      ),
+                  ) ? (
+                    <Empty label="중단한 업무가 없습니다." />
+                  ) : null}
+                </section>
+              ) : null}
+            </div>
           ) : null}
           {view === "projects" && !selected ? (
             <>
@@ -2596,43 +2620,45 @@ export function OpsShell({
           </footer>
         </main>
       </div>
-      <div className="ops-timer">
-        <div>
-          <small>{active ? "ACTIVE" : "TIME TRACKER"}</small>
-          <strong>{text(activeTask?.title) || "진행 중인 업무 없음"}</strong>
+      {!isPersonalOverview || active ? (
+        <div className="ops-timer">
+          <div>
+            <small>{active ? "ACTIVE" : "TIME TRACKER"}</small>
+            <strong>{text(activeTask?.title) || "진행 중인 업무 없음"}</strong>
+          </div>
+          <code>{clock(activeSeconds)}</code>
+          {active ? (
+            <>
+              <button disabled={!canWrite} onClick={() => setRecovery(true)}>
+                기록 확인
+              </button>
+              <button
+                disabled={!canWrite || !timerGuardReady}
+                onClick={() =>
+                  workflowReady
+                    ? setParkOpen(active)
+                    : timer("pause", text(active.task_id))
+                }
+              >
+                <Pause size={17} />
+                일시정지
+              </button>
+              <button
+                disabled={!canWrite || !timerGuardReady}
+                onClick={() => setSummary(active)}
+              >
+                <Square size={15} />
+                종료
+              </button>
+            </>
+          ) : (
+            <button disabled={!canWrite} onClick={() => move("projects")}>
+              <Play size={16} />
+              업무 선택
+            </button>
+          )}
         </div>
-        <code>{clock(activeSeconds)}</code>
-        {active ? (
-          <>
-            <button disabled={!canWrite} onClick={() => setRecovery(true)}>
-              기록 확인
-            </button>
-            <button
-              disabled={!canWrite || !timerGuardReady}
-              onClick={() =>
-                workflowReady
-                  ? setParkOpen(active)
-                  : timer("pause", text(active.task_id))
-              }
-            >
-              <Pause size={17} />
-              일시정지
-            </button>
-            <button
-              disabled={!canWrite || !timerGuardReady}
-              onClick={() => setSummary(active)}
-            >
-              <Square size={15} />
-              종료
-            </button>
-          </>
-        ) : (
-          <button disabled={!canWrite} onClick={() => move("projects")}>
-            <Play size={16} />
-            업무 선택
-          </button>
-        )}
-      </div>
+      ) : null}
       <nav className="ops-mobile-nav" aria-label="모바일 메뉴">
         {visibleMenus
           .filter((m) =>

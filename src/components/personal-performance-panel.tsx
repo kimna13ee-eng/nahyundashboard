@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
-import { ArrowUpRight, BarChart3, RefreshCw } from "lucide-react";
+import { ArrowUpRight, BarChart3, ChevronDown, RefreshCw } from "lucide-react";
 import { OpsDialog } from "./ops-dialog";
 import { workspaceApiPath } from "@/lib/workspace-api";
 import {
@@ -129,10 +129,12 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
   const [metric, setMetric] = useState<ChartMetric>("score");
+  const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<ReelsPerformanceEntry | null>(null);
   const detailOpen = useRef(false);
   const loadCurrent = useRef<(() => Promise<boolean>) | null>(null);
   const chartTitle = useId();
+  const remainingId = useId();
 
   useEffect(() => {
     if (!enabled) return;
@@ -225,12 +227,22 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
 
   const result = enabled ? snapshot : null;
   const summary = result?.summary;
-  const entries = [...(summary?.entries || [])]
-    .sort(
-      (a, b) =>
-        b.publishedAt.localeCompare(a.publishedAt) || a.id.localeCompare(b.id),
-    )
-    .slice(0, 12);
+  const entries = [...(summary?.entries || [])].sort((a, b) => {
+    const left = a[metric];
+    const right = b[metric];
+    if (left === null && right !== null) return 1;
+    if (right === null && left !== null) return -1;
+    return (
+      (right ?? 0) - (left ?? 0) ||
+      b.publishedAt.localeCompare(a.publishedAt) ||
+      a.id.localeCompare(b.id)
+    );
+  });
+  const topEntries = entries.slice(0, 3);
+  const remainingEntries = entries.slice(3);
+  const rankingScope = expanded
+    ? `조회한 릴스 ${entries.length}개 전체 순위`
+    : `조회한 릴스 ${entries.length}개 중 상위 ${topEntries.length}개`;
   const maximum =
     metric === "score"
       ? 100
@@ -260,6 +272,39 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
   function closeDetail() {
     detailOpen.current = false;
     setDetail(null);
+  }
+  function rankingRow(entry: ReelsPerformanceEntry, index: number) {
+    const value = entry[metric];
+    return (
+      <button
+        key={entry.id}
+        type="button"
+        className={`ops-reels-bar-row${value === null ? " is-missing" : ""}${index < 3 ? " is-top" : ""}`}
+        onClick={() => openDetail(entry)}
+        title={`${index + 1}위 · ${entry.title} · ${entry.publishedAt} · ${metricLabels[metric]} ${metricValue(metric, value)}`}
+        aria-label={`${index + 1}위, ${entry.title}, 발행일 ${entry.publishedAt}, ${metricLabels[metric]} ${metricValue(metric, value)}, 상세 보기`}
+      >
+        <span className="ops-reels-rank" aria-hidden="true">
+          {index + 1}
+        </span>
+        <span className="ops-reels-bar-label">
+          <strong>{entry.title}</strong>
+          <small>{entry.publishedAt}</small>
+        </span>
+        <span className="ops-reels-track" aria-hidden="true">
+          <span
+            style={
+              {
+                "--reels-bar-width": `${value === null || !maximum ? 0 : (value / maximum) * 100}%`,
+              } as CSSProperties
+            }
+          />
+        </span>
+        <span className="ops-reels-bar-value">
+          {metricValue(metric, value)}
+        </span>
+      </button>
+    );
   }
 
   return (
@@ -382,22 +427,28 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
       <figure className="ops-reels-chart" aria-labelledby={chartTitle}>
         <div className="ops-reels-chart-heading">
           <figcaption id={chartTitle}>
-            <strong>게시물별 {metricLabels[metric]}</strong>
+            <strong>
+              {metricLabels[metric]} 랭킹
+              <span className="ops-reels-top-label">
+                {expanded ? "ALL" : "TOP 3"}
+              </span>
+            </strong>
             <span>
               {ready
                 ? metric === "score"
-                  ? `최근 발행 ${entries.length}개 · 0~100점 고정 · ${scoreCoverage}`
-                  : `최근 발행 ${entries.length}개 · 합계는 조회한 릴스 ${summary.postCount}개 기준`
-                : "최근 발행 릴스 최대 12개"}
+                  ? `${rankingScope} · 0~100점 · ${scoreCoverage}`
+                  : `${rankingScope} · 합계는 전체 조회 범위 기준`
+                : "지표별 상위 3개 릴스부터 확인하세요."}
             </span>
           </figcaption>
           <label>
             <span className="sr-only">릴스 성과 그래프 지표</span>
             <select
               value={metric}
-              onChange={(event) =>
-                setMetric(event.currentTarget.value as ChartMetric)
-              }
+              onChange={(event) => {
+                setMetric(event.currentTarget.value as ChartMetric);
+                setExpanded(false);
+              }}
             >
               {chartMetrics.map((key) => (
                 <option key={key} value={key}>
@@ -409,41 +460,20 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
         </div>
         <div
           className="ops-reels-plot"
-          tabIndex={entries.length ? 0 : undefined}
           role="region"
           aria-label="릴스별 성과 그래프. 게시물을 누르면 상세 기록을 볼 수 있습니다."
         >
           {entries.length ? (
-            entries.map((entry) => {
-              const value = entry[metric];
-              return (
-                <button
-                  key={entry.id}
-                  type="button"
-                  className={`ops-reels-bar-row${value === null ? " is-missing" : ""}`}
-                  onClick={() => openDetail(entry)}
-                  title={`${entry.title} · ${entry.publishedAt} · ${metricLabels[metric]} ${metricValue(metric, value)}`}
-                  aria-label={`${entry.title}, 발행일 ${entry.publishedAt}, ${metricLabels[metric]} ${metricValue(metric, value)}, 상세 보기`}
-                >
-                  <span className="ops-reels-bar-label">
-                    <strong>{entry.title}</strong>
-                    <small>{entry.publishedAt}</small>
-                  </span>
-                  <span className="ops-reels-track" aria-hidden="true">
-                    <span
-                      style={
-                        {
-                          "--reels-bar-width": `${value === null || !maximum ? 0 : (value / maximum) * 100}%`,
-                        } as CSSProperties
-                      }
-                    />
-                  </span>
-                  <span className="ops-reels-bar-value">
-                    {metricValue(metric, value)}
-                  </span>
-                </button>
-              );
-            })
+            <>
+              {topEntries.map(rankingRow)}
+              <div id={remainingId} hidden={!expanded}>
+                {expanded
+                  ? remainingEntries.map((entry, index) =>
+                      rankingRow(entry, index + 3),
+                    )
+                  : null}
+              </div>
+            </>
           ) : (
             <div className="ops-reels-empty" role="status">
               <BarChart3 size={24} aria-hidden="true" />
@@ -466,6 +496,20 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
             </div>
           )}
         </div>
+        {remainingEntries.length ? (
+          <button
+            className="ops-reels-expand"
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={remainingId}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            {expanded
+              ? `나머지 ${remainingEntries.length.toLocaleString("ko-KR")}개 접기`
+              : `나머지 ${remainingEntries.length.toLocaleString("ko-KR")}개 펼치기`}
+            <ChevronDown size={15} aria-hidden="true" />
+          </button>
+        ) : null}
         {summary && summary.postCount > 0 && !summary.observedRowCount ? (
           <p className="ops-reels-warning">
             발행 릴스는 있지만 성과 수치가 아직 미입력 상태예요. 빈칸을 0으로
@@ -482,8 +526,10 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
           </p>
         ) : null}
         {entries.length ? (
-          <details className="ops-reels-table">
-            <summary>그래프를 표로 보기 · 최근 {entries.length}개</summary>
+          <details className="ops-reels-table" key={metric}>
+            <summary>
+              전체 순위를 표로 보기 · {entries.length.toLocaleString("ko-KR")}개
+            </summary>
             <div
               className="ops-reels-table-scroll"
               role="region"
@@ -493,12 +539,15 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
               <table>
                 <caption className="sr-only">
                   {result?.source.truncated
-                    ? "조회 범위 내 최근 발행 릴스의 최신 관측 성과"
-                    : "최근 발행 릴스의 최신 관측 성과"}
+                    ? `조회 범위 내 릴스의 ${metricLabels[metric]} 순위와 최신 관측 성과`
+                    : `발행 릴스의 ${metricLabels[metric]} 순위와 최신 관측 성과`}
                 </caption>
                 <thead>
                   <tr>
-                    <th scope="col">릴스</th>
+                    <th scope="col">순위</th>
+                    <th scope="col" className="ops-reels-table-title">
+                      릴스
+                    </th>
                     <th scope="col">발행일</th>
                     {chartMetrics.map((key) => (
                       <th scope="col" key={key}>
@@ -508,9 +557,10 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.map((entry) => (
+                  {entries.map((entry, index) => (
                     <tr key={entry.id}>
-                      <th scope="row">
+                      <td>{index + 1}</td>
+                      <th scope="row" className="ops-reels-table-title">
                         <button type="button" onClick={() => openDetail(entry)}>
                           {entry.title}
                         </button>
@@ -527,19 +577,19 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
           </details>
         ) : null}
       </figure>
-      <dl className="ops-reels-breakdown">
-        {(["likes", "comments", "saves", "shares"] as const).map((key) => (
-          <div key={key}>
-            <dt>{metricLabels[key]}</dt>
-            <dd>{ready ? number(summary.totals[key]) : "—"}</dd>
-            <small>
-              {summary ? coverageText(summary, key) : "기록된 수치 합계"}
-            </small>
-          </div>
-        ))}
-      </dl>
       <details className="ops-reels-score-method">
-        <summary>100점 산정 기준</summary>
+        <summary>세부 지표 · 100점 산정 기준</summary>
+        <dl className="ops-reels-breakdown">
+          {(["likes", "comments", "saves", "shares"] as const).map((key) => (
+            <div key={key}>
+              <dt>{metricLabels[key]}</dt>
+              <dd>{ready ? number(summary.totals[key]) : "—"}</dd>
+              <small>
+                {summary ? coverageText(summary, key) : "기록된 수치 합계"}
+              </small>
+            </div>
+          ))}
+        </dl>
         <p>
           {result?.source.truncated ? "조회 범위 내 " : "현재 발행된 "}개인
           릴스의 상대 점수예요. 조회수·좋아요·댓글·저장·공유를 각각 20%씩
