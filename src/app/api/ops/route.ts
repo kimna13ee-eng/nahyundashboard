@@ -93,6 +93,14 @@ async function handle(req: NextRequest) {
             .select("category,video_url")
             .limit(0)
         ).error,
+        yogaMetadataReady:
+          workspace === "PERSONAL" &&
+          !(
+            await client
+              .from("ops_schedules")
+              .select("duration_minutes")
+              .limit(0)
+          ).error,
         taskProcessReady: !(
           await client
             .from("tasks")
@@ -127,6 +135,20 @@ async function handle(req: NextRequest) {
       });
     }
     const body = await req.json();
+    const raw =
+      body.value && typeof body.value === "object" && !Array.isArray(body.value)
+        ? (body.value as Record<string, unknown>)
+        : null;
+    if (
+      workspace === "FRENGLE" &&
+      body.resource === "schedules" &&
+      raw &&
+      Object.hasOwn(raw, "duration_minutes")
+    )
+      return json(
+        { error: "운동 소요 시간은 PERSONAL에서만 입력할 수 있습니다." },
+        403,
+      );
     if (body.action === "timer") {
       const { data, error } = await client.rpc(
         "ops_timer_guarded",
@@ -211,10 +233,6 @@ async function handle(req: NextRequest) {
           ? json({ ok: true })
           : json({ error: "항목을 찾을 수 없습니다." }, 404);
     }
-    const raw =
-      body.value && typeof body.value === "object" && !Array.isArray(body.value)
-        ? (body.value as Record<string, unknown>)
-        : null;
     if (resource === "projects" && raw && Object.hasOwn(raw, "process_steps")) {
       const value = parseProjectProcessInput(raw);
       const { data, error } = await client.rpc("ops_project_save", {

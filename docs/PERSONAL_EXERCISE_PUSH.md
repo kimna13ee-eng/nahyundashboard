@@ -4,13 +4,17 @@ Content Studio는 PERSONAL의 연결된 SNS 시트를 보여 준다. 기존 수�
 
 PERSONAL의 일반 일정 등록은 콘텐츠명 한 칸만 입력한다. Overview에서는 오늘, Calendar에서는 선택한 날짜의 종일(서울 00:00~다음날 00:00) 콘텐츠 일정으로 저장한다. 시작·종료 시간, 프로젝트, 일정 분류와 메모 입력은 표시하지 않는다. 새 콘텐츠 일정은 기존 DB 기본 분류 `other`를 사용한다. 기존 일정의 제목 수정은 제목만 갱신해 숨긴 시간·프로젝트·메모·분류를 보존한다. FRENGLE의 일정 등록 폼은 유지한다.
 
-PERSONAL의 Yoga Planner에서 날짜를 선택하고 ‘영상 링크 등록’으로 HTTPS 영상 URL을 저장한다. 새 일정의 제목은 ‘요가’, 분류는 운동이며 선택 날짜의 21:00~22:00으로 저장한다. 기존 운동 일정도 같은 보드에 표시하며 수정 시 저장된 시간과 다른 필드를 유지한다. 날짜별 영상 카드에서 링크 열기·수정·휴지통 이동이 가능하고, 오늘부터 7일간의 예정 목록을 따로 표시한다. 운동 일정의 시작일을 한국 날짜로 계산하여 그날 21:00에 등록된 기기로 알린다. 운동 분류와 영상 URL이 모두 있는 일정만 대상이다. 반복 규칙·콘텐츠에서 파생된 일정은 이 발송 대상이 아니다. 같은 날 운동 일정이 여러 개면 각 일정이 알림 하나씩 생성된다.
+PERSONAL의 Yoga Planner는 선택한 날짜가 속한 월요일~일요일 7칸 보드다. 이전·다음 주, 이번 주, 날짜 선택으로 원하는 주를 보고 각 요일의 ‘영상 등록’에서 HTTPS 영상 URL·영상 제목과 선택적인 운동 시간(분)을 저장한다. 영상 제목 전체와 입력한 시간을 카드에 표시한다. 시간 미입력은 별도로 표시하며 일정의 1시간 창을 영상 재생시간으로 추정하지 않는다. 주간 합계는 입력된 분 수만 더하고 미입력 영상 개수를 함께 보여 준다.
 
-알림에는 개인 제목이나 외부 영상 URL을 넣지 않는다. 기존 iPhone 서비스워커와 호환되도록 서버의 `/?view=calendar&date=...&schedule=...` 알림 URL을 유지한다. 앱은 로그인한 소유자의 일정이 운동인지 확인한 뒤 실제 저장된 서울 날짜의 Yoga Planner 카드로 연결한다. 일반 일정은 기존 캘린더 상세로 연결한다. 외부 영상은 소유자가 보드에서 직접 선택한다. 서비스워커는 요청을 캐시하지 않는다. 기존 기기는 알림 재등록이나 환경변수·SQL 변경이 필요 없다.
+새 일정은 운동 분류와 선택 날짜의 21:00~22:00으로 저장한다. `duration_minutes`는 실제 영상에서 확인해 입력한 1~1440분의 정수 또는 null이며, 알림 시각·기존 일정 시간에 영향을 주지 않는다. 기존 운동 일정도 같은 보드에 표시하며 수정 시 제목·URL·분 수 외의 필드를 유지한다. 각 카드에서 링크 열기·수정·휴지통 이동이 가능하다. 운동 일정의 시작일을 한국 날짜로 계산하여 그날 21:00에 등록된 기기로 알린다. 운동 분류와 영상 URL이 모두 있는 일정만 대상이다. 반복 규칙·콘텐츠에서 파생된 일정은 이 발송 대상이 아니다. 같은 날 운동 일정이 여러 개면 각 일정이 알림 하나씩 생성된다.
+
+YouTube 영상 URL은 ‘영상 제목 불러오기’로 제목을 가져오거나 직접 입력할 수 있다. 인증된 PERSONAL의 동일 출처 POST만 허용하며 11자 영상 ID로 고정 YouTube oEmbed 주소를 구성한다. 외부 리다이렉트·쿠키 전송을 막고 8초·64KiB 한도를 적용한다. 응답의 HTML·이미지·작성자·재생시간은 사용하지 않고 제목 텍스트만 최대120자로 반환한다. 다른 HTTPS 영상은 URL을 직접 요청하지 않고 제목과 분 수를 수동 입력한다. 제목 조회에 실패해도 직접 입력하여 저장할 수 있다. 근거: [공식 oEmbed 사양의 YouTube 제공자 예시](https://oembed.com/#section5.1).
+
+알림에는 개인 제목이나 외부 영상 URL을 넣지 않는다. 기존 iPhone 서비스워커와 호환되도록 서버의 `/?view=calendar&date=...&schedule=...` 알림 URL을 유지한다. 앱은 로그인한 소유자의 일정이 운동인지 확인한 뒤 실제 저장된 서울 날짜가 속한 Yoga Planner 주간 보드의 카드로 연결한다. 일반 일정은 기존 캘린더 상세로 연결한다. 외부 영상은 소유자가 보드에서 직접 선택한다. 서비스워커는 요청을 캐시하지 않는다. 기존 기기의 알림 재등록이나 환경변수 변경은 필요 없다.
 
 ## 운영 적용 순서
 
-1. PERSONAL 프로젝트에 `018_schedule_categories.sql`, `019_personal_exercise_push.sql`을 순서대로 적용한다. FRENGLE에는 적용하지 않는다.
+1. PERSONAL 프로젝트에 `018_schedule_categories.sql`, `019_personal_exercise_push.sql`, `021_yoga_duration.sql`을 순서대로 적용한다. FRENGLE에는 적용하지 않는다. 기존 알림 설치 환경은 SQL021만 추가한다. 기존 행의 분 수는 null로 유지한다. SQL021 미적용 시 `yogaMetadataReady=false`로 시간 입력을 비활성화하며 제목·URL 저장은 유지한다.
 2. 최초 1회 `node scripts/create-exercise-push-config.mjs https://my-ops-personal-preview.onrender.com`을 실행한다. 기존 파일이 있으면 덮어쓰지 않는다. `outputs/personal-exercise-push.private.env`의 값을 Render 환경변수에 저장한다. 이 파일은 Git에서 제외된다. 기존 VAPID 키를 다시 만들면 모든 기기를 재등록해야 한다.
 3. PERSONAL Supabase의 Project Settings → API Keys에서 서버 전용 secret key를 Render의 `PERSONAL_SUPABASE_SECRET_KEY`에 직접 저장한다. 개인 DB의 publishable key, FRENGLE 키, OAuth client secret으로 대체하지 않는다. 비밀 키를 채팅에 붙여 넣거나 NEXT_PUBLIC 변수로 만들지 않는다. 기존 publishable/URL 설정은 유지한다.
 4. Render에 최신 main을 배포한다. `GET /api/personal-push?workspace=PERSONAL`은 로그인 후 환경변수와 SQL 상태를 확인하며, 미설정이면 알림 활성화를 막는다.

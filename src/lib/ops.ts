@@ -54,6 +54,17 @@ function choice(v: unknown, allowed: string[]) {
     throw new Error("선택 항목을 확인해 주세요.");
   return v;
 }
+export function parseYogaDurationMinutes(value: unknown): number | null {
+  if (value === null) return null;
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > 1440
+  )
+    throw new Error("운동 소요 시간은 1~1440분의 정수로 입력해 주세요.");
+  return value;
+}
 /** A personal schedule's hidden fields must never be reconstructed on edit. */
 export function parsePersonalScheduleEdit(raw: unknown) {
   if (
@@ -64,7 +75,10 @@ export function parsePersonalScheduleEdit(raw: unknown) {
     throw new Error("입력 정보를 확인해 주세요.");
   const value = raw as Record<string, unknown>;
   if (
-    Reflect.ownKeys(value).some((key) => key !== "title" && key !== "video_url")
+    Reflect.ownKeys(value).some(
+      (key) =>
+        key !== "title" && key !== "video_url" && key !== "duration_minutes",
+    )
   )
     throw new Error("수정할 일정 입력 항목을 확인해 주세요.");
   return {
@@ -75,6 +89,9 @@ export function parsePersonalScheduleEdit(raw: unknown) {
     ),
     ...(Object.hasOwn(value, "video_url")
       ? { video_url: parseScheduleVideoUrl(value.video_url) }
+      : {}),
+    ...(Object.hasOwn(value, "duration_minutes")
+      ? { duration_minutes: parseYogaDurationMinutes(value.duration_minutes) }
       : {}),
   };
 }
@@ -192,6 +209,9 @@ export function parseResource(resource: Resource, raw: unknown) {
         : {}),
       ...(v.video_url !== undefined
         ? { video_url: parseScheduleVideoUrl(v.video_url) }
+        : {}),
+      ...(Object.hasOwn(v, "duration_minutes")
+        ? { duration_minutes: parseYogaDurationMinutes(v.duration_minutes) }
         : {}),
     };
   }

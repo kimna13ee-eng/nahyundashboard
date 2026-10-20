@@ -20,6 +20,7 @@ import { ContentAnalyticsPanel } from "./content-analytics-panel";
 import { PersonalSheetsPanel } from "./personal-sheets-panel";
 import { PersonalPerformancePanel } from "./personal-performance-panel";
 import { YogaPlannerPanel } from "./yoga-planner-panel";
+import { YogaVideoFields } from "./yoga-video-fields";
 import "./personal-overview.css";
 import type { PersonalSheetTab } from "@/lib/personal-sheet-tabs";
 import {
@@ -122,7 +123,6 @@ type Editor = {
   dueDate?: string;
   scheduleDate?: string;
   scheduleCategory?: ScheduleCategory;
-  defaultTitle?: string;
   requireVideo?: boolean;
 };
 function workspaceViewAllowed(view: string, workspace: ApiWorkspace) {
@@ -226,6 +226,7 @@ export function OpsShell({
   const [taskProcessReady, setTaskProcessReady] = useState(false);
   const [projectProcessReady, setProjectProcessReady] = useState(false);
   const [scheduleCategoryReady, setScheduleCategoryReady] = useState(false);
+  const [yogaMetadataReady, setYogaMetadataReady] = useState(false);
   const [automationResults, setAutomationResults] = useState<OpsRow[]>([]);
   const [automationReady, setAutomationReady] = useState(false);
   useEffect(() => {
@@ -299,6 +300,7 @@ export function OpsShell({
     setAutomationResults([]);
     setAutomationReady(false);
     setProjectProcessReady(false);
+    setYogaMetadataReady(false);
   }, []);
   const rows = (name: string) => data[name] || [];
   const tasks = rows("tasks"),
@@ -364,6 +366,7 @@ export function OpsShell({
       setTaskProcessReady(result.taskProcessReady === true);
       setProjectProcessReady(result.projectProcessReady === true);
       setScheduleCategoryReady(result.scheduleCategoryReady === true);
+      setYogaMetadataReady(result.yogaMetadataReady === true);
       setTaskTestClassification(result.taskTestClassification === true);
       setLibraryWorkflow(result.libraryWorkflow === true);
       setOffset(Date.parse(result.serverNow) - Date.now());
@@ -375,6 +378,7 @@ export function OpsShell({
         setError(e instanceof Error ? e.message : "불러오기 실패");
         setData({});
         setDataReady(false);
+        setYogaMetadataReady(false);
         setTimerGuardReady(false);
         setWorkflowChecked(true);
         setWorkflowData({});
@@ -2541,15 +2545,16 @@ export function OpsShell({
                   setDay(next);
                   setYogaFocus(undefined);
                 }}
-                onCreate={(selectedDay) =>
+                onCreate={(selectedDay) => {
+                  setDay(selectedDay);
+                  setYogaFocus(undefined);
                   setEditor({
                     resource: "schedules",
                     scheduleDate: selectedDay,
                     scheduleCategory: "exercise",
-                    defaultTitle: "요가",
                     requireVideo: true,
-                  })
-                }
+                  });
+                }}
                 onEdit={(row) =>
                   setEditor({ resource: "schedules", row, requireVideo: true })
                 }
@@ -3034,6 +3039,7 @@ export function OpsShell({
         <ResourceEditor
           workspace={space}
           scheduleCategoryReady={scheduleCategoryReady}
+          yogaMetadataReady={yogaMetadataReady}
           taskTestClassification={taskTestClassification}
           taskProcessReady={taskProcessReady}
           projectProcessReady={projectProcessReady}
@@ -3272,6 +3278,7 @@ function Empty({ label }: { label: string }) {
 function ResourceEditor({
   workspace,
   scheduleCategoryReady,
+  yogaMetadataReady,
   taskTestClassification,
   taskProcessReady,
   projectProcessReady,
@@ -3288,6 +3295,7 @@ function ResourceEditor({
 }: {
   workspace: ApiWorkspace;
   scheduleCategoryReady: boolean;
+  yogaMetadataReady: boolean;
   taskTestClassification: boolean;
   taskProcessReady: boolean;
   projectProcessReady: boolean;
@@ -3440,7 +3448,18 @@ function ResourceEditor({
               );
             if (isExerciseSchedule && scheduleCategoryReady) {
               if (!row.id) value.category = "exercise";
-              value.video_url = scheduleVideoUrl;
+              value.video_url = editor.requireVideo
+                ? text(f.get("video_url"))
+                : scheduleVideoUrl;
+              if (
+                editor.requireVideo &&
+                yogaMetadataReady &&
+                f.has("duration_minutes")
+              )
+                value.duration_minutes =
+                  f.get("duration_minutes") === ""
+                    ? null
+                    : Number(f.get("duration_minutes"));
             }
           } else {
             value.starts_at = new Date(
@@ -3481,18 +3500,17 @@ function ResourceEditor({
             보관하지 않도록 전체 데이터 조회가 필요합니다.
           </p>
         ) : null}
-        {isExerciseSchedule && !row.id && editor.defaultTitle ? (
-          <input type="hidden" name="title" value={editor.defaultTitle} />
-        ) : resource !== "task_notes" ? (
-          field(
-            "title",
-            isPersonalSchedule
-              ? isExerciseSchedule
-                ? "운동명"
-                : "콘텐츠명"
-              : "제목",
-          )
-        ) : null}
+        {resource !== "task_notes" &&
+        !(isExerciseSchedule && editor.requireVideo)
+          ? field(
+              "title",
+              isPersonalSchedule
+                ? isExerciseSchedule
+                  ? "운동명"
+                  : "콘텐츠명"
+                : "제목",
+            )
+          : null}
         {resource === "library_items" && libraryWorkflow ? (
           <>
             {field("tool", "적용 도구", "text", 80)}
@@ -3711,7 +3729,15 @@ function ResourceEditor({
                     : "종일 콘텐츠 일정"}
               </p>
             ) : null}
-            {isExerciseSchedule ? (
+            {isExerciseSchedule && editor.requireVideo ? (
+              <YogaVideoFields
+                initialTitle={text(row.title)}
+                initialUrl={text(row.video_url)}
+                initialMinutes={row.duration_minutes}
+                durationReady={yogaMetadataReady}
+                disabled={busy || !scheduleCategoryReady}
+              />
+            ) : isExerciseSchedule ? (
               <>
                 <label>
                   {editor.requireVideo

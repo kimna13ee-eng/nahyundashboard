@@ -45,6 +45,7 @@ const phase2 = await import("../src/app/api/phase2/route.ts");
 type QueryRecord = {
   table: string;
   filters: [string, unknown][];
+  selected?: string;
   value?: Record<string, unknown>;
 };
 const personalId = "11111111-1111-4111-8111-111111111111";
@@ -59,6 +60,7 @@ function project(id: string) {
     member: true,
     signedIn: true,
     projectProcessReady: true,
+    yogaMetadataReady: true,
     mutationError: null as { message: string; code?: string } | null,
     rpcError: null as { message: string; code?: string } | null,
   };
@@ -68,7 +70,8 @@ function project(id: string) {
       this.record = { table, filters: [] };
       queries.push(this.record);
     }
-    select() {
+    select(columns?: string) {
+      this.record.selected = columns;
       return this;
     }
     eq(column: string, value: unknown) {
@@ -99,7 +102,15 @@ function project(id: string) {
       return this;
     }
     async limit() {
-      return { data: [], error: null, count: 0 };
+      return {
+        data: [],
+        error:
+          this.record.selected === "duration_minutes" &&
+          !state.yogaMetadataReady
+            ? { message: "column duration_minutes does not exist" }
+            : null,
+        count: 0,
+      };
     }
     async maybeSingle() {
       return {
@@ -614,5 +625,146 @@ test("개인 일정 부분수정도 로그인·Origin·ID 검증을 우회하지
       false,
     );
     assert.deepEqual(f.company.queries, []);
+  }
+});
+
+test("요가 metadata capability는 PERSONAL 열 조회 성공시에만 true, 회사는 probe하지 않음", async () => {
+  for (const ready of [true, false]) {
+    const f = setup();
+    f.personal.state.yogaMetadataReady = ready;
+    const response = await ops.GET(request("/api/ops?workspace=PERSONAL"));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).yogaMetadataReady, ready);
+    assert.equal(
+      f.personal.queries.filter(
+        (query) => query.selected === "duration_minutes",
+      ).length,
+      1,
+    );
+    assert.deepEqual(f.company.queries, []);
+  }
+  const f = setup();
+  const response = await ops.GET(request("/api/ops?workspace=FRENGLE"));
+  assert.equal((await response.json()).yogaMetadataReady, false);
+  assert.equal(
+    f.company.queries.some((query) => query.selected === "duration_minutes"),
+    false,
+  );
+  assert.deepEqual(f.personal.queries, []);
+});
+
+test("PERSONAL 요가 생성·부분수정은 유효 duration만 저장하고 미전송은 그대로 보존", async () => {
+  for (const duration of [1, 1440, null]) {
+    for (const method of ["POST", "PATCH"] as const) {
+      const f = setup();
+      const value = {
+        title: "요가 제목",
+        duration_minutes: duration,
+        ...(method === "POST"
+          ? {
+              starts_at: "2026-10-20T21:00:00+09:00",
+              ends_at: "2026-10-20T22:00:00+09:00",
+              category: "exercise",
+              video_url: "https://video.example/yoga",
+            }
+          : {}),
+      };
+      const response = await ops[method](
+        request("/api/ops?workspace=PERSONAL", method, {
+          resource: "schedules",
+          id: rowId,
+          value,
+        }),
+      );
+      assert.equal(response.status, method === "POST" ? 201 : 200);
+      const write = f.personal.queries.find((query) => query.value)!;
+      assert.equal(write.value?.duration_minutes, duration);
+      if (method === "PATCH") {
+        assert.deepEqual(write.value, value);
+        assert.deepEqual(write.filters, [
+          ["id", rowId],
+          ["owner_id", personalId],
+        ]);
+      }
+      assert.deepEqual(f.company.queries, []);
+    }
+  }
+  const f = setup();
+  const response = await ops.PATCH(
+    request("/api/ops?workspace=PERSONAL", "PATCH", {
+      resource: "schedules",
+      id: rowId,
+      value: { title: "제목만 변경" },
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(f.personal.queries.find((query) => query.value)?.value, {
+    title: "제목만 변경",
+  });
+});
+
+test("요가 소요 시간은 잘못된 입력·인증·외부 origin을 DB 쓰기 전에 거절", async () => {
+  for (const duration of [0, -1, 1441, 0.5, "20", true, {}]) {
+    const f = setup();
+    const response = await ops.PATCH(
+      request("/api/ops?workspace=PERSONAL", "PATCH", {
+        resource: "schedules",
+        id: rowId,
+        value: { title: "요가", duration_minutes: duration },
+      }),
+    );
+    assert.equal(response.status, 400);
+    assert.equal(
+      f.personal.queries.some((query) => query.value),
+      false,
+    );
+  }
+  for (const reason of ["signed-out", "origin"] as const) {
+    const f = setup();
+    f.personal.state.signedIn = reason !== "signed-out";
+    const response = await ops.PATCH(
+      request(
+        "/api/ops?workspace=PERSONAL",
+        "PATCH",
+        {
+          resource: "schedules",
+          id: rowId,
+          value: { title: "요가", duration_minutes: 20 },
+        },
+        reason === "origin" ? "https://other.invalid" : "http://dashboard.test",
+      ),
+    );
+    assert.equal(response.status, reason === "signed-out" ? 401 : 403);
+    assert.equal(
+      f.personal.queries.some((query) => query.value),
+      false,
+    );
+    assert.deepEqual(f.company.queries, []);
+  }
+});
+
+test("회사 일정 duration 키는 null까지 거절하고 개인 DB로 우회하지 않음", async () => {
+  for (const duration of [20, null, "20", 0]) {
+    for (const method of ["POST", "PATCH"] as const) {
+      const f = setup();
+      const response = await ops[method](
+        request("/api/ops?workspace=FRENGLE", method, {
+          resource: "schedules",
+          id: rowId,
+          value: {
+            title: "회사 일정",
+            starts_at: "2026-10-20T21:00:00+09:00",
+            ends_at: "2026-10-20T22:00:00+09:00",
+            duration_minutes: duration,
+          },
+        }),
+      );
+      assert.equal(response.status, 403);
+      assert.equal(
+        f.company.queries.some((query) => query.table === "ops_schedules"),
+        false,
+      );
+      assert.deepEqual(f.personal.queries, []);
+    }
   }
 });

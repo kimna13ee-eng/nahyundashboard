@@ -1,0 +1,41 @@
+.editorial .ops-yoga-video-fields {
+  display: grid;
+  gap: 17px;
+  min-width: 0;
+}
+.editorial .ops-yoga-video-fetch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px 12px;
+  margin-top: -7px;
+}
+.editorial .ops-yoga-video-fetch button {
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 1px solid #dcd0e5;
+  border-radius: 9px;
+  background: #f2ecf7;
+  color: #795a8e;
+  font-size: 12px;
+}
+.editorial .ops-yoga-video-fetch span,
+.editorial .ops-yoga-video-message,
+.editorial .ops-yoga-video-error {
+  font-size: 11px;
+  line-height: 1.8;
+}
+.editorial .ops-yoga-video-fetch span {
+  color: #9b8da3;
+}
+.editorial .ops-yoga-video-message {
+  color: #71617e;
+}
+.editorial .ops-yoga-video-error {
+  color: #a15870;
+}
+@media (max-width: 640px) {
+  .editorial .ops-yoga-video-fetch button {
+    min-height: 44px;
+  }
+}
