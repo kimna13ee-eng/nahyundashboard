@@ -19,6 +19,7 @@ import { AnalyticsPanel } from "./analytics-panel";
 import { ContentAnalyticsPanel } from "./content-analytics-panel";
 import { PersonalSheetsPanel } from "./personal-sheets-panel";
 import { PersonalPerformancePanel } from "./personal-performance-panel";
+import { YogaPlannerPanel } from "./yoga-planner-panel";
 import "./personal-overview.css";
 import type { PersonalSheetTab } from "@/lib/personal-sheet-tabs";
 import {
@@ -71,6 +72,7 @@ import {
   FolderKanban,
   Workflow,
   FileSpreadsheet,
+  Flower2,
   NotebookPen,
   Library,
   ChartNoAxesCombined,
@@ -106,6 +108,7 @@ const menus = [
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "automations", label: "Automations", icon: Workflow },
   { id: "personal-sheets", label: "Content Studio", icon: FileSpreadsheet },
+  { id: "yoga-planner", label: "Yoga Planner", icon: Flower2 },
   { id: "journal", label: "Work Journal", icon: NotebookPen },
   { id: "library", label: "Library", icon: Library },
   { id: "analytics", label: "Analytics", icon: ChartNoAxesCombined },
@@ -119,7 +122,15 @@ type Editor = {
   dueDate?: string;
   scheduleDate?: string;
   scheduleCategory?: ScheduleCategory;
+  defaultTitle?: string;
+  requireVideo?: boolean;
 };
+function workspaceViewAllowed(view: string, workspace: ApiWorkspace) {
+  if (["personal-sheets", "yoga-planner"].includes(view))
+    return workspace === "PERSONAL";
+  if (["journal", "analytics"].includes(view)) return workspace === "FRENGLE";
+  return true;
+}
 const text = (v: unknown) => String(v ?? "");
 type ScheduleCategory = (typeof scheduleCategories)[number];
 function calendarCategory(row: OpsRow): ScheduleCategory {
@@ -204,6 +215,7 @@ export function OpsShell({
   >("INITIALIZING");
   const [calendarDetail, setCalendarDetail] = useState<OpsRow | null>(null);
   const [linkedSchedule, setLinkedSchedule] = useState<string | null>(null);
+  const [yogaFocus, setYogaFocus] = useState<string | undefined>();
   const noteWrites = useRef(new Set<string>());
   const startSubmit = useRef(false);
   const completionSubmit = useRef(false);
@@ -380,20 +392,21 @@ export function OpsShell({
     if (
       requestedView &&
       menus.some((menu) => menu.id === requestedView) &&
-      (workspace === "PERSONAL" || requestedView !== "personal-sheets")
+      workspaceViewAllowed(requestedView, workspace)
     )
       queueMicrotask(() => setView(requestedView));
     const linkedDay = params.get("date") || "";
     const parsedDay = Date.parse(`${linkedDay}T00:00:00Z`);
     if (
-      params.get("view") === "calendar" &&
+      (requestedView === "calendar" ||
+        (requestedView === "yoga-planner" && workspace === "PERSONAL")) &&
       /^\d{4}-\d{2}-\d{2}$/.test(linkedDay) &&
       Number.isFinite(parsedDay) &&
       new Date(parsedDay).toISOString().slice(0, 10) === linkedDay
     ) {
       queueMicrotask(() => {
         if (!mounted) return;
-        setView("calendar");
+        setView(requestedView === "yoga-planner" ? "yoga-planner" : "calendar");
         setCalendarView("day");
         setDay(linkedDay);
         const scheduleId = params.get("schedule");
@@ -432,7 +445,7 @@ export function OpsShell({
       loading ||
       !user ||
       authState !== "AUTHENTICATED" ||
-      view !== "calendar"
+      !["calendar", "yoga-planner"].includes(view)
     )
       return;
     let mounted = true;
@@ -441,8 +454,16 @@ export function OpsShell({
     );
     queueMicrotask(() => {
       if (!mounted) return;
-      if (linked) setCalendarDetail({ ...linked, source: "일정" });
-      else
+      // Keep the installed iPhone worker's calendar link compatible. Resolve
+      // only this account's fetched exercise row to its current Seoul date.
+      if (linked && space === "PERSONAL" && linked.category === "exercise") {
+        setYogaFocus(linked.id);
+        setDay(localDateTime(linked.starts_at).slice(0, 10));
+        setView("yoga-planner");
+      } else if (linked) {
+        setView("calendar");
+        setCalendarDetail({ ...linked, source: "일정" });
+      } else
         setNotice("해당 일정이 삭제되었거나 현재 계정에서 조회되지 않습니다.");
       setLinkedSchedule(null);
     });
@@ -626,20 +647,23 @@ export function OpsShell({
   }
   function move(id: string) {
     setLinkedSchedule(null);
+    setYogaFocus(undefined);
     setContentFocus(undefined);
-    setView(id);
+    setView(workspaceViewAllowed(id, space) ? id : "overview");
     setDetail(null);
     setSearch("");
     setNotice("");
   }
-  const visibleMenus = menus.filter(
-    (menu) => menu.id !== "personal-sheets" || space === "PERSONAL",
+  const visibleMenus = menus.filter((menu) =>
+    workspaceViewAllowed(menu.id, space),
   );
   const title =
     view === "legacy-content"
       ? "기존 콘텐츠 기록"
       : menus.find((m) => m.id === view)?.label || "Overview";
   const isPersonalOverview = space === "PERSONAL" && view === "overview";
+  const isPersonalLayout =
+    space === "PERSONAL" && ["overview", "yoga-planner"].includes(view);
   function openTaskEditor(task: OpsRow) {
     if (isProjectProcess(task)) {
       const parent = projects.find((p) => p.id === task.project_id);
@@ -1048,7 +1072,7 @@ export function OpsShell({
   }
   return (
     <div
-      className={`editorial${isPersonalOverview ? " is-personal-overview" : ""}${isPersonalOverview && active ? " has-active-timer" : ""}`}
+      className={`editorial${isPersonalLayout ? " is-personal-layout" : ""}${isPersonalLayout && active ? " has-active-timer" : ""}`}
     >
       <aside className="ops-sidebar">
         <Link
@@ -1098,11 +1122,16 @@ export function OpsShell({
                 value={space}
                 disabled={busy}
                 onChange={(e) => {
+                  if (e.target.value === "ALL") {
+                    router.push("/all");
+                    return;
+                  }
                   const next =
                     e.target.value === "FRENGLE" ? "FRENGLE" : "PERSONAL";
                   if (next === space) return;
                   const nextView =
-                    view === "personal-sheets" || view === "legacy-content"
+                    !workspaceViewAllowed(view, next) ||
+                    view === "legacy-content"
                       ? "overview"
                       : view;
                   const params = new URLSearchParams({ view: nextView });
@@ -1112,12 +1141,13 @@ export function OpsShell({
                   );
                 }}
               >
+                <option>ALL</option>
                 <option>PERSONAL</option>
                 <option>FRENGLE</option>
               </select>
             </label>
           </div>
-          {!isPersonalOverview ? (
+          {!isPersonalLayout ? (
             <div className="ops-header-primary" aria-label="빠른 업무 액션">
               {" "}
               <button
@@ -1929,18 +1959,8 @@ export function OpsShell({
                     aria-label="개인 일정 등록"
                   >
                     {create("schedules", "일정 등록", { scheduleDate: day })}
-                    <button
-                      disabled={!canWrite || !scheduleCategoryReady}
-                      onClick={() => {
-                        setCalendarCategoryFilter("all");
-                        setEditor({
-                          resource: "schedules",
-                          scheduleDate: day,
-                          scheduleCategory: "exercise",
-                        });
-                      }}
-                    >
-                      운동 등록
+                    <button onClick={() => move("yoga-planner")}>
+                      <Flower2 size={15} /> 요가 플래너
                     </button>
                   </div>
                 ) : (
@@ -2005,9 +2025,12 @@ export function OpsShell({
                   </label>
                 ) : null}
                 {space === "PERSONAL" ? (
-                  <a className="ops-yoga-settings-link" href="#yoga-reminder">
-                    운동 알림 <ArrowUpRight size={13} />
-                  </a>
+                  <button
+                    className="ops-yoga-settings-link"
+                    onClick={() => move("yoga-planner")}
+                  >
+                    요가 알림 <ArrowUpRight size={13} />
+                  </button>
                 ) : null}
               </div>
               {calendarView === "month" ? (
@@ -2502,17 +2525,46 @@ export function OpsShell({
               ) : null}
             </>
           ) : null}
-          {view === "calendar" && space === "PERSONAL" ? (
-            <div id="yoga-reminder">
-              <YogaReminderPanel
-                key={`push:${user?.email || "signed-out"}:${space}`}
+          {view === "yoga-planner" && space === "PERSONAL" ? (
+            <>
+              <YogaPlannerPanel
+                schedules={rows("schedules")}
+                day={day}
                 enabled={
                   Boolean(user) &&
                   authState === "AUTHENTICATED" &&
-                  space === "PERSONAL"
+                  configured === true
                 }
+                canWrite={canWrite && scheduleCategoryReady}
+                loading={loading || !dataReady}
+                onDayChange={(next) => {
+                  setDay(next);
+                  setYogaFocus(undefined);
+                }}
+                onCreate={(selectedDay) =>
+                  setEditor({
+                    resource: "schedules",
+                    scheduleDate: selectedDay,
+                    scheduleCategory: "exercise",
+                    defaultTitle: "요가",
+                    requireVideo: true,
+                  })
+                }
+                onEdit={(row) =>
+                  setEditor({ resource: "schedules", row, requireVideo: true })
+                }
+                onDelete={(row) =>
+                  setDeleteTarget({ resource: "schedules", row })
+                }
+                focusedId={yogaFocus}
               />
-            </div>
+              <div id="yoga-reminder">
+                <YogaReminderPanel
+                  key={`push:${user?.email || "signed-out"}:${space}`}
+                  enabled={Boolean(user) && authState === "AUTHENTICATED"}
+                />
+              </div>
+            </>
           ) : null}
           {view === "calendar" ? (
             <Phase2Panel
@@ -2649,7 +2701,7 @@ export function OpsShell({
           </footer>
         </main>
       </div>
-      {!isPersonalOverview || active ? (
+      {!isPersonalLayout || active ? (
         <div className="ops-timer">
           <div>
             <small>{active ? "ACTIVE" : "TIME TRACKER"}</small>
@@ -2691,9 +2743,13 @@ export function OpsShell({
       <nav className="ops-mobile-nav" aria-label="모바일 메뉴">
         {visibleMenus
           .filter((m) =>
-            ["overview", "calendar", "projects", "journal", "library"].includes(
-              m.id,
-            ),
+            [
+              "overview",
+              "calendar",
+              "projects",
+              "library",
+              space === "PERSONAL" ? "yoga-planner" : "journal",
+            ].includes(m.id),
           )
           .map((m) => (
             <button
@@ -3267,7 +3323,9 @@ function ResourceEditor({
           : resource === "schedules"
             ? isPersonalSchedule
               ? isExerciseSchedule
-                ? "운동 일정"
+                ? editor.requireVideo
+                  ? "요가 영상"
+                  : "운동 일정"
                 : "콘텐츠 일정"
               : "일정"
             : "라이브러리";
@@ -3423,16 +3481,18 @@ function ResourceEditor({
             보관하지 않도록 전체 데이터 조회가 필요합니다.
           </p>
         ) : null}
-        {resource !== "task_notes"
-          ? field(
-              "title",
-              isPersonalSchedule
-                ? isExerciseSchedule
-                  ? "운동명"
-                  : "콘텐츠명"
-                : "제목",
-            )
-          : null}
+        {isExerciseSchedule && !row.id && editor.defaultTitle ? (
+          <input type="hidden" name="title" value={editor.defaultTitle} />
+        ) : resource !== "task_notes" ? (
+          field(
+            "title",
+            isPersonalSchedule
+              ? isExerciseSchedule
+                ? "운동명"
+                : "콘텐츠명"
+              : "제목",
+          )
+        ) : null}
         {resource === "library_items" && libraryWorkflow ? (
           <>
             {field("tool", "적용 도구", "text", 80)}
@@ -3654,7 +3714,9 @@ function ResourceEditor({
             {isExerciseSchedule ? (
               <>
                 <label>
-                  요가·운동 영상 URL (선택)
+                  {editor.requireVideo
+                    ? "요가 영상 URL"
+                    : "요가·운동 영상 URL (선택)"}
                   <input
                     name="video_url"
                     type="url"
@@ -3662,6 +3724,7 @@ function ResourceEditor({
                     inputMode="url"
                     maxLength={2000}
                     disabled={!scheduleCategoryReady}
+                    required={editor.requireVideo}
                     value={scheduleVideoUrl}
                     onChange={(event) =>
                       setScheduleVideoUrl(event.target.value)
@@ -3671,7 +3734,7 @@ function ResourceEditor({
                 </label>
                 <p className="ops-schedule-form-hint">
                   이 일정 날짜의 밤 9시(한국시간) 알림에 사용할 영상입니다.
-                  iPhone에서는 홈 화면 앱의 ‘운동 알림’을 켜 주세요.
+                  iPhone에서는 홈 화면 앱의 Yoga Planner에서 알림을 켜 주세요.
                 </p>
               </>
             ) : null}

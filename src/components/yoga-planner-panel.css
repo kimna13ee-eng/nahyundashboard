@@ -1,0 +1,484 @@
+.editorial .ops-yoga-planner {
+  min-width: 0;
+  margin-bottom: 24px;
+  padding: 28px;
+  border: 1px solid #e8e0eb;
+  border-radius: 24px;
+  background: linear-gradient(140deg, #fffdf9, #fff 65%, #faf7fc);
+  box-shadow: 0 8px 36px #68517305;
+}
+.editorial .ops-yoga-planner-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.editorial .ops-yoga-planner-eyebrow {
+  color: #9b86aa;
+  font-size: 10px;
+  letter-spacing: 0.025em;
+}
+.editorial .ops-yoga-planner-heading h2 {
+  margin: 7px 0 8px;
+  color: #55425f;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.editorial .ops-yoga-planner-heading p {
+  margin: 0;
+  color: #95879d;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.editorial .ops-yoga-planner-time {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 10px;
+  padding: 13px 16px;
+  border-radius: 14px;
+  background: #f4edf7;
+  color: #9676a9;
+}
+.editorial .ops-yoga-planner-time strong {
+  display: block;
+  color: #775b8d;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.editorial .ops-yoga-planner-time span {
+  display: block;
+  margin-top: 4px;
+  color: #9e8da8;
+  font-size: 10px;
+}
+.editorial .ops-yoga-planner-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #eee7f1;
+}
+.editorial .ops-yoga-planner-date-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.editorial .ops-yoga-planner-date-controls button {
+  min-height: 38px;
+  padding: 9px;
+  border: 1px solid #e5dce9;
+  border-radius: 10px;
+  background: #fff;
+  color: #8c749b;
+  font-size: 11px;
+}
+.editorial .ops-yoga-planner-date-controls button:last-child {
+  padding-inline: 13px;
+}
+.editorial .ops-yoga-planner-date-input {
+  display: block;
+  min-width: 0;
+}
+.editorial .ops-yoga-planner-date-input input {
+  width: 144px;
+  max-width: 100%;
+  min-height: 38px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #e5dce9;
+  border-radius: 10px;
+  background: #fff;
+  color: #776382;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.editorial .ops-yoga-planner-add {
+  min-height: 38px;
+  padding: 9px 14px;
+  border: 1px solid #d6c6e2;
+  border-radius: 10px;
+  background: #e9dff0;
+  color: #715480;
+  font-size: 12px;
+  font-weight: 500;
+}
+.editorial .ops-yoga-planner-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(240px, 1fr);
+  gap: 24px;
+  margin-top: 24px;
+  align-items: start;
+}
+.editorial .ops-yoga-planner-selected {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid #e8deee;
+  border-radius: 20px;
+  background: linear-gradient(155deg, #f7f0fa, #fcfaf8);
+}
+.editorial .ops-yoga-planner-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 20px;
+  color: #b5a0c1;
+}
+.editorial .ops-yoga-planner-date-status {
+  color: #a48ab3;
+  font-size: 9px;
+  letter-spacing: 0.025em;
+}
+.editorial .ops-yoga-planner-section-heading h3 {
+  margin: 7px 0 0;
+  color: #72597f;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.65;
+  letter-spacing: -0.025em;
+}
+.editorial .ops-yoga-planner-cards {
+  display: grid;
+  gap: 14px;
+}
+.editorial .ops-yoga-planner-video {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid #e9e0ee;
+  border-radius: 16px;
+  background: #fffffff0;
+}
+.editorial .ops-yoga-planner-video.is-focused {
+  outline: 2px solid #b295c5;
+  outline-offset: 3px;
+}
+.editorial .ops-yoga-planner-video-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.editorial .ops-yoga-planner-video-head > div {
+  min-width: 0;
+}
+.editorial .ops-yoga-planner-video-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 13px;
+  background: #f1e9f6;
+  color: #a085b2;
+}
+.editorial .ops-yoga-planner-video-label {
+  color: #ac99b6;
+  font-size: 10px;
+}
+.editorial .ops-yoga-planner-video h4 {
+  margin: 5px 0 0;
+  color: #665171;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-yoga-planner-domain {
+  margin: 19px 0 12px;
+  color: #a18fa9;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-yoga-planner-open {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 15px;
+  border: 1px solid #ded0e8;
+  border-radius: 11px;
+  background: #f0e8f5;
+  color: #7e5f91;
+  font-size: 13px;
+  font-weight: 500;
+}
+.editorial .ops-yoga-planner-open:hover {
+  background: #e8dcf0;
+}
+.editorial .ops-yoga-planner-video-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px 15px;
+  margin-top: 17px;
+  padding-top: 11px;
+  border-top: 1px solid #f0eaf3;
+}
+.editorial .ops-yoga-planner-video-actions button {
+  min-height: 32px;
+  gap: 5px;
+  padding: 5px 0;
+  border: 0;
+  color: #a18bae;
+  font-size: 11px;
+}
+.editorial .ops-yoga-planner-missing {
+  margin: 20px 0 0;
+  color: #9b839f;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-yoga-planner-empty {
+  display: flex;
+  min-height: 242px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 22px 0;
+  text-align: center;
+  color: #c0accb;
+}
+.editorial .ops-yoga-planner-empty strong {
+  color: #8f759f;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.7;
+}
+.editorial .ops-yoga-planner-empty p {
+  margin: 0;
+  color: #a795b0;
+  font-size: 11px;
+  line-height: 1.9;
+}
+.editorial .ops-yoga-planner-empty button {
+  min-height: 38px;
+  margin-top: 3px;
+  padding: 9px 14px;
+  border: 1px solid #dccce7;
+  border-radius: 10px;
+  background: #ffffffa8;
+  color: #9274a3;
+  font-size: 11px;
+}
+.editorial .ops-yoga-planner-loading {
+  min-height: 242px;
+  margin: 0;
+  padding-block: 92px;
+  color: #9c85a9;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.editorial .ops-yoga-planner-upcoming {
+  min-width: 0;
+  padding-top: 8px;
+}
+.editorial .ops-yoga-planner-upcoming-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #a189af;
+}
+.editorial .ops-yoga-planner-upcoming-heading h3 {
+  margin: 0;
+  color: #7b628a;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.editorial .ops-yoga-planner-upcoming-heading > span {
+  margin-left: auto;
+  color: #ac98b8;
+  font-size: 10px;
+}
+.editorial .ops-yoga-planner-upcoming-range {
+  margin: 9px 0 18px;
+  color: #af9fba;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.editorial .ops-yoga-planner-upcoming-list {
+  display: grid;
+  gap: 9px;
+}
+.editorial .ops-yoga-planner-upcoming-list > button {
+  display: flex;
+  justify-content: flex-start;
+  min-width: 0;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #eee6f2;
+  border-radius: 13px;
+  background: #fcfafc;
+  text-align: left;
+}
+.editorial .ops-yoga-planner-upcoming-list > button.is-selected {
+  border-color: #d6c2e4;
+  background: #f5edf9;
+}
+.editorial .ops-yoga-planner-upcoming-list > button > svg {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: #baa5c6;
+}
+.editorial .ops-yoga-planner-upcoming-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 29px;
+  gap: 4px;
+  color: #ad96ba;
+}
+.editorial .ops-yoga-planner-upcoming-day strong {
+  color: #896b9a;
+  font-size: 19px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.editorial .ops-yoga-planner-upcoming-day > span {
+  font-size: 10px;
+}
+.editorial .ops-yoga-planner-upcoming-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 7px;
+}
+.editorial .ops-yoga-planner-upcoming-info strong {
+  color: #8a7099;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.editorial .ops-yoga-planner-upcoming-info > span {
+  color: #b09abc;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.editorial .ops-yoga-planner-upcoming-empty {
+  margin: 0;
+  padding: 29px 15px;
+  border: 1px dashed #e6dcea;
+  border-radius: 13px;
+  color: #ad99b8;
+  font-size: 11px;
+  line-height: 1.9;
+  text-align: center;
+}
+.editorial .ops-yoga-planner-footnote {
+  margin: 23px 0 0;
+  padding-top: 15px;
+  border-top: 1px solid #f0e8f2;
+  color: #ae9bb8;
+  font-size: 10px;
+  line-height: 1.9;
+}
+@media (max-width: 1040px) {
+  .editorial .ops-yoga-planner-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .editorial .ops-yoga-planner-upcoming-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .editorial .ops-yoga-planner {
+    padding: 18px;
+    border-radius: 20px;
+  }
+  .editorial .ops-yoga-planner-heading {
+    flex-direction: column;
+    gap: 17px;
+    margin-bottom: 20px;
+  }
+  .editorial .ops-yoga-planner-heading h2 {
+    font-size: 21px;
+  }
+  .editorial .ops-yoga-planner-time {
+    width: 100%;
+  }
+  .editorial .ops-yoga-planner-time > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px 10px;
+  }
+  .editorial .ops-yoga-planner-time span {
+    margin-top: 0;
+  }
+  .editorial .ops-yoga-planner-toolbar {
+    align-items: stretch;
+    padding-bottom: 20px;
+  }
+  .editorial .ops-yoga-planner-date-controls {
+    gap: 5px;
+  }
+  .editorial .ops-yoga-planner-date-controls button {
+    min-height: 44px;
+    padding: 8px;
+  }
+  .editorial .ops-yoga-planner-date-controls button:last-child {
+    padding-inline: 11px;
+  }
+  .editorial .ops-yoga-planner-date-input input {
+    width: 134px;
+    min-height: 44px;
+    padding-inline: 7px;
+    font-size: 12px;
+  }
+  .editorial .ops-yoga-planner-add {
+    width: 100%;
+    min-height: 44px;
+  }
+  .editorial .ops-yoga-planner-grid {
+    margin-top: 20px;
+    gap: 24px;
+  }
+  .editorial .ops-yoga-planner-selected {
+    padding: 17px;
+    border-radius: 16px;
+  }
+  .editorial .ops-yoga-planner-section-heading {
+    gap: 9px;
+  }
+  .editorial .ops-yoga-planner-section-heading h3 {
+    font-size: 14px;
+  }
+  .editorial .ops-yoga-planner-section-heading > svg {
+    flex-shrink: 0;
+    width: 24px;
+  }
+  .editorial .ops-yoga-planner-video {
+    padding: 16px;
+  }
+  .editorial .ops-yoga-planner-video-head {
+    gap: 10px;
+  }
+  .editorial .ops-yoga-planner-video-icon {
+    width: 35px;
+    height: 35px;
+    border-radius: 11px;
+  }
+  .editorial .ops-yoga-planner-video h4 {
+    font-size: 14px;
+  }
+  .editorial .ops-yoga-planner-video-actions button {
+    min-height: 44px;
+  }
+  .editorial .ops-yoga-planner-upcoming-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

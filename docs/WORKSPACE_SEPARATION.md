@@ -2,13 +2,18 @@
 
 The root dashboard uses PERSONAL. `/frengle` uses FRENGLE. Each page mounts a
 separate dashboard and keeps its own Supabase session cookie. The workspace
-selector changes routes; it does not combine rows from both databases.
+selector changes routes. `/all` is a read-only combined overview, fetching each
+workspace through its own authenticated API. It offers no cross-workspace write
+or transfer actions. Missing access clears only the affected workspace's rows.
 
 Shared ops, workflow and recurrence APIs require an explicit workspace. Every
 FRENGLE request checks the company session and current company membership before
 opening company records. Missing company configuration or membership never falls
 back to PERSONAL. Existing `ALL` API requests remain a PERSONAL compatibility
-alias; the dashboard selector only offers PERSONAL and FRENGLE.
+alias. The selector's ALL choice opens `/all`, which sends explicit PERSONAL and
+FRENGLE requests instead of using the legacy ALL API alias. ALL summarizes saved
+schedules, task deadlines and automation receipts; recurrence and linked-sheet
+publication schedules remain in their individual workspaces.
 
 The company database requires `supabase/frengle/001_automation_results.sql`,
 `002_work_check_results.sql`, and `003_core_workspace.sql`. Apply these only to
@@ -17,7 +22,8 @@ timers, journal, library and recurrence. All company core tables enforce owner
 and company membership RLS; callable functions use invoker rights.
 
 Content Studio sheets, legacy personal content, inspiration, annual leave and
-exercise notifications stay in PERSONAL. Company automation receipts come from
+Yoga Planner and exercise notifications stay in PERSONAL. PERSONAL navigation
+omits Work Journal and Analytics; FRENGLE retains them. Company automation receipts come from
 the company endpoint; PERSONAL receipts keep the personal endpoint. Logging out
 or changing accounts clears loaded records and automation receipts.
 

@@ -1,10 +1,10 @@
-/* Content-first PERSONAL Overview; company and other tabs keep their layout. */
-.editorial.is-personal-overview {
+/* PERSONAL Overview and Yoga Planner share the calm frame. */
+.editorial.is-personal-layout {
   background:
     radial-gradient(ellipse at 94% 5%, #ebe3f3 0, transparent 42%),
     radial-gradient(ellipse at 20% 100%, #f0e8e0 0, transparent 42%), #f7f5f2;
 }
-.editorial.is-personal-overview .ops-sidebar {
+.editorial.is-personal-layout .ops-sidebar {
   inset: 16px auto 16px 16px;
   width: 208px;
   padding: 28px 16px 20px;
@@ -12,20 +12,20 @@
   border-radius: 24px;
   background: linear-gradient(165deg, #f7f1e9, #fffdfa 80%);
 }
-.editorial.is-personal-overview .ops-brand {
+.editorial.is-personal-layout .ops-brand {
   flex-shrink: 0;
   font-size: 21px;
   gap: 8px;
 }
-.editorial.is-personal-overview .ops-brand small {
+.editorial.is-personal-layout .ops-brand small {
   display: none;
 }
-.editorial.is-personal-overview .ops-caption {
+.editorial.is-personal-layout .ops-caption {
   flex-shrink: 0;
   margin: 36px 10px 14px;
   color: #948798;
 }
-.editorial.is-personal-overview .ops-sidebar nav {
+.editorial.is-personal-layout .ops-sidebar nav {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -34,7 +34,7 @@
   margin-inline: -2px;
   gap: 8px;
 }
-.editorial.is-personal-overview .ops-sidebar nav button {
+.editorial.is-personal-layout .ops-sidebar nav button {
   min-height: 42px;
   padding: 10px 12px;
   border: 0;
@@ -43,26 +43,26 @@
   color: #817587;
   font-weight: 500;
 }
-.editorial.is-personal-overview .ops-sidebar nav button.active {
+.editorial.is-personal-layout .ops-sidebar nav button.active {
   background: #e7dfee;
   color: #594866;
   box-shadow: 0 3px 12px #67517f09;
 }
-.editorial.is-personal-overview .ops-user {
+.editorial.is-personal-layout .ops-user {
   flex-shrink: 0;
   padding-inline: 8px;
   border-top-color: #e9e0d9;
 }
-.editorial.is-personal-overview .ops-user button {
+.editorial.is-personal-layout .ops-user button {
   border: 0;
   background: transparent;
   padding-left: 0;
 }
-.editorial.is-personal-overview .ops-main-shell {
+.editorial.is-personal-layout .ops-main-shell {
   margin-left: 240px;
   padding: 16px 20px 20px 0;
 }
-.editorial.is-personal-overview .ops-top {
+.editorial.is-personal-layout .ops-top {
   top: 16px;
   min-height: 68px;
   padding: 14px 20px;
@@ -72,33 +72,33 @@
   backdrop-filter: blur(16px);
   box-shadow: 0 5px 22px #59456c04;
 }
-.editorial.is-personal-overview .ops-top :is(button, summary, select) {
+.editorial.is-personal-layout .ops-top :is(button, summary, select) {
   border-color: #e6dfeb;
   border-radius: 10px;
 }
-.editorial.is-personal-overview .ops-main {
+.editorial.is-personal-layout .ops-main {
   max-width: 1480px;
   padding: 28px 10px 52px;
   margin-inline: auto;
 }
-.editorial.is-personal-overview .ops-heading {
+.editorial.is-personal-layout .ops-heading {
   margin-bottom: 20px;
 }
-.editorial.is-personal-overview .ops-heading h1 {
+.editorial.is-personal-layout .ops-heading h1 {
   font-size: clamp(28px, 3vw, 36px);
   font-weight: 650;
 }
-.editorial.is-personal-overview .ops-heading small {
+.editorial.is-personal-layout .ops-heading small {
   color: #9c8ca7;
 }
-.editorial.is-personal-overview .ops-heading > span {
+.editorial.is-personal-layout .ops-heading > span {
   padding: 9px 12px;
   border-radius: 12px;
   background: #fffaf3;
   color: #8b7a92;
   white-space: nowrap;
 }
-.editorial.is-personal-overview .ops-connection {
+.editorial.is-personal-layout .ops-connection {
   gap: 5px 14px;
   padding: 13px 16px;
   margin-bottom: 22px;
@@ -106,15 +106,15 @@
   border-radius: 16px;
   background: #f0eaf4;
 }
-.editorial.is-personal-overview .ops-connection strong {
+.editorial.is-personal-layout .ops-connection strong {
   font-size: 10px;
   color: #7b668c;
 }
-.editorial.is-personal-overview .ops-connection p {
+.editorial.is-personal-layout .ops-connection p {
   font-size: 10px;
   color: #8c7d96;
 }
-.editorial.is-personal-overview .ops-connection button {
+.editorial.is-personal-layout .ops-connection button {
   background: #ffffffb8;
   border-color: #e2d7e9;
   border-radius: 9px;
@@ -155,12 +155,12 @@
   border-radius: 9px;
   background: #ffffffa8;
 }
-.editorial.is-personal-overview .ops-main footer {
+.editorial.is-personal-layout .ops-main footer {
   margin-top: 32px;
   padding-top: 22px;
   border-top-color: #e7dfe9;
 }
-.editorial.is-personal-overview.has-active-timer .ops-main {
+.editorial.is-personal-layout.has-active-timer .ops-main {
   padding-bottom: 140px;
 }
 @media (min-width: 1280px) {
@@ -169,11 +169,11 @@
   }
 }
 @media (max-width: 760px) {
-  .editorial.is-personal-overview .ops-main-shell {
+  .editorial.is-personal-layout .ops-main-shell {
     margin-left: 0;
     padding: 0;
   }
-  .editorial.is-personal-overview .ops-top {
+  .editorial.is-personal-layout .ops-top {
     top: 0;
     min-height: 68px;
     padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
@@ -181,21 +181,21 @@
     border-top: 0;
     gap: 8px;
   }
-  .editorial.is-personal-overview .ops-main {
+  .editorial.is-personal-layout .ops-main {
     padding: 24px 14px calc(100px + env(safe-area-inset-bottom));
   }
-  .editorial.is-personal-overview.has-active-timer .ops-main {
+  .editorial.is-personal-layout.has-active-timer .ops-main {
     padding-bottom: calc(190px + env(safe-area-inset-bottom));
   }
-  .editorial.is-personal-overview .ops-heading {
+  .editorial.is-personal-layout .ops-heading {
     align-items: flex-start;
     gap: 12px;
   }
-  .editorial.is-personal-overview .ops-heading > span {
+  .editorial.is-personal-layout .ops-heading > span {
     padding: 7px 9px;
     font-size: 10px;
   }
-  .editorial.is-personal-overview .ops-connection {
+  .editorial.is-personal-layout .ops-connection {
     margin-bottom: 18px;
     padding: 12px 14px;
   }

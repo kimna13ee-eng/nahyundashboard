@@ -4,9 +4,9 @@ Content Studio는 PERSONAL의 연결된 SNS 시트를 보여 준다. 기존 수�
 
 PERSONAL의 일반 일정 등록은 콘텐츠명 한 칸만 입력한다. Overview에서는 오늘, Calendar에서는 선택한 날짜의 종일(서울 00:00~다음날 00:00) 콘텐츠 일정으로 저장한다. 시작·종료 시간, 프로젝트, 일정 분류와 메모 입력은 표시하지 않는다. 새 콘텐츠 일정은 기존 DB 기본 분류 `other`를 사용한다. 기존 일정의 제목 수정은 제목만 갱신해 숨긴 시간·프로젝트·메모·분류를 보존한다. FRENGLE의 일정 등록 폼은 유지한다.
 
-운동 일정은 PERSONAL Calendar 상단의 ‘운동 등록’에서 운동명과 선택적인 HTTPS 영상 URL을 입력한다. 새 운동 일정은 선택 날짜의 21:00~22:00으로 저장하고 기존 운동 일정은 저장된 시간을 유지한다. 운동 일정의 시작일을 한국 날짜로 계산하여 그날 21:00에 등록된 기기로 알린다. 운동 분류와 영상 URL이 모두 있는 일정만 대상이다. 반복 규칙·콘텐츠에서 파생된 일정은 이 발송 대상이 아니다. 같은 날 운동 일정이 여러 개면 각 일정이 알림 하나씩 생성된다.
+PERSONAL의 Yoga Planner에서 날짜를 선택하고 ‘영상 링크 등록’으로 HTTPS 영상 URL을 저장한다. 새 일정의 제목은 ‘요가’, 분류는 운동이며 선택 날짜의 21:00~22:00으로 저장한다. 기존 운동 일정도 같은 보드에 표시하며 수정 시 저장된 시간과 다른 필드를 유지한다. 날짜별 영상 카드에서 링크 열기·수정·휴지통 이동이 가능하고, 오늘부터 7일간의 예정 목록을 따로 표시한다. 운동 일정의 시작일을 한국 날짜로 계산하여 그날 21:00에 등록된 기기로 알린다. 운동 분류와 영상 URL이 모두 있는 일정만 대상이다. 반복 규칙·콘텐츠에서 파생된 일정은 이 발송 대상이 아니다. 같은 날 운동 일정이 여러 개면 각 일정이 알림 하나씩 생성된다.
 
-알림에는 개인 제목이나 외부 영상 URL을 넣지 않는다. 알림을 누르면 PERSONAL 캘린더의 해당 날짜와 일정 상세를 열고, 로그인한 소유자가 영상 링크를 선택한다. 서비스워커는 요청을 캐시하지 않는다.
+알림에는 개인 제목이나 외부 영상 URL을 넣지 않는다. 기존 iPhone 서비스워커와 호환되도록 서버의 `/?view=calendar&date=...&schedule=...` 알림 URL을 유지한다. 앱은 로그인한 소유자의 일정이 운동인지 확인한 뒤 실제 저장된 서울 날짜의 Yoga Planner 카드로 연결한다. 일반 일정은 기존 캘린더 상세로 연결한다. 외부 영상은 소유자가 보드에서 직접 선택한다. 서비스워커는 요청을 캐시하지 않는다. 기존 기기는 알림 재등록이나 환경변수·SQL 변경이 필요 없다.
 
 ## 운영 적용 순서
 
@@ -15,8 +15,8 @@ PERSONAL의 일반 일정 등록은 콘텐츠명 한 칸만 입력한다. Overvi
 3. PERSONAL Supabase의 Project Settings → API Keys에서 서버 전용 secret key를 Render의 `PERSONAL_SUPABASE_SECRET_KEY`에 직접 저장한다. 개인 DB의 publishable key, FRENGLE 키, OAuth client secret으로 대체하지 않는다. 비밀 키를 채팅에 붙여 넣거나 NEXT_PUBLIC 변수로 만들지 않는다. 기존 publishable/URL 설정은 유지한다.
 4. Render에 최신 main을 배포한다. `GET /api/personal-push?workspace=PERSONAL`은 로그인 후 환경변수와 SQL 상태를 확인하며, 미설정이면 알림 활성화를 막는다.
 5. PERSONAL에서 pg_cron, pg_net, Supabase Vault를 사용할 수 있는지 확인한다. 위 스크립트가 생성한 `outputs/personal-exercise-push-vault.private.sql`을 PERSONAL SQL Editor에서 실행한 후 `supabase/personal/setup_exercise_push_cron.sql`을 실행한다. 설치 직후 예약 호출은 비활성 상태다. URL·호출용 토큰만 Vault에 저장하며 DB 서버 키·VAPID 개인키는 Render에만 둔다.
-6. iPhone iOS 16.4 이상에서 Safari로 대시보드를 열고 공유 → 홈 화면에 추가한다. 홈 화면 아이콘으로 열어 PERSONAL 로그인 → 캘린더 → 운동 알림 → 이 기기 알림 켜기를 누르고 알림을 허용한다. 테스트 알림을 보내 실제 수신을 확인한다. 일반 Safari 탭의 알림 권한만으로는 iPhone 웹 푸시를 켤 수 없다.
-7. 수신을 확인한 뒤 PERSONAL SQL Editor에서 `select cron.alter_job(jobid,active:=true) from cron.job where jobname='ops-exercise-push-2100';`을 실행한다. 캘린더에서 설정 새로고침을 누르면 예약 발송 준비 상태가 표시된다. 설정 SQL을 다시 실행하면 기존 job도 비활성 상태로 돌아간다.
+6. iPhone iOS 16.4 이상에서 Safari로 대시보드를 열고 공유 → 홈 화면에 추가한다. 홈 화면 아이콘으로 열어 PERSONAL 로그인 → Yoga Planner → 운동 알림 → 이 기기 알림 켜기를 누르고 알림을 허용한다. 테스트 알림을 보내 실제 수신을 확인한다. 일반 Safari 탭의 알림 권한만으로는 iPhone 웹 푸시를 켤 수 없다.
+7. 수신을 확인한 뒤 PERSONAL SQL Editor에서 `select cron.alter_job(jobid,active:=true) from cron.job where jobname='ops-exercise-push-2100';`을 실행한다. 요가 플래너에서 설정 새로고침을 누르면 예약 발송 준비 상태가 표시된다. 설정 SQL을 다시 실행하면 기존 job도 비활성 상태로 돌아간다.
 
 서버 설정 준비 중으로 표시되면 로그인 상태에서 `/api/personal-push?workspace=PERSONAL`의 `setup`을 확인한다. 저장소 조회와 appUrl/databaseUrl/serviceKey/vapidKeyPair/dispatchSecret 검증 결과를 boolean으로만 반환하며 키 값·길이·일부 문자는 반환하지 않는다. serviceKey=false이면 PERSONAL_SUPABASE_SECRET_KEY, vapidKeyPair=false이면 VAPID 공개/개인키의 짝, dispatchSecret=false이면 생성한 발송 비밀값을 Render에서 확인한다. Vault와 Cron 미설정은 scheduled=false 원인이며 ready=false 원인은 아니다.
 

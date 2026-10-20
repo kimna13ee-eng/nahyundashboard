@@ -328,7 +328,7 @@ export function YogaReminderPanel({ enabled }: { enabled: boolean }) {
       );
       setMessage(
         config.scheduled
-          ? "이 기기의 운동 알림을 켰습니다. 운동 일정에 날짜별 영상 URL을 등록해 주세요."
+          ? "이 기기의 요가 알림을 켰습니다. 요가 플래너에 날짜별 영상 URL을 등록해 주세요."
           : "이 기기의 알림 연결을 저장했습니다. 예약 발송은 서버 설정 완료 후 시작됩니다.",
       );
     } catch (cause) {
@@ -421,8 +421,8 @@ export function YogaReminderPanel({ enabled }: { enabled: boolean }) {
       <div className="ops-yoga-reminder-body">
         <p>
           {config?.scheduled
-            ? "캘린더 상단의 ‘운동 등록’에서 날짜별 영상을 저장하면, 해당 날짜 밤 9시에 링크를 확인할 수 있는 알림을 받습니다."
-            : "캘린더 상단의 ‘운동 등록’에서 날짜별 영상 URL을 저장하고, 이 기기를 알림 수신 기기로 등록할 수 있습니다."}
+            ? "위 요가 플래너에 날짜별 영상을 저장하면, 해당 날짜 밤 9시에 이 보드에서 링크를 확인할 수 있는 알림을 받습니다."
+            : "요가 플래너에 날짜별 영상 URL을 저장하고, 이 기기를 알림 수신 기기로 등록할 수 있습니다."}
         </p>
         {!enabled ? (
           <p>PERSONAL에 로그인한 뒤 이 기기의 알림을 설정해 주세요.</p>
@@ -449,7 +449,7 @@ export function YogaReminderPanel({ enabled }: { enabled: boolean }) {
                   <li>Safari에서 이 대시보드를 엽니다.</li>
                   <li>공유 → 홈 화면에 추가를 선택합니다.</li>
                   <li>
-                    추가한 앱에서 PERSONAL → Calendar → 운동 알림을 켭니다.
+                    추가한 앱에서 PERSONAL → Yoga Planner → 운동 알림을 켭니다.
                   </li>
                 </ol>
               </div>
