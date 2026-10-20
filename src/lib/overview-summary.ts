@@ -20,6 +20,7 @@ export function dailyTaskGroups(tasks: OpsRow[], day: string) {
       task.status !== "completed" &&
       !isArchivedProjectProcess(task) &&
       (isProjectProcess(task) ||
+        task.status === "running" ||
         task.due_date === day ||
         (Number.isFinite(created) && seoulDate(new Date(created)) === day))
     );
@@ -94,7 +95,11 @@ export function dailyTaskSummary(tasks: OpsRow[], day: string) {
         : !isArchivedProjectProcess(task);
     }
     const created = Date.parse(String(task.created_at));
+    const completedAt =
+      task.status === "completed" ? taskCompletionTime(task) : null;
     return (
+      task.status === "running" ||
+      Boolean(completedAt && seoulDate(new Date(completedAt)) === day) ||
       task.due_date === day ||
       (Number.isFinite(created) && seoulDate(new Date(created)) === day)
     );

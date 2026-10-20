@@ -177,6 +177,83 @@ test("프로젝트의 미완료 단계는 날짜와 관계없이 매일 표시�
   );
 });
 
+test("진행 중 업무는 마감일과 무관하게 매일 표시하고 오늘 완료하면 하루 합계에 남는다", () => {
+  const tasks = [
+    {
+      id: "future",
+      status: "running",
+      created_at: "2026-09-01T00:00:00Z",
+      due_date: "2026-11-01",
+      completed_at: null as string | null,
+    },
+    {
+      id: "past",
+      status: "running",
+      created_at: "2026-09-01T00:00:00Z",
+      due_date: "2026-10-01",
+    },
+    {
+      id: "none",
+      status: "running",
+      created_at: "2026-09-01T00:00:00Z",
+      due_date: null,
+    },
+    {
+      id: "today",
+      status: "running",
+      created_at: "2026-10-20T00:00:00Z",
+      due_date: "2026-10-20",
+    },
+    {
+      id: "waiting",
+      status: "pending",
+      created_at: "2026-09-01T00:00:00Z",
+      due_date: "2026-11-01",
+    },
+    {
+      id: "archived",
+      project_id: "p",
+      project_step_id: "a",
+      project_step_archived_at: "2026-10-19T00:00:00Z",
+      status: "running",
+    },
+    {
+      id: "done-before",
+      status: "completed",
+      created_at: "2026-09-01T00:00:00Z",
+      due_date: "2026-11-01",
+      completed_at: "2026-10-19T14:59:59Z",
+    },
+  ];
+  assert.deepEqual(
+    dailyTaskGroups(tasks, "2026-10-20").pending.map((task) => task.id),
+    ["future", "past", "none", "today"],
+  );
+  assert.deepEqual(dailyTaskSummary(tasks, "2026-10-20"), {
+    total: 4,
+    completed: 0,
+  });
+  tasks[0].status = "completed";
+  tasks[0].completed_at = "2026-10-19T15:00:00Z";
+  const today = dailyTaskGroups(tasks, "2026-10-20");
+  assert.deepEqual(
+    today.pending.map((task) => task.id),
+    ["past", "none", "today"],
+  );
+  assert.deepEqual(
+    today.completed.map((task) => task.id),
+    ["future"],
+  );
+  assert.deepEqual(dailyTaskSummary(tasks, "2026-10-20"), {
+    total: 4,
+    completed: 1,
+  });
+  assert.deepEqual(dailyTaskSummary(tasks, "2026-10-21"), {
+    total: 3,
+    completed: 0,
+  });
+});
+
 test("이번 주는 월요일부터 일요일, 선택 날짜와 관계없이 오늘을 기준으로 계산", () => {
   assert.deepEqual(seoulWeek("2026-10-19").days, [
     "2026-10-19",

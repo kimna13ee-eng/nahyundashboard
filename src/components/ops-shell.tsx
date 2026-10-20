@@ -1334,13 +1334,13 @@ export function OpsShell({
                 })}
               </div>
               <p className="ops-overview-metric-note">
-                {today} · 전체: 미완료 프로세스와 오늘 등록·마감 업무 · 완료:
-                오늘 완료 · 자동화: 수신 결과
+                {today} · 전체: 미완료 프로세스와 진행 중·오늘 등록·마감 업무 ·
+                완료: 오늘 완료 · 자동화: 수신 결과
               </p>
               <section className="ops-card ops-overview-today">
                 {heads(
                   "오늘 할 일",
-                  `${today} · 미완료 프로세스는 매일 표시 · 기존 업무는 오늘 등록·마감 기준`,
+                  `${today} · 미완료 프로세스와 진행 중 업무는 매일 표시 · 그 외 오늘 등록·마감 기준`,
                   create("projects", "프로젝트 등록"),
                 )}
                 {taskList(todayTasks.pending)}
