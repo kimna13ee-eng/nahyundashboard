@@ -84,7 +84,7 @@ const menus = [
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "automations", label: "Automations", icon: Workflow },
   { id: "content", label: "Content Studio", icon: PanelsTopLeft },
-  { id: "personal-sheets", label: "콘텐츠 시트", icon: FileSpreadsheet },
+  { id: "personal-sheets", label: "내 SNS 스튜디오", icon: FileSpreadsheet },
   { id: "journal", label: "Work Journal", icon: NotebookPen },
   { id: "library", label: "Library", icon: Library },
   { id: "analytics", label: "Analytics", icon: ChartNoAxesCombined },

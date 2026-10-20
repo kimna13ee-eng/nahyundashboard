@@ -11,9 +11,34 @@
 }
 .editorial .ops-sheet-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  padding: 0 20px 18px;
+  min-width: 0;
+}
+.editorial .ops-sheet-groups {
+  display: grid;
+  gap: 14px;
+  padding: 0 20px 20px;
   border-bottom: 1px solid var(--line, #e8e4df);
+}
+.editorial .ops-sheet-group-picker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.editorial .ops-sheet-group-picker button {
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: #f6f3f8;
+  color: #8b7f95;
+  font-size: 11px;
+}
+.editorial .ops-sheet-group-picker button[aria-pressed="true"] {
+  background: #eae2f1;
+  border-color: #c4b3d1;
+  color: #675176;
 }
 .editorial .ops-sheet-tabs button {
   min-width: 72px;
@@ -150,6 +175,26 @@
   background: #f1edf4;
   z-index: 3;
 }
+.editorial .ops-sheet-table.is-grid tr > :first-child {
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  padding: 10px 8px;
+  text-align: center;
+  background: #f7f4f8;
+}
+.editorial .ops-sheet-table.is-grid thead th:not(:first-child) {
+  text-align: center;
+}
+.editorial .ops-sheet-grid-row-open {
+  width: 100%;
+  min-width: 0;
+  padding: 3px;
+  border: 0;
+  background: transparent;
+  color: #8b7f95;
+  font-variant-numeric: tabular-nums;
+}
 .editorial .ops-sheet-table tbody th {
   z-index: 1;
   font-weight: 500;
@@ -209,6 +254,9 @@
   background: #faf6ed;
   color: #8b7653;
 }
+.editorial .ops-personal-sheets > .ops-sheet-footer {
+  margin: 0;
+}
 .editorial .ops-sheet-detail-caption {
   color: #8a818e;
   font-size: 11px;
@@ -247,8 +295,15 @@
   .editorial .ops-personal-sheets .ops-section-head {
     align-items: flex-start;
   }
-  .editorial .ops-sheet-tabs {
-    padding-inline: 16px;
+  .editorial .ops-sheet-groups {
+    padding: 0 16px 18px;
+  }
+  .editorial .ops-sheet-group-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .editorial .ops-sheet-group-picker button,
+  .editorial .ops-sheet-tabs button {
+    min-height: 44px;
   }
   .editorial .ops-sheet-toolbar {
     padding-inline: 16px;

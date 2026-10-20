@@ -1,17 +1,17 @@
-export const personalSheetTabs = {
-  planning: { gid: "1103", title: "03_기획", lastColumn: "Z", width: 26 },
-  drafts: { gid: "1104", title: "04_원고", lastColumn: "Z", width: 26 },
-  performance: {
-    gid: "1106",
-    title: "06_발행성과",
-    lastColumn: "Z",
-    width: 26,
-  },
-} as const;
+import {
+  isPersonalSheetTab,
+  personalSheetTabs,
+  type PersonalSheetTab,
+} from "./personal-sheet-tabs.ts";
+export {
+  isPersonalSheetTab,
+  personalSheetTabs,
+  type PersonalSheetTab,
+} from "./personal-sheet-tabs.ts";
 
-export type PersonalSheetTab = keyof typeof personalSheetTabs;
 export const personalSheetRowLimit = 1000;
 export const personalSheetResponseLimit = 3 * 1024 * 1024;
+const personalSheetWidth = 26;
 
 export type PersonalSheetData = {
   tab: PersonalSheetTab;
@@ -23,13 +23,6 @@ export type PersonalSheetData = {
   truncated: boolean;
   rowLimit: number;
 };
-
-export function isPersonalSheetTab(value: unknown): value is PersonalSheetTab {
-  return (
-    typeof value === "string" &&
-    Object.prototype.hasOwnProperty.call(personalSheetTabs, value)
-  );
-}
 
 export function validPersonalSpreadsheetId(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9_-]{20,200}$/.test(value);
@@ -51,10 +44,10 @@ export function personalSheetUrls(
   );
   csv.searchParams.set("format", "csv");
   csv.searchParams.set("gid", config.gid);
-  // One header, 1,000 visible rows, and one row to detect truncation.
+  // One optional header, 1,000 visible rows, and one row to detect truncation.
   csv.searchParams.set(
     "range",
-    `A1:${config.lastColumn}${personalSheetRowLimit + 2}`,
+    `A1:Z${personalSheetRowLimit + (config.layout === "grid" ? 1 : 2)}`,
   );
   return { sourceUrl: source.toString(), csvUrl: csv.toString() };
 }
@@ -67,9 +60,11 @@ export function parseGoogleSheetCsv(body: string, tab: PersonalSheetTab) {
   if (new TextEncoder().encode(body).byteLength > personalSheetResponseLimit)
     throw new Error("시트 응답이 너무 큽니다. 원본 시트에서 확인해 주세요.");
   const content = body.replace(/^\uFEFF/, "");
+  const grid = personalSheetTabs[tab].layout === "grid";
   let headers: string[] | null = null;
   const rows: string[][] = [];
   let dataRows = 0;
+  let gridRow = 0;
   let row: string[] = [];
   let cell = "";
   let inQuotes = false;
@@ -77,7 +72,7 @@ export function parseGoogleSheetCsv(body: string, tab: PersonalSheetTab) {
   let startedField = false;
   const addCell = () => {
     row.push(cell);
-    if (row.length > personalSheetTabs[tab].width)
+    if (row.length > personalSheetWidth)
       throw new Error("허용된 시트 범위를 확인하지 못했습니다.");
     cell = "";
     closedQuote = false;
@@ -85,7 +80,11 @@ export function parseGoogleSheetCsv(body: string, tab: PersonalSheetTab) {
   };
   const addRow = () => {
     addCell();
-    if (headers === null) headers = row;
+    if (grid) {
+      gridRow++;
+      if (row.some((value) => value !== "")) dataRows = gridRow;
+      if (gridRow <= personalSheetRowLimit) rows.push(row);
+    } else if (headers === null) headers = row;
     else if (row.some((value) => value !== "")) {
       dataRows++;
       if (rows.length < personalSheetRowLimit) rows.push(row);
@@ -122,6 +121,12 @@ export function parseGoogleSheetCsv(body: string, tab: PersonalSheetTab) {
   }
   if (inQuotes) throw new Error("시트 응답 형식을 확인하지 못했습니다.");
   if (startedField || closedQuote || row.length) addRow();
+  // Keep dashboard spacer rows so the visible row numbers match the source.
+  // Only trailing empty rows are omitted; they must not trigger truncation.
+  if (grid) {
+    while (rows.length && rows[rows.length - 1].every((value) => value === ""))
+      rows.pop();
+  }
   const labels: string[] = headers ?? [];
   const width = Math.max(
     labels.length,

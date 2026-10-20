@@ -16,14 +16,14 @@ export async function GET(request: NextRequest) {
     params.getAll("workspace").length !== 1 ||
     params.get("workspace") !== "PERSONAL"
   )
-    return json({ error: "콘텐츠 시트는 PERSONAL에서만 볼 수 있습니다." }, 403);
+    return json({ error: "내 SNS 스튜디오는 PERSONAL에서만 볼 수 있습니다." }, 403);
   const tab = params.get("tab");
   if (
     !isPersonalSheetTab(tab) ||
     params.getAll("tab").length !== 1 ||
     [...params.keys()].some((key) => key !== "workspace" && key !== "tab")
   )
-    return json({ error: "기획·원고·성과 시트 중 하나를 선택해 주세요." }, 400);
+    return json({ error: "SNS 스튜디오에서 조회할 시트를 선택해 주세요." }, 400);
   if (!personalConfigured())
     return json({ error: "PERSONAL 연결이 필요합니다." }, 503);
 
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       return json(
         {
           error:
-            "콘텐츠 시트 연결 설정을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+            "SNS 스튜디오 연결 설정을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
           setupRequired: true,
         },
         503,
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     if (!source.data)
       return json(
         {
-          error: "개인 계정에 연결된 콘텐츠 시트가 없습니다.",
+          error: "개인 계정에 연결된 SNS 스튜디오 시트가 없습니다.",
           setupRequired: true,
         },
         503,
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
     return json(
       {
         error:
-          "콘텐츠 시트를 불러오지 못했습니다. 연결과 원본 시트 접근 권한을 확인해 주세요.",
+          "SNS 스튜디오 시트를 불러오지 못했습니다. 연결과 원본 시트 접근 권한을 확인해 주세요.",
       },
       502,
     );

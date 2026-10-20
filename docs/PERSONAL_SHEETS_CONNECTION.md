@@ -1,20 +1,31 @@
-# PERSONAL content sheets — 2026-10-19
+# PERSONAL SNS studio — 2026-10-20
 
-The top-level 콘텐츠 시트 menu follows Content Studio and is visible only in the
+The top-level 내 SNS 스튜디오 menu replaces 콘텐츠 시트 after Content Studio and is visible only in the
 PERSONAL workspace, including mobile More. Leaving PERSONAL returns to Overview
 and unmounts the panel. Login/user/tab changes abort pending reads and clear the
 previous sheet's state.
 
 The authenticated, read-only `/api/personal-sheets` route accepts only
-`workspace=PERSONAL` and `tab=planning|drafts|performance`. It loads the source
+`workspace=PERSONAL` and a fixed tab key from `personal-sheet-tabs.ts`. It loads the source
 from the current user's `ops_personal_sheet_sources` row. Other users cannot
 select that row, insert a source or change it through the client. The reusable
 SQL016 contains no spreadsheet IDs or user seed data. The confirmed source was
 bound separately to the intended PERSONAL owner in the SQL editor; the
 connection check returned true on 2026-10-19.
 
-Allowed tabs are fixed to 03_기획 (1103), 04_원고 (1104), and 06_발행성과 (1106).
-No other workbook tabs are fetched. CSV export preserves formatted values,
+The verified workbook now has 17 allowed tabs, grouped as follows:
+
+- 콘텐츠 운영: 기획, 원고, 검수, 발행·성과.
+- 리서치·아이디어: 레퍼런스, 리서치, Grok 인박스.
+- 캐릭터·가이드: 캐릭터 바이블, 셀카·비주얼 DNA, 통합 캐해,
+  레퍼런스 해석, 콘텐츠 캘리브레이션.
+- 운영 관리: 시트 대시보드, 인계 로그, 직원 규칙, 에이전트 실행지침,
+  운영 설정.
+
+The catalog pins each key to its observed sheet ID. Only the selected tab is
+fetched; callers cannot supply a workbook ID, arbitrary sheet ID, or URL. The
+Grok inbox and agent instructions are sheet text, never an external integration
+or executable instructions. CSV export preserves formatted values,
 mixed text/numbers, quoted commas and multiline drafts. Google sharing settings
 remain unchanged. The current source can be read with its existing link access;
 if access later becomes private, reads fail rather than exposing cached data or
@@ -23,29 +34,45 @@ changing the file's permissions.
 The source ID is stored only in the owner's database configuration, not the
 repository. Source requests use fixed Google HTTPS endpoints, at most three
 validated Google redirects, no credentials, no-store, a 12-second timeout and a
-3 MiB streaming limit. The bounded range is A1:Z1002: a header, a maximum of 1,000
-displayed data rows and a truncation sentinel. Blank rows are omitted. Data
+3 MiB streaming limit. Tables request A1:Z1002: a header, a maximum of 1,000
+displayed data rows and a truncation sentinel. Blank table rows are omitted.
+The source dashboard requests A1:Z1001 without a header: its title and internal
+blank rows are retained, synthetic A–Z column names and physical row numbers
+preserve cell positions, and only trailing blank rows are omitted. A value
+after physical row 1,000 triggers the truncation notice. Data
 beyond that range or beyond column Z is outside this viewer's scope. No cell
 content is evaluated as HTML, JavaScript or formulas.
 
-The panel supports the three tabs, search across displayed columns, horizontal
+The panel supports four groups with only their selected group's tabs visible,
+search across displayed columns, horizontal
 scrolling, a fixed header/first column and full-text row details. It reads again
-every minute while the visible list is open, with a manual refresh option.
+every minute while the visible list is open, with manual and app-header refresh.
 Opening a draft detail pauses background refresh. The timestamp is the fetch
 time, not a claim about the original file's last edit.
 
 Validation:
 - CSV parser/input/network and settings RLS tests; forced owner isolation,
   anonymous and client-write denial, and idempotent migration.
-- All displayed source values matched the authenticated Google Sheets formatted
-  read for all current records: planning 9, drafts 1, performance 9.
-- Production build, 71 unit tests and lint passed.
+- On 2026-10-20 all displayed source values matched the authenticated Google
+  Sheets formatted read across all 17 tabs. Current planning has 18 items,
+  drafts 1, performance 9; the dashboard retains all 36 physical rows.
 - Local fixture UI: menu absent in ALL, present in PERSONAL, search across
   fields, tab switches, multiline full draft details, zero/percentage rendering,
   unsafe links rendered as text, errors clear stale rows, and leaving PERSONAL
   hides the menu/data and returns to Overview.
 - Running API: eight invalid workspace/tab/parameter checks returned expected
-  errors with no-store; POST returned 405.
+  errors with no-store; POST returned 405 in the original release.
+- Expansion validation: 87 unit tests, the existing source-owner RLS database
+  test, lint, TypeScript, and production build passed. The running API passed
+  27 checks including all 17 keys requiring authentication, rejected ALL and
+  FRENGLE workspaces, duplicate/extra parameters, and GET-only responses.
+- Desktop and 390px browser checks covered four groups, representative sheet
+  switches, 18-item planning search, full multiline draft details, zeroes and
+  percentage values, and original dashboard rows 1–6 including spacer rows.
+  App-header refresh completed, and leaving PERSONAL unmounted the data and
+  removed the menu in both ALL and FRENGLE. Mobile More exposes the new menu.
 
-Revision ce9b21d was manually deployed on Render. All three production tabs and
-their current row counts were verified 2026-10-19. Auto-Deploy remains disabled.
+Revision ce9b21d's original three-tab integration was manually deployed and
+verified 2026-10-19. The existing owner's source binding was verified again on
+2026-10-20, so this expansion needs no database migration or source reseeding.
+The 17-tab application expansion requires a new Render deployment.
