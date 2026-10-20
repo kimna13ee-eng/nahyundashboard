@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { json, sameOrigin } from "@/lib/http";
 import { personalClient, personalConfigured } from "@/lib/supabase/server";
 import { parsePushEndpoint, parsePushSubscription } from "@/lib/personal-push";
-import { pushAdmin, pushConfiguration } from "@/lib/personal-push-server";
+import { pushAdmin, pushConfigurationState } from "@/lib/personal-push-server";
 
 export const runtime = "nodejs";
 async function handle(req: NextRequest) {
@@ -20,7 +20,7 @@ async function handle(req: NextRequest) {
     } = await client.auth.getUser();
     if (error || !user)
       return json({ error: "개인 계정 로그인이 필요합니다." }, 401);
-    const config = pushConfiguration();
+    const { config, checks } = pushConfigurationState();
     if (req.method === "GET") {
       const result = await client
         .from("ops_push_subscriptions")
@@ -39,6 +39,7 @@ async function handle(req: NextRequest) {
         ),
         publicKey: ready ? config!.publicKey : null,
         subscriptions: result.error ? [] : result.data,
+        setup: ready ? undefined : { storageReady: !result.error, checks },
         message: ready
           ? null
           : "운동 알림의 서버 설정을 준비 중입니다. 날짜별 영상은 먼저 저장할 수 있어요.",

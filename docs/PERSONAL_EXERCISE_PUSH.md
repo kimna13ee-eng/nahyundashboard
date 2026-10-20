@@ -16,6 +16,8 @@ Content Studio는 PERSONAL의 연결된 SNS 시트를 보여 준다. 기존 수�
 6. iPhone iOS 16.4 이상에서 Safari로 대시보드를 열고 공유 → 홈 화면에 추가한다. 홈 화면 아이콘으로 열어 PERSONAL 로그인 → 캘린더 → 운동 알림 → 이 기기 알림 켜기를 누르고 알림을 허용한다. 테스트 알림을 보내 실제 수신을 확인한다. 일반 Safari 탭의 알림 권한만으로는 iPhone 웹 푸시를 켤 수 없다.
 7. 수신을 확인한 뒤 PERSONAL SQL Editor에서 `select cron.alter_job(jobid,active:=true) from cron.job where jobname='ops-exercise-push-2100';`을 실행한다. 캘린더에서 설정 새로고침을 누르면 예약 발송 준비 상태가 표시된다. 설정 SQL을 다시 실행하면 기존 job도 비활성 상태로 돌아간다.
 
+서버 설정 준비 중으로 표시되면 로그인 상태에서 `/api/personal-push?workspace=PERSONAL`의 `setup`을 확인한다. 저장소 조회와 appUrl/databaseUrl/serviceKey/vapidKeyPair/dispatchSecret 검증 결과를 boolean으로만 반환하며 키 값·길이·일부 문자는 반환하지 않는다. serviceKey=false이면 PERSONAL_SUPABASE_SECRET_KEY, vapidKeyPair=false이면 VAPID 공개/개인키의 짝, dispatchSecret=false이면 생성한 발송 비밀값을 Render에서 확인한다. Vault와 Cron 미설정은 scheduled=false 원인이며 ready=false 원인은 아니다.
+
 ## 발송과 재시도
 
 DB의 기본 UTC 기준 12:00~12:29(한국 21:00~21:29)에 매분 보호된 서버 API를 호출한다. 일정·날짜·구독 조합을 유일하게 저장하고 행 잠금/claim token으로 동시 발송을 제한한다. 임대 2분, 최대 3회 시도 후 종료한다. 만료 구독(404/410)은 비활성화한다. 삭제·분류 변경·날짜 변경·구독 해제된 항목은 발송 직전에 재확인한다.
