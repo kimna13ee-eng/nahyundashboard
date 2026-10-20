@@ -54,6 +54,30 @@ function choice(v: unknown, allowed: string[]) {
     throw new Error("선택 항목을 확인해 주세요.");
   return v;
 }
+/** A personal schedule's hidden fields must never be reconstructed on edit. */
+export function parsePersonalScheduleEdit(raw: unknown) {
+  if (
+    !raw ||
+    typeof raw !== "object" ||
+    ![Object.prototype, null].includes(Object.getPrototypeOf(raw))
+  )
+    throw new Error("입력 정보를 확인해 주세요.");
+  const value = raw as Record<string, unknown>;
+  if (
+    Reflect.ownKeys(value).some((key) => key !== "title" && key !== "video_url")
+  )
+    throw new Error("수정할 일정 입력 항목을 확인해 주세요.");
+  return {
+    title: text(
+      Object.hasOwn(value, "title") ? value.title : undefined,
+      120,
+      true,
+    ),
+    ...(Object.hasOwn(value, "video_url")
+      ? { video_url: parseScheduleVideoUrl(value.video_url) }
+      : {}),
+  };
+}
 export function parseResource(resource: Resource, raw: unknown) {
   if (!raw || typeof raw !== "object")
     throw new Error("입력 정보를 확인해 주세요.");

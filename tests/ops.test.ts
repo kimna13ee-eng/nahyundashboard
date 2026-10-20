@@ -20,6 +20,7 @@ test("업무 테스트 구분은 boolean/null만 허용하고 미전송 값은 �
 });
 import {
   parseResource,
+  parsePersonalScheduleEdit,
   containsSecret,
   seoulDate,
   intervalSeconds,
@@ -27,6 +28,48 @@ import {
   scheduleOverlaps,
   longRunningInterval,
 } from "../src/lib/ops.ts";
+test("개인 일정 부분수정은 제목·선택 영상 URL만 검증하고 숨긴 필드는 반환하지 않음", () => {
+  const title = "  콘텐츠 원문  ";
+  assert.deepEqual(parsePersonalScheduleEdit({ title }), { title });
+  assert.deepEqual(
+    parsePersonalScheduleEdit({
+      title,
+      video_url: " https://video.example/yoga ",
+    }),
+    { title, video_url: "https://video.example/yoga" },
+  );
+  assert.deepEqual(parsePersonalScheduleEdit({ title, video_url: "" }), {
+    title,
+    video_url: "",
+  });
+  assert.equal(
+    parsePersonalScheduleEdit({ title: "가".repeat(120) }).title.length,
+    120,
+  );
+  for (const value of [
+    null,
+    [],
+    "title",
+    new Date(),
+    Object.create({ title: "상속 제목" }),
+    {},
+    { title: " " },
+    { title: "가".repeat(121) },
+    { title, video_url: undefined },
+    { title, video_url: "javascript:alert(1)" },
+    { title, video_url: "https://video.example/?access_token=abc" },
+    ...[
+      "starts_at",
+      "ends_at",
+      "notes",
+      "project_id",
+      "category",
+      "owner_id",
+    ].map((key) => ({ title, [key]: "hidden" })),
+    { title, [Symbol("hidden")]: true },
+  ])
+    assert.throws(() => parsePersonalScheduleEdit(value));
+});
 test("장기 미종료 검사는 현재 열린 구간에만 적용", () => {
   const now = Date.parse("2026-10-10T18:00:00+09:00");
   const i = {

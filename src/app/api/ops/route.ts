@@ -4,7 +4,13 @@ import {
   workspaceSession,
   WorkspaceAccessError,
 } from "@/lib/workspaces/server";
-import { parseResource, resources, uuid, type Resource } from "@/lib/ops";
+import {
+  parsePersonalScheduleEdit,
+  parseResource,
+  resources,
+  uuid,
+  type Resource,
+} from "@/lib/ops";
 import { parseTimerRequest, timerRpcFailure } from "@/lib/timer-request";
 import {
   parseProjectCategory,
@@ -233,18 +239,26 @@ async function handle(req: NextRequest) {
       }
       return json({ row: { id: data } }, req.method === "POST" ? 201 : 200);
     }
-    // A category-only edit of a legacy project must not replace its checklist
-    // or other metadata. Full legacy requests retain their previous contract.
+    // Personal edits update only visible fields, preserving stored timestamps
+    // and other hidden values without a lossy client round trip. Full schedule
+    // requests and legacy project edits retain their existing contracts.
     const value =
-      resource === "projects" &&
+      resource === "schedules" &&
       req.method === "PATCH" &&
+      workspace === "PERSONAL" &&
       raw &&
-      raw.project_category !== undefined &&
-      raw.title === undefined &&
-      raw.description === undefined &&
-      raw.status === undefined
-        ? { project_category: parseProjectCategory(raw.project_category) }
-        : parseResource(resource, body.value);
+      raw.starts_at === undefined &&
+      raw.ends_at === undefined
+        ? parsePersonalScheduleEdit(raw)
+        : resource === "projects" &&
+            req.method === "PATCH" &&
+            raw &&
+            raw.project_category !== undefined &&
+            raw.title === undefined &&
+            raw.description === undefined &&
+            raw.status === undefined
+          ? { project_category: parseProjectCategory(raw.project_category) }
+          : parseResource(resource, body.value);
     const q =
       req.method === "POST"
         ? client.from(table).insert({ ...value, owner_id: user.id })

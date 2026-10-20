@@ -58,6 +58,7 @@ import {
   addSeoulMinutes,
   scheduleDefaults,
   scheduleRangeError,
+  personalScheduleFields,
 } from "@/lib/schedule-form";
 import {
   scheduleCategories,
@@ -117,6 +118,7 @@ type Editor = {
   kind?: string;
   dueDate?: string;
   scheduleDate?: string;
+  scheduleCategory?: ScheduleCategory;
 };
 const text = (v: unknown) => String(v ?? "");
 type ScheduleCategory = (typeof scheduleCategories)[number];
@@ -804,7 +806,11 @@ export function OpsShell({
     <button
       className="ops-primary"
       disabled={!canWrite || (resource === "projects" && !projectProcessReady)}
-      onClick={() => setEditor({ resource, ...options })}
+      onClick={() => {
+        if (resource === "schedules" && space === "PERSONAL")
+          setCalendarCategoryFilter("all");
+        setEditor({ resource, ...options });
+      }}
     >
       <Plus size={15} />
       {label}
@@ -1916,7 +1922,30 @@ export function OpsShell({
               {heads(
                 "Calendar",
                 "Asia/Seoul · 연차 기록은 표시하지 않습니다.",
-                create("schedules", "일정 등록", { scheduleDate: day }),
+                space === "PERSONAL" ? (
+                  <div
+                    className="ops-overview-create-actions"
+                    role="group"
+                    aria-label="개인 일정 등록"
+                  >
+                    {create("schedules", "일정 등록", { scheduleDate: day })}
+                    <button
+                      disabled={!canWrite || !scheduleCategoryReady}
+                      onClick={() => {
+                        setCalendarCategoryFilter("all");
+                        setEditor({
+                          resource: "schedules",
+                          scheduleDate: day,
+                          scheduleCategory: "exercise",
+                        });
+                      }}
+                    >
+                      운동 등록
+                    </button>
+                  </div>
+                ) : (
+                  create("schedules", "일정 등록", { scheduleDate: day })
+                ),
               )}
               <div className="ops-toolbar">
                 <div className="ops-tabs">
@@ -3218,17 +3247,30 @@ function ResourceEditor({
   save: (body: unknown, method?: string) => Promise<boolean>;
 }) {
   const resource = editor.resource,
-    row: Record<string, unknown> = editor.row || {},
-    title =
-      resource === "projects"
-        ? "프로젝트"
-        : resource === "tasks"
-          ? "업무"
-          : resource === "task_notes"
-            ? "메모"
-            : resource === "schedules"
-              ? "일정"
-              : "라이브러리";
+    row: Record<string, unknown> = editor.row || {};
+  const isPersonalSchedule =
+    workspace === "PERSONAL" && resource === "schedules";
+  const isExerciseSchedule =
+    isPersonalSchedule &&
+    (row.category === "exercise" ||
+      (!row.id && editor.scheduleCategory === "exercise"));
+  const scheduleDay = row.starts_at
+    ? localDateTime(row.starts_at).slice(0, 10)
+    : editor.scheduleDate || seoulDate();
+  const title =
+    resource === "projects"
+      ? "프로젝트"
+      : resource === "tasks"
+        ? "업무"
+        : resource === "task_notes"
+          ? "메모"
+          : resource === "schedules"
+            ? isPersonalSchedule
+              ? isExerciseSchedule
+                ? "운동 일정"
+                : "콘텐츠 일정"
+              : "일정"
+            : "라이브러리";
   const defaults = scheduleDefaults(editor.scheduleDate || seoulDate());
   const [scheduleStart, setScheduleStart] = useState(
     row.starts_at ? localDateTime(row.starts_at) : defaults.startsAt,
@@ -3237,17 +3279,14 @@ function ResourceEditor({
     row.ends_at ? localDateTime(row.ends_at) : defaults.endsAt,
   );
   const [scheduleEndEdited, setScheduleEndEdited] = useState(Boolean(row.id));
-  const [scheduleCategory, setScheduleCategory] = useState<ScheduleCategory>(
-    scheduleCategories.includes(text(row.category) as ScheduleCategory)
-      ? (text(row.category) as ScheduleCategory)
-      : "other",
-  );
+  const [scheduleSubmissionError, setScheduleSubmissionError] = useState("");
   const [scheduleVideoUrl, setScheduleVideoUrl] = useState(text(row.video_url));
   const submitting = useRef(false);
   const scheduleError =
-    resource === "schedules"
+    scheduleSubmissionError ||
+    (resource === "schedules" && !isPersonalSchedule
       ? scheduleRangeError(scheduleStart, scheduleEnd)
-      : "";
+      : "");
   const projectIncomplete =
     resource === "projects" && Boolean(row.id) && tasksTruncated;
   const field = (name: string, label: string, type = "text", max = 120) => (
@@ -3334,13 +3373,31 @@ function ResourceEditor({
       }
       if (resource === "schedules") {
         try {
-          value.starts_at = new Date(
-            text(value.starts_at) + ":00+09:00",
-          ).toISOString();
-          value.ends_at = new Date(
-            text(value.ends_at) + ":00+09:00",
-          ).toISOString();
-        } catch {
+          setScheduleSubmissionError("");
+          if (isPersonalSchedule) {
+            if (!row.id)
+              Object.assign(
+                value,
+                personalScheduleFields(scheduleDay, isExerciseSchedule),
+              );
+            if (isExerciseSchedule && scheduleCategoryReady) {
+              if (!row.id) value.category = "exercise";
+              value.video_url = scheduleVideoUrl;
+            }
+          } else {
+            value.starts_at = new Date(
+              text(value.starts_at) + ":00+09:00",
+            ).toISOString();
+            value.ends_at = new Date(
+              text(value.ends_at) + ":00+09:00",
+            ).toISOString();
+          }
+        } catch (cause) {
+          setScheduleSubmissionError(
+            cause instanceof Error
+              ? cause.message
+              : "일정 날짜를 확인해 주세요.",
+          );
           return;
         }
       }
@@ -3366,7 +3423,16 @@ function ResourceEditor({
             보관하지 않도록 전체 데이터 조회가 필요합니다.
           </p>
         ) : null}
-        {resource !== "task_notes" ? field("title", "제목") : null}
+        {resource !== "task_notes"
+          ? field(
+              "title",
+              isPersonalSchedule
+                ? isExerciseSchedule
+                  ? "운동명"
+                  : "콘텐츠명"
+                : "제목",
+            )
+          : null}
         {resource === "library_items" && libraryWorkflow ? (
           <>
             {field("tool", "적용 도구", "text", 80)}
@@ -3530,7 +3596,8 @@ function ResourceEditor({
             )}
           </>
         ) : null}
-        {resource === "tasks" || resource === "schedules"
+        {resource === "tasks" ||
+        (resource === "schedules" && !isPersonalSchedule)
           ? select(
               "project_id",
               "프로젝트",
@@ -3574,34 +3641,17 @@ function ResourceEditor({
         ) : null}
         {resource === "schedules" ? (
           <>
-            {workspace === "PERSONAL" ? (
-              <label>
-                일정 분류
-                <select
-                  name="category"
-                  aria-label="일정 분류"
-                  value={scheduleCategory}
-                  disabled={!scheduleCategoryReady}
-                  onChange={(event) =>
-                    setScheduleCategory(event.target.value as ScheduleCategory)
-                  }
-                >
-                  {scheduleCategories.map((category) => (
-                    <option value={category} key={category}>
-                      {scheduleCategoryLabels[category]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            {workspace === "PERSONAL" && !scheduleCategoryReady ? (
+            {isPersonalSchedule ? (
               <p className="ops-schedule-form-hint">
-                일정 분류 연결을 확인해 주세요. 기본 일정은 저장할 수 있습니다.
+                {scheduleDay} ·{" "}
+                {isExerciseSchedule
+                  ? "밤 9시 운동 알림"
+                  : row.id
+                    ? "콘텐츠 일정"
+                    : "종일 콘텐츠 일정"}
               </p>
             ) : null}
-            {workspace === "PERSONAL" &&
-            scheduleCategoryReady &&
-            scheduleCategory === "exercise" ? (
+            {isExerciseSchedule ? (
               <>
                 <label>
                   요가·운동 영상 URL (선택)
@@ -3611,6 +3661,7 @@ function ResourceEditor({
                     pattern="https://.+"
                     inputMode="url"
                     maxLength={2000}
+                    disabled={!scheduleCategoryReady}
                     value={scheduleVideoUrl}
                     onChange={(event) =>
                       setScheduleVideoUrl(event.target.value)
@@ -3624,38 +3675,43 @@ function ResourceEditor({
                 </p>
               </>
             ) : null}
-            <label>
-              시작 (서울 시간)
-              <input
-                required
-                name="starts_at"
-                type="datetime-local"
-                value={scheduleStart}
-                onChange={(event) => {
-                  const nextStart = event.currentTarget.value;
-                  setScheduleStart(nextStart);
-                  if (!scheduleEndEdited)
-                    setScheduleEnd(addSeoulMinutes(nextStart, 60));
-                }}
-              />
-            </label>
-            <label>
-              종료 (서울 시간)
-              <input
-                required
-                name="ends_at"
-                type="datetime-local"
-                value={scheduleEnd}
-                aria-invalid={Boolean(scheduleError)}
-                aria-describedby={
-                  scheduleError ? "schedule-time-error" : undefined
-                }
-                onChange={(event) => {
-                  setScheduleEnd(event.currentTarget.value);
-                  setScheduleEndEdited(true);
-                }}
-              />
-            </label>
+            {!isPersonalSchedule ? (
+              <>
+                <label>
+                  시작 (서울 시간)
+                  <input
+                    required
+                    name="starts_at"
+                    type="datetime-local"
+                    value={scheduleStart}
+                    onChange={(event) => {
+                      const nextStart = event.currentTarget.value;
+                      setScheduleStart(nextStart);
+                      if (!scheduleEndEdited)
+                        setScheduleEnd(addSeoulMinutes(nextStart, 60));
+                    }}
+                  />
+                </label>
+                <label>
+                  종료 (서울 시간)
+                  <input
+                    required
+                    name="ends_at"
+                    type="datetime-local"
+                    value={scheduleEnd}
+                    aria-invalid={Boolean(scheduleError)}
+                    aria-describedby={
+                      scheduleError ? "schedule-time-error" : undefined
+                    }
+                    onChange={(event) => {
+                      setScheduleEnd(event.currentTarget.value);
+                      setScheduleEndEdited(true);
+                    }}
+                  />
+                </label>
+                {area("notes", "메모", 2000)}
+              </>
+            ) : null}
             {scheduleError ? (
               <p
                 id="schedule-time-error"
@@ -3665,7 +3721,6 @@ function ResourceEditor({
                 {scheduleError}
               </p>
             ) : null}
-            {area("notes", "메모", 2000)}
           </>
         ) : null}
         {resource === "library_items" ? (

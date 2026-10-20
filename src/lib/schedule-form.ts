@@ -1,4 +1,31 @@
 const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
+const SEOUL_OFFSET_MILLISECONDS = 9 * 60 * 60 * 1000;
+
+function validDayMilliseconds(day: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day.startsWith("0000-")) return null;
+  const value = new Date(`${day}T00:00:00.000Z`);
+  return Number.isFinite(value.getTime()) &&
+    value.toISOString().slice(0, 10) === day
+    ? value.getTime()
+    : null;
+}
+
+/** New personal content is all-day; exercise starts at 21:00 in Seoul. */
+export function personalScheduleFields(day: string, exercise = false) {
+  const selectedDay = validDayMilliseconds(day);
+  if (selectedDay === null)
+    throw new Error("일정을 등록할 날짜를 확인해 주세요.");
+  const midnight = selectedDay - SEOUL_OFFSET_MILLISECONDS;
+  const start = midnight + (exercise ? 21 * 60 * 60 * 1000 : 0);
+  const end = exercise ? start + 60 * 60 * 1000 : midnight + DAY_MILLISECONDS;
+  return {
+    starts_at: new Date(start).toISOString(),
+    ends_at: new Date(end).toISOString(),
+    project_id: null,
+    notes: "",
+  };
+}
 
 function localDateTimeValue(value: string) {
   const match = LOCAL_DATE_TIME.exec(value);

@@ -421,8 +421,8 @@ export function YogaReminderPanel({ enabled }: { enabled: boolean }) {
       <div className="ops-yoga-reminder-body">
         <p>
           {config?.scheduled
-            ? "날짜마다 다른 요가·운동 영상을 일정에 저장하면, 해당 날짜 밤 9시에 링크를 확인할 수 있는 알림을 받습니다."
-            : "운동 일정에 날짜별 영상 URL을 저장하고, 이 기기를 알림 수신 기기로 등록할 수 있습니다."}
+            ? "캘린더 상단의 ‘운동 등록’에서 날짜별 영상을 저장하면, 해당 날짜 밤 9시에 링크를 확인할 수 있는 알림을 받습니다."
+            : "캘린더 상단의 ‘운동 등록’에서 날짜별 영상 URL을 저장하고, 이 기기를 알림 수신 기기로 등록할 수 있습니다."}
         </p>
         {!enabled ? (
           <p>PERSONAL에 로그인한 뒤 이 기기의 알림을 설정해 주세요.</p>

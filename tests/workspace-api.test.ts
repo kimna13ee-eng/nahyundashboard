@@ -466,3 +466,153 @@ test("프로젝트 기능 readiness와 진행 타이머·동시편집 실패를 
     "진행 중인 타이머를 먼저 마쳐주세요.",
   );
 });
+
+test("PERSONAL 일정 부분수정은 제목·영상만 owner 범위에서 갱신", async () => {
+  for (const value of [
+    { title: "콘텐츠명 변경" },
+    { title: "운동명 변경", video_url: "https://video.example/yoga" },
+    { title: "운동 알림 링크 비우기", video_url: "" },
+  ]) {
+    const f = setup();
+    const response = await ops.PATCH(
+      request("/api/ops?workspace=PERSONAL", "PATCH", {
+        resource: "schedules",
+        id: rowId,
+        owner_id: companyId,
+        value,
+      }),
+    );
+    assert.equal(response.status, 200);
+    const writes = f.personal.queries.filter((query) => query.value);
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].table, "ops_schedules");
+    // No timestamps are sent back to Postgres: original fractional precision,
+    // project, notes, and category remain untouched even for a 1µs interval.
+    assert.deepEqual(writes[0].value, value);
+    assert.deepEqual(writes[0].filters, [
+      ["id", rowId],
+      ["owner_id", personalId],
+    ]);
+    assert.deepEqual(f.company.queries, []);
+  }
+});
+
+test("PERSONAL 일정 부분수정은 숨긴 필드와 불량 입력을 DB 갱신 전에 거절", async () => {
+  for (const value of [
+    {},
+    { title: " " },
+    { title: "가".repeat(121) },
+    { title: "영상", video_url: "http://video.example/yoga" },
+    ...["project_id", "notes", "category", "owner_id", "timezone"].map(
+      (key) => ({ title: "콘텐츠", [key]: "hidden" }),
+    ),
+    { title: "잘못된 시간", starts_at: "2026-10-20T00:00:00+09:00" },
+    { title: "잘못된 시간", ends_at: "2026-10-21T00:00:00+09:00" },
+    { title: "잘못된 시간", starts_at: null, ends_at: null },
+  ]) {
+    const f = setup();
+    const response = await ops.PATCH(
+      request("/api/ops?workspace=PERSONAL", "PATCH", {
+        resource: "schedules",
+        id: rowId,
+        value,
+      }),
+    );
+    assert.equal(response.status, 400);
+    assert.equal(
+      f.personal.queries.some((query) => query.value),
+      false,
+    );
+    assert.deepEqual(f.company.queries, []);
+  }
+});
+
+test("개인 신규와 회사 일정은 제목만으로 저장하지 않고 전체 시간 계약을 유지", async () => {
+  for (const [workspace, method] of [
+    ["PERSONAL", "POST"],
+    ["FRENGLE", "POST"],
+    ["FRENGLE", "PATCH"],
+  ] as const) {
+    const f = setup();
+    const response = await ops[method](
+      request(`/api/ops?workspace=${workspace}`, method, {
+        resource: "schedules",
+        ...(method === "PATCH" ? { id: rowId } : {}),
+        value: { title: "시간 없는 일정" },
+      }),
+    );
+    assert.equal(response.status, 400);
+    assert.equal(
+      f.personal.queries.some((query) => query.value),
+      false,
+    );
+    assert.equal(
+      f.company.queries.some((query) => query.value),
+      false,
+    );
+  }
+  for (const workspace of ["PERSONAL", "FRENGLE"] as const) {
+    for (const method of ["POST", "PATCH"] as const) {
+      const f = setup();
+      const target = workspace === "PERSONAL" ? f.personal : f.company;
+      const value = {
+        title: "전체 일정",
+        starts_at: "2026-10-20T21:00:00+09:00",
+        ends_at: "2026-10-20T22:00:00+09:00",
+        project_id: rowId,
+        notes: "기존 전체 폼",
+      };
+      const response = await ops[method](
+        request(`/api/ops?workspace=${workspace}`, method, {
+          resource: "schedules",
+          ...(method === "PATCH" ? { id: rowId } : {}),
+          value,
+        }),
+      );
+      assert.equal(response.status, method === "POST" ? 201 : 200);
+      assert.deepEqual(target.queries.find((query) => query.value)?.value, {
+        ...value,
+        starts_at: "2026-10-20T12:00:00.000Z",
+        ends_at: "2026-10-20T13:00:00.000Z",
+        timezone: "Asia/Seoul",
+        ...(method === "POST"
+          ? { owner_id: workspace === "PERSONAL" ? personalId : companyId }
+          : {}),
+      });
+      assert.deepEqual(
+        (workspace === "PERSONAL" ? f.company : f.personal).queries,
+        [],
+      );
+    }
+  }
+});
+
+test("개인 일정 부분수정도 로그인·Origin·ID 검증을 우회하지 않음", async () => {
+  for (const failure of ["signed-out", "origin", "id"] as const) {
+    const f = setup();
+    if (failure === "signed-out") f.personal.state.signedIn = false;
+    const response = await ops.PATCH(
+      request(
+        "/api/ops?workspace=PERSONAL",
+        "PATCH",
+        {
+          resource: "schedules",
+          id: failure === "id" ? "invalid-id" : rowId,
+          value: { title: "콘텐츠" },
+        },
+        failure === "origin"
+          ? "https://other.invalid"
+          : "http://dashboard.test",
+      ),
+    );
+    assert.equal(
+      response.status,
+      failure === "signed-out" ? 401 : failure === "origin" ? 403 : 400,
+    );
+    assert.equal(
+      f.personal.queries.some((query) => query.value),
+      false,
+    );
+    assert.deepEqual(f.company.queries, []);
+  }
+});
