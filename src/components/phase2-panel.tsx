@@ -10,6 +10,8 @@ import { scheduleOverlaps, type OpsData, type OpsRow } from "@/lib/ops";
 import { metricKeys, personalTemplates } from "@/lib/personal-content";
 import { needsPersonalContentType } from "@/lib/personal-content-form";
 import { recurrenceStatus, runStates } from "@/lib/workflow";
+import { usePathname } from "next/navigation";
+import { workspaceApiPath, workspaceFromPathname } from "@/lib/workspace-api";
 type Field = {
   key: string;
   label: string;
@@ -108,7 +110,7 @@ function local(value: unknown) {
     .slice(0, 16);
 }
 async function request(method: string, body?: unknown) {
-  const res = await fetch("/api/phase2?workspace=PERSONAL", {
+  const res = await fetch(workspaceApiPath("/api/phase2"), {
     method,
     signal: method === "GET" ? AbortSignal.timeout(20000) : undefined,
     cache: "no-store",
@@ -135,6 +137,8 @@ type Phase2PanelProps = {
   initialContentId?: string;
 };
 export function Phase2Panel(props: Phase2PanelProps) {
+  const workspace = workspaceFromPathname(usePathname());
+  if (workspace === "FRENGLE" && props.resource !== "recurrence") return null;
   return props.resource === "leave" ? (
     <LeavePanel enabled={props.enabled} />
   ) : (
@@ -151,6 +155,7 @@ function Phase2ResourcePanel({
   onOpenTask,
   initialContentId,
 }: Phase2PanelProps) {
+  const workspace = workspaceFromPathname(usePathname());
   const [data, setData] = useState<OpsData>({}),
     [ready, setReady] = useState(false),
     [loading, setLoading] = useState(true),
@@ -203,7 +208,7 @@ function Phase2ResourcePanel({
       setVersions(r.versions || []);
       setContentTasks(r.contentTasks || []);
       if (resource === "recurrence") {
-        const response = await fetch("/api/workflow?workspace=PERSONAL", {
+        const response = await fetch(workspaceApiPath("/api/workflow"), {
           cache: "no-store",
         });
         const workflow = await response.json();
@@ -312,7 +317,7 @@ function Phase2ResourcePanel({
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/workflow?workspace=PERSONAL", {
+      const response = await fetch(workspaceApiPath("/api/workflow"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -344,7 +349,7 @@ function Phase2ResourcePanel({
               ? "PERSONAL 전용 · 업무 캘린더와 공유 보고서에 포함하지 않습니다."
               : resource === "recurrence"
                 ? "일·주·월·연 반복 · 월·연은 추가 SQL 적용 후 사용"
-                : "PERSONAL에서 직접 등록한 자료"}
+                : `${workspace}에서 직접 등록한 자료`}
           </p>
         </div>
         <button
@@ -359,7 +364,7 @@ function Phase2ResourcePanel({
           {labels[resource]} 등록
         </button>
       </div>
-      {!enabled ? <p>개인 로그인과 PERSONAL 선택이 필요합니다.</p> : null}
+      {!enabled ? <p>{workspace} 로그인과 저장소 연결이 필요합니다.</p> : null}
       {enabled && loading ? (
         <p role="status">운영 DB에서 불러오는 중…</p>
       ) : null}

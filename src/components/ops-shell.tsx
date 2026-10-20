@@ -7,10 +7,12 @@ import {
   type FormEvent,
 } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { OpsDialog } from "./ops-dialog";
 import { OpsFormActions } from "./ops-form-actions";
 import { DesktopDownload } from "./desktop-download";
 import { AppRecoveryControls } from "./app-recovery-controls";
+import { workspaceApiPath, type ApiWorkspace } from "@/lib/workspace-api";
 import { occurrences } from "@/lib/phase2";
 import { Phase2Panel } from "./phase2-panel";
 import { AnalyticsPanel } from "./analytics-panel";
@@ -86,7 +88,6 @@ import {
   type Resource,
 } from "@/lib/ops";
 import { statusLabels, type Status } from "@/lib/domain";
-type Space = "ALL" | "PERSONAL" | "FRENGLE";
 const menus = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
@@ -158,7 +159,7 @@ function localDateTime(v: unknown) {
   return parts.replace(" ", "T");
 }
 async function api(path: string, method = "GET", body?: unknown) {
-  const r = await fetch(path, {
+  const r = await fetch(workspaceApiPath(path), {
     method,
     signal: method === "GET" ? AbortSignal.timeout(20000) : undefined,
     cache: "no-store",
@@ -174,9 +175,14 @@ async function api(path: string, method = "GET", body?: unknown) {
     );
   return data;
 }
-export function OpsShell() {
+export function OpsShell({
+  workspace = "PERSONAL",
+}: {
+  workspace?: ApiWorkspace;
+}) {
+  const router = useRouter();
+  const space = workspace;
   const [view, setView] = useState("overview"),
-    [space, setSpace] = useState<Space>("ALL"),
     [data, setData] = useState<OpsData>({}),
     [user, setUser] = useState<{ email?: string } | null>(null),
     [configured, setConfigured] = useState<boolean | null>(null);
@@ -194,12 +200,7 @@ export function OpsShell() {
   const [automationResults, setAutomationResults] = useState<OpsRow[]>([]);
   const [automationReady, setAutomationReady] = useState(false);
   useEffect(() => {
-    if (
-      !user ||
-      space === "FRENGLE" ||
-      !["overview", "automations"].includes(view)
-    )
-      return;
+    if (!user || !["overview", "automations"].includes(view)) return;
     let mounted = true;
     const interval = setInterval(async () => {
       if (document.visibilityState !== "visible") return;
@@ -258,7 +259,18 @@ export function OpsShell() {
     backgroundBusy.current = busy;
   }, [busy]);
   const pendingTimer = useRef<{ key: string; requestId: string } | null>(null);
-  const rows = (name: string) => (space === "FRENGLE" ? [] : data[name] || []);
+  const clearAccountData = useCallback(() => {
+    generation.current++;
+    setData({});
+    setDataReady(false);
+    setWorkflowData({});
+    setWorkflowReady(false);
+    setWorkflowChecked(false);
+    setTimerGuardReady(false);
+    setAutomationResults([]);
+    setAutomationReady(false);
+  }, []);
+  const rows = (name: string) => data[name] || [];
   const tasks = rows("tasks"),
     projects = rows("projects"),
     notes = rows("task_notes"),
@@ -284,7 +296,6 @@ export function OpsShell() {
     Boolean(user) &&
     authState === "AUTHENTICATED" &&
     configured === true &&
-    space !== "FRENGLE" &&
     dataReady &&
     !busy &&
     !loading;
@@ -345,6 +356,13 @@ export function OpsShell() {
   useEffect(() => {
     let mounted = true;
     const params = new URLSearchParams(window.location.search);
+    const requestedView = params.get("view");
+    if (
+      requestedView &&
+      menus.some((menu) => menu.id === requestedView) &&
+      (workspace === "PERSONAL" || requestedView !== "personal-sheets")
+    )
+      queueMicrotask(() => setView(requestedView));
     const linkedDay = params.get("date") || "";
     const parsedDay = Date.parse(`${linkedDay}T00:00:00Z`);
     if (
@@ -355,7 +373,6 @@ export function OpsShell() {
     ) {
       queueMicrotask(() => {
         if (!mounted) return;
-        setSpace("PERSONAL");
         setView("calendar");
         setCalendarView("day");
         setDay(linkedDay);
@@ -387,7 +404,7 @@ export function OpsShell() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
       generation.current++;
     };
-  }, []);
+  }, [workspace]);
   useEffect(() => {
     if (
       !linkedSchedule ||
@@ -395,7 +412,6 @@ export function OpsShell() {
       loading ||
       !user ||
       authState !== "AUTHENTICATED" ||
-      space !== "PERSONAL" ||
       view !== "calendar"
     )
       return;
@@ -434,7 +450,10 @@ export function OpsShell() {
           try {
             const session = await api("/api/session");
             setAuthState(session.user ? "AUTHENTICATED" : "UNAUTHENTICATED");
-            if (session.user?.email !== user?.email) setUser(session.user);
+            if (session.user?.email !== user?.email) {
+              clearAccountData();
+              setUser(session.user);
+            }
             if (session.user) await load();
             else {
               setData({});
@@ -465,7 +484,7 @@ export function OpsShell() {
         clearInterval(refresh);
       };
     }
-  }, [user, load]);
+  }, [user, load, clearAccountData]);
   const mutate = useCallback(
     async (body: unknown, method = "POST") => {
       setBusy(true);
@@ -553,9 +572,10 @@ export function OpsShell() {
         password: f.get("password"),
       });
       const session = await api("/api/session");
+      clearAccountData();
       setUser(session.user);
       setAuthState(session.user ? "AUTHENTICATED" : "UNAUTHENTICATED");
-      setNotice("개인 계정 로그인 완료");
+      setNotice(`${space} 계정 로그인 완료`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "로그인 실패");
     } finally {
@@ -565,20 +585,15 @@ export function OpsShell() {
   async function logout() {
     setBusy(true);
     try {
-      await disconnectThisDevicePush().catch(() => undefined);
+      if (space === "PERSONAL")
+        await disconnectThisDevicePush().catch(() => undefined);
       await api("/api/auth", "POST", { action: "logout" });
-      generation.current++;
+      clearAccountData();
       setUser(null);
       setCalendarDetail(null);
       setLinkedSchedule(null);
       setAuthState("UNAUTHENTICATED");
-      setData({});
-      setWorkflowData({});
-      setWorkflowReady(false);
-      setTimerGuardReady(false);
       pendingTimer.current = null;
-      setWorkflowChecked(false);
-      setDataReady(false);
       setCaptureOpen(false);
       setParkOpen(null);
       setSummary(null);
@@ -804,7 +819,7 @@ export function OpsShell() {
     [calendarKey],
   );
   useEffect(() => {
-    if (!user || space === "FRENGLE" || view !== "overview") return;
+    if (!user || view !== "overview") return;
     const controller = new AbortController();
     let requestSequence = 0;
     let activeRequest: AbortController | null = null;
@@ -814,14 +829,17 @@ export function OpsShell() {
       const requestController = new AbortController();
       activeRequest = requestController;
       try {
-        const response = await fetch("/api/phase2?workspace=PERSONAL", {
-          cache: "no-store",
-          signal: AbortSignal.any([
-            controller.signal,
-            requestController.signal,
-            AbortSignal.timeout(20000),
-          ]),
-        });
+        const response = await fetch(
+          workspaceApiPath("/api/phase2?workspace=PERSONAL"),
+          {
+            cache: "no-store",
+            signal: AbortSignal.any([
+              controller.signal,
+              requestController.signal,
+              AbortSignal.timeout(20000),
+            ]),
+          },
+        );
         const result = await response.json();
         if (!response.ok)
           throw new Error(
@@ -878,9 +896,7 @@ export function OpsShell() {
     };
   }, [calendarKey, user, space, view]);
   const extra =
-    calendarExtra.key === calendarKey && user && space !== "FRENGLE"
-      ? calendarExtra.data
-      : {};
+    calendarExtra.key === calendarKey && user ? calendarExtra.data : {};
   const calendarAnchor = view === "overview" ? today : day;
   const recurrenceFrom =
     view === "overview"
@@ -893,7 +909,7 @@ export function OpsShell() {
           .toISOString()
           .slice(0, 10);
   const journalRows = journalEntries(
-    space === "FRENGLE" ? {} : data,
+    data,
     day,
     tick + offset,
     excludeJournalTests,
@@ -962,7 +978,10 @@ export function OpsShell() {
   return (
     <div className="editorial">
       <aside className="ops-sidebar">
-        <Link href="/" className="ops-brand">
+        <Link
+          href={space === "FRENGLE" ? "/frengle" : "/"}
+          className="ops-brand"
+        >
           <Command size={24} />
           MY OPS <small>OS / 01</small>
         </Link>
@@ -981,7 +1000,7 @@ export function OpsShell() {
           ))}
         </nav>
         <div className="ops-user">
-          <strong>PERSONAL 전용</strong>
+          <strong>{space} 전용</strong>
           <small>
             {user?.email ||
               (authState === "INITIALIZING" ? "MY OPS 시작 중" : "로그인 전")}
@@ -1006,18 +1025,20 @@ export function OpsShell() {
                 value={space}
                 disabled={busy}
                 onChange={(e) => {
-                  setSpace(e.target.value as Space);
-                  setLinkedSchedule(null);
-                  setCalendarDetail(null);
-                  if (
-                    view === "personal-sheets" &&
-                    e.target.value !== "PERSONAL"
-                  )
-                    setView("overview");
-                  setDetail(null);
+                  const next =
+                    e.target.value === "FRENGLE" ? "FRENGLE" : "PERSONAL";
+                  if (next === space) return;
+                  const nextView =
+                    view === "personal-sheets" || view === "legacy-content"
+                      ? "overview"
+                      : view;
+                  const params = new URLSearchParams({ view: nextView });
+                  if (nextView === "calendar") params.set("date", day);
+                  router.push(
+                    `${next === "FRENGLE" ? "/frengle" : "/"}?${params}`,
+                  );
                 }}
               >
-                <option>ALL</option>
                 <option>PERSONAL</option>
                 <option>FRENGLE</option>
               </select>
@@ -1037,14 +1058,18 @@ export function OpsShell() {
           </div>
           <div className="ops-header-utilities" aria-label="앱 관리">
             {" "}
-            <DesktopDownload compact signedIn={Boolean(user)} />
+            {space === "PERSONAL" ? (
+              <DesktopDownload compact signedIn={Boolean(user)} />
+            ) : null}
             <AppRecoveryControls
               loading={loading || busy || authState === "INITIALIZING"}
               refresh={async () => {
                 const session = await api("/api/session").catch(() => null);
                 if (session) {
-                  if (session.user?.email !== user?.email)
+                  if (session.user?.email !== user?.email) {
+                    clearAccountData();
                     setUser(session.user);
+                  }
                   setConfigured(session.configured);
                 }
                 if (session?.user) {
@@ -1065,7 +1090,7 @@ export function OpsShell() {
                   setAuthState(session ? "UNAUTHENTICATED" : "ERROR");
                   throw new Error(
                     session
-                      ? "설정에서 개인 계정으로 로그인해 주세요."
+                      ? `설정에서 ${space} 계정으로 로그인해 주세요.`
                       : "인증 상태 조회 실패. 연결 후 다시 시도해 주세요.",
                   );
                 }
@@ -1078,23 +1103,21 @@ export function OpsShell() {
                 authState === "INITIALIZING"
                   ? "로그인 상태 확인 중"
                   : user
-                    ? "개인 계정 설정 열기"
-                    : "개인 계정 로그인 열기"
+                    ? `${space} 계정 설정 열기`
+                    : `${space} 계정 로그인 열기`
               }
               disabled={authState === "INITIALIZING"}
               onClick={() => move("settings")}
             >
-              {space === "FRENGLE"
-                ? "회사 저장소 미연결"
-                : authState === "INITIALIZING"
-                  ? "MY OPS 시작 중 · 인증 복원을 확인하고 있습니다."
-                  : authState === "ERROR"
-                    ? "연결 또는 인증 오류. 데이터 새로고침으로 다시 확인해 주세요."
-                    : configured === false
-                      ? "Supabase 미연결"
-                      : user
-                        ? "개인 계정 설정"
-                        : "개인 계정 로그인"}
+              {authState === "INITIALIZING"
+                ? "MY OPS 시작 중 · 인증 복원을 확인하고 있습니다."
+                : authState === "ERROR"
+                  ? "연결 또는 인증 오류. 데이터 새로고침으로 다시 확인해 주세요."
+                  : configured === false
+                    ? "Supabase 미연결"
+                    : user
+                      ? `${space} 계정 설정`
+                      : `${space} 계정 로그인`}
             </button>
           </div>
         </header>
@@ -1116,17 +1139,17 @@ export function OpsShell() {
               <p>
                 {view === "overview"
                   ? "오늘의 흐름을 정리하고, 중요한 일에 집중하세요."
-                  : "개인 데이터만 저장 · Asia/Seoul"}
+                  : `${space === "PERSONAL" ? "개인" : "회사"} 데이터만 저장 · Asia/Seoul`}
               </p>
             </div>
             <span>{today}</span>
           </div>
           {view === "inbox" ? (
             <WorkflowInbox
-              items={space === "FRENGLE" ? [] : workflowData.inbox || []}
+              items={workflowData.inbox || []}
               projects={projects}
-              ready={workflowReady && space !== "FRENGLE"}
-              enabled={Boolean(user) && space !== "FRENGLE"}
+              ready={workflowReady}
+              enabled={Boolean(user)}
               busy={busy}
               error={error}
               open={captureOpen}
@@ -1144,35 +1167,25 @@ export function OpsShell() {
           <div className="ops-connection">
             <strong>
               {space === "FRENGLE"
-                ? "FRENGLE · 회사 전용 포털"
-                : space === "ALL"
-                  ? "ALL · 현재 연결 가능한 PERSONAL 데이터만 표시합니다."
-                  : "PERSONAL · 개인 프로젝트 전용"}
+                ? "FRENGLE · 회사 업무 전용"
+                : "PERSONAL · 개인 프로젝트 전용"}
             </strong>
             <p>
-              {space === "FRENGLE"
-                ? "회사 자동화 데이터는 별도 저장소와 회사 전용 포털에서 확인하세요."
-                : configured === false
-                  ? "환경변수가 없습니다. 샘플 데이터와 임의의 통계를 표시하지 않습니다."
-                  : user
-                    ? "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 자동화 데이터에는 수신된 결과를 표시합니다."
-                    : "설정에서 개인 계정으로 로그인하세요. 로그인 전에는 실제 데이터를 표시하지 않습니다."}
+              {configured === false
+                ? "환경변수가 없습니다. 샘플 데이터와 임의의 통계를 표시하지 않습니다."
+                : user
+                  ? "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 자동화 데이터에는 수신된 결과를 표시합니다."
+                  : `설정에서 ${space} 계정으로 로그인하세요. 로그인 전에는 실제 데이터를 표시하지 않습니다.`}
             </p>
-            {user && dataReady && space !== "FRENGLE" && !timerGuardReady ? (
+            {user && dataReady && !timerGuardReady ? (
               <p role="status">
                 타이머 보호 연결 확인이 필요합니다. SQL010 적용 후 설정에서 DB
                 새로고침해 주세요.
               </p>
             ) : null}
-            {space === "FRENGLE" ? (
-              <Link href="/frengle">
-                회사 포털 열기 <ArrowUpRight size={14} />
-              </Link>
-            ) : (
-              <button onClick={() => move("settings")}>
-                설정 <ArrowUpRight size={14} />
-              </button>
-            )}
+            <button onClick={() => move("settings")}>
+              설정 <ArrowUpRight size={14} />
+            </button>
           </div>
           {error ? (
             <p className="ops-alert bad" role="alert">
@@ -1230,9 +1243,7 @@ export function OpsShell() {
                   const contents = (
                     <>
                       <small>{label}</small>
-                      <strong>
-                        {user && space !== "FRENGLE" && !error ? value : "—"}
-                      </strong>
+                      <strong>{user && !error ? value : "—"}</strong>
                       {label === "자동화 데이터" ? (
                         <span>
                           수신 결과 확인 <ArrowUpRight size={14} />
@@ -1240,7 +1251,7 @@ export function OpsShell() {
                       ) : null}
                       <p>
                         {label === "자동화 데이터"
-                          ? "오늘 수신한 Metricool 결과 · 최근 100건 기준"
+                          ? `오늘 수신한 ${space === "PERSONAL" ? "Metricool" : "회사 자동화"} 결과 · 최근 100건 기준`
                           : label === "오늘 완료"
                             ? `${today} · 오늘 완료한 업무`
                             : `${today} · 오늘 등록 또는 마감인 업무`}
@@ -1290,7 +1301,6 @@ export function OpsShell() {
                   create("schedules", "일정 등록", { scheduleDate: today }),
                 )}
                 {user &&
-                space !== "FRENGLE" &&
                 (calendarExtra.key !== calendarKey || !calendarExtra.ready) ? (
                   <p className="ops-week-notice" role="status">
                     {calendarExtra.key === calendarKey && calendarExtra.error
@@ -1403,9 +1413,10 @@ export function OpsShell() {
                 </div>
               </section>
               <AutomationResultsPanel
+                workspace={space}
                 results={automationResults}
                 ready={automationReady}
-                enabled={Boolean(user) && space !== "FRENGLE"}
+                enabled={Boolean(user)}
                 compact
                 onViewAll={() => move("automations")}
                 refresh={() => void load()}
@@ -1809,24 +1820,26 @@ export function OpsShell() {
                 >
                   <ChevronRight size={16} />
                 </button>
-                <label className="ops-calendar-category-filter">
-                  일정 분류
-                  <select
-                    value={calendarCategoryFilter}
-                    onChange={(event) =>
-                      setCalendarCategoryFilter(
-                        event.target.value as ScheduleCategory | "all",
-                      )
-                    }
-                  >
-                    <option value="all">전체</option>
-                    {scheduleCategories.map((category) => (
-                      <option value={category} key={category}>
-                        {scheduleCategoryLabels[category]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {space === "PERSONAL" ? (
+                  <label className="ops-calendar-category-filter">
+                    일정 분류
+                    <select
+                      value={calendarCategoryFilter}
+                      onChange={(event) =>
+                        setCalendarCategoryFilter(
+                          event.target.value as ScheduleCategory | "all",
+                        )
+                      }
+                    >
+                      <option value="all">전체</option>
+                      {scheduleCategories.map((category) => (
+                        <option value={category} key={category}>
+                          {scheduleCategoryLabels[category]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 {space === "PERSONAL" ? (
                   <a className="ops-yoga-settings-link" href="#yoga-reminder">
                     운동 알림 <ArrowUpRight size={13} />
@@ -1988,12 +2001,10 @@ export function OpsShell() {
                   space +
                   day
                 }
-                data={space === "FRENGLE" ? {} : data}
+                data={data}
                 day={day}
                 now={tick + offset}
-                enabled={
-                  Boolean(user) && !loading && !error && space !== "FRENGLE"
-                }
+                enabled={Boolean(user) && !loading && !error}
               />
               <div className="ops-toolbar">
                 <button
@@ -2076,11 +2087,7 @@ export function OpsShell() {
                     ))}
                 </div>
               ))}
-              {!loading &&
-              !error &&
-              user &&
-              space !== "FRENGLE" &&
-              !journalRows.length ? (
+              {!loading && !error && user && !journalRows.length ? (
                 <Empty label="선택 날짜와 필터에 해당하는 작업 기록이 없습니다." />
               ) : null}
             </section>
@@ -2089,7 +2096,7 @@ export function OpsShell() {
             <section className="ops-card">
               {heads(
                 "Library",
-                "원문 보존 · PERSONAL 자료만 저장",
+                `원문 보존 · ${space} 자료만 저장`,
                 libTab === "inspiration"
                   ? undefined
                   : create(
@@ -2104,15 +2111,19 @@ export function OpsShell() {
                     ["prompt", "Prompt"],
                     ["skill", "Skills"],
                     ["inspiration", "Inspiration"],
-                  ].map(([id, label]) => (
-                    <button
-                      key={id}
-                      onClick={() => setLibTab(id)}
-                      className={libTab === id ? "active" : ""}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  ]
+                    .filter(
+                      ([id]) => space === "PERSONAL" || id !== "inspiration",
+                    )
+                    .map(([id, label]) => (
+                      <button
+                        key={id}
+                        onClick={() => setLibTab(id)}
+                        className={libTab === id ? "active" : ""}
+                      >
+                        {label}
+                      </button>
+                    ))}
                 </div>
                 <input
                   aria-label="라이브러리 검색"
@@ -2125,7 +2136,7 @@ export function OpsShell() {
                 <Phase2Panel
                   key={"inspiration:" + (user?.email || "signed-out") + space}
                   resource="inspiration"
-                  enabled={Boolean(user) && space !== "FRENGLE"}
+                  enabled={Boolean(user)}
                   projects={projects}
                   day={day}
                 />
@@ -2265,13 +2276,14 @@ export function OpsShell() {
           ) : null}
           {["automations"].includes(view) ? (
             <AutomationResultsPanel
-              results={space === "FRENGLE" ? [] : automationResults}
-              ready={Boolean(user) && space !== "FRENGLE" && automationReady}
-              enabled={Boolean(user) && space !== "FRENGLE"}
+              workspace={space}
+              results={automationResults}
+              ready={Boolean(user) && automationReady}
+              enabled={Boolean(user)}
               refresh={() => void load()}
             />
           ) : null}
-          {view === "legacy-content" ? (
+          {view === "legacy-content" && space === "PERSONAL" ? (
             <Phase2Panel
               key={"content:" + (user?.email || "signed-out") + space}
               resource="content"
@@ -2282,7 +2294,7 @@ export function OpsShell() {
                 setTab("Overview");
                 setView("projects");
               }}
-              enabled={Boolean(user) && space !== "FRENGLE"}
+              enabled={Boolean(user)}
               projects={projects}
               day={day}
             />
@@ -2302,20 +2314,22 @@ export function OpsShell() {
               <AnalyticsPanel
                 taskClassification={taskClassification}
                 taskProcessReady={taskProcessReady}
-                data={space === "FRENGLE" ? {} : data}
-                enabled={Boolean(user) && !error && space !== "FRENGLE"}
+                data={data}
+                enabled={Boolean(user) && !error}
                 now={tick + offset}
                 day={day}
               />
-              <ContentAnalyticsPanel
-                key={
-                  "content-analytics:" + (user?.email || "signed-out") + space
-                }
-                enabled={Boolean(user) && space !== "FRENGLE"}
-                projects={projects}
-                day={day}
-                now={tick + offset}
-              />
+              {space === "PERSONAL" ? (
+                <ContentAnalyticsPanel
+                  key={
+                    "content-analytics:" + (user?.email || "signed-out") + space
+                  }
+                  enabled={Boolean(user)}
+                  projects={projects}
+                  day={day}
+                  now={tick + offset}
+                />
+              ) : null}
             </>
           ) : null}
           {view === "calendar" && space === "PERSONAL" ? (
@@ -2335,7 +2349,7 @@ export function OpsShell() {
               key={"recurrence:" + (user?.email || "signed-out") + space}
               onCalendarData={receiveCalendarData}
               resource="recurrence"
-              enabled={Boolean(user) && space !== "FRENGLE"}
+              enabled={Boolean(user)}
               projects={projects}
               day={day}
               calendarView={calendarView}
@@ -2344,7 +2358,7 @@ export function OpsShell() {
           {view === "settings" ? (
             <div className="ops-two">
               <section className="ops-card">
-                {heads("PERSONAL 연결", "Supabase Auth + PostgreSQL")}
+                {heads(`${space} 연결`, "Supabase Auth + PostgreSQL")}
                 <div className="ops-detail">
                   <p>
                     환경변수:{" "}
@@ -2371,7 +2385,7 @@ export function OpsShell() {
                   ) : !user ? (
                     <form className="ops-form" onSubmit={login}>
                       <label>
-                        개인 계정 이메일
+                        {space} 계정 이메일
                         <input
                           name="email"
                           type="email"
@@ -2403,13 +2417,13 @@ export function OpsShell() {
                         DB 새로고침
                       </button>
                       <button type="button" disabled={busy} onClick={logout}>
-                        개인 계정 로그아웃
+                        {space} 계정 로그아웃
                       </button>
                     </>
                   )}
                   <p>
-                    공개 회원가입은 제공하지 않습니다. Supabase에서 개인 계정을
-                    준비해 주세요.
+                    공개 회원가입은 제공하지 않습니다. {space} 저장소의 계정을
+                    사용해 주세요.
                   </p>
                 </div>
               </section>
@@ -2420,18 +2434,24 @@ export function OpsShell() {
                 )}
                 <div className="ops-detail">
                   <p>
-                    모두 미연결입니다. 일반 채팅 기록은 자동 수집하지 않습니다.
+                    {space} 저장소에 전달된 자동화 결과는 Automations에서
+                    확인하세요.
                   </p>
-                  <p>회사 Daily Report·자동 업로드는 후속 단계입니다.</p>
-                  <a href="/demo">별도 테스트 데모 열기</a>
+                  <p>
+                    워크스페이스를 바꾸면 해당 저장소의 계정과 데이터로 새로
+                    엽니다.
+                  </p>
+                  <button onClick={() => move("automations")}>
+                    자동화 데이터 보기
+                  </button>
                 </div>
               </section>
             </div>
           ) : null}
-          {view === "settings" ? (
+          {view === "settings" && space === "PERSONAL" ? (
             <DesktopDownload signedIn={Boolean(user)} />
           ) : null}
-          {view === "settings" ? (
+          {view === "settings" && space === "PERSONAL" ? (
             <Phase2Panel
               key={"leave:" + (user?.email || "signed-out") + space}
               resource="leave"
@@ -2773,6 +2793,7 @@ export function OpsShell() {
       ) : null}
       {editor ? (
         <ResourceEditor
+          workspace={space}
           scheduleCategoryReady={scheduleCategoryReady}
           taskTestClassification={taskTestClassification}
           taskProcessReady={taskProcessReady}
@@ -2890,8 +2911,8 @@ export function OpsShell() {
               />
             </label>
             <p>
-              선택한 PERSONAL 업무의 메모에 저장합니다. 타이머 종료 요약이나
-              작업 시간을 변경하지 않습니다.
+              선택한 {space} 업무의 메모에 저장합니다. 타이머 종료 요약이나 작업
+              시간을 변경하지 않습니다.
             </p>
             {error ? (
               <p role="alert" className="ops-alert bad">
@@ -3007,6 +3028,7 @@ function Empty({ label }: { label: string }) {
   );
 }
 function ResourceEditor({
+  workspace,
   scheduleCategoryReady,
   taskTestClassification,
   taskProcessReady,
@@ -3019,6 +3041,7 @@ function ResourceEditor({
   close,
   save,
 }: {
+  workspace: ApiWorkspace;
   scheduleCategoryReady: boolean;
   taskTestClassification: boolean;
   taskProcessReady: boolean;
@@ -3351,30 +3374,34 @@ function ResourceEditor({
         ) : null}
         {resource === "schedules" ? (
           <>
-            <label>
-              일정 분류
-              <select
-                name="category"
-                aria-label="일정 분류"
-                value={scheduleCategory}
-                disabled={!scheduleCategoryReady}
-                onChange={(event) =>
-                  setScheduleCategory(event.target.value as ScheduleCategory)
-                }
-              >
-                {scheduleCategories.map((category) => (
-                  <option value={category} key={category}>
-                    {scheduleCategoryLabels[category]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {!scheduleCategoryReady ? (
+            {workspace === "PERSONAL" ? (
+              <label>
+                일정 분류
+                <select
+                  name="category"
+                  aria-label="일정 분류"
+                  value={scheduleCategory}
+                  disabled={!scheduleCategoryReady}
+                  onChange={(event) =>
+                    setScheduleCategory(event.target.value as ScheduleCategory)
+                  }
+                >
+                  {scheduleCategories.map((category) => (
+                    <option value={category} key={category}>
+                      {scheduleCategoryLabels[category]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {workspace === "PERSONAL" && !scheduleCategoryReady ? (
               <p className="ops-schedule-form-hint">
                 일정 분류 연결을 확인해 주세요. 기본 일정은 저장할 수 있습니다.
               </p>
             ) : null}
-            {scheduleCategoryReady && scheduleCategory === "exercise" ? (
+            {workspace === "PERSONAL" &&
+            scheduleCategoryReady &&
+            scheduleCategory === "exercise" ? (
               <>
                 <label>
                   요가·운동 영상 URL (선택)

@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { contentStages, contentSummary } from "@/lib/content-analytics";
 import type { OpsRow } from "@/lib/ops";
 import { isVerificationRecord } from "@/lib/content-analytics";
+import { workspaceApiPath, workspaceFromPathname } from "@/lib/workspace-api";
+import { usePathname } from "next/navigation";
 
 export function ContentAnalyticsPanel({
   enabled,
@@ -15,6 +17,7 @@ export function ContentAnalyticsPanel({
   day: string;
   now: number;
 }) {
+  const workspace = workspaceFromPathname(usePathname());
   const [result, setResult] = useState<{
     rows: OpsRow[];
     truncated: boolean;
@@ -27,11 +30,11 @@ export function ContentAnalyticsPanel({
   const [project, setProject] = useState("all");
   const [date, setDate] = useState(day);
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || workspace === "FRENGLE") return;
     const controller = new AbortController();
     async function load() {
       try {
-        const response = await fetch("/api/phase2?workspace=PERSONAL", {
+        const response = await fetch(workspaceApiPath("/api/phase2"), {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -40,8 +43,8 @@ export function ContentAnalyticsPanel({
           throw new Error(body.error || "콘텐츠 조회에 실패했습니다.");
         if (!controller.signal.aborted) {
           setResult({
-            rows: body.data.content,
-            truncated: body.truncated.includes("content"),
+            rows: body.data?.content || [],
+            truncated: (body.truncated || []).includes("content"),
           });
           setError("");
         }
@@ -58,7 +61,8 @@ export function ContentAnalyticsPanel({
     }
     void load();
     return () => controller.abort();
-  }, [enabled, revision]);
+  }, [enabled, revision, workspace]);
+  if (workspace === "FRENGLE") return null;
   const rows = enabled ? result?.rows || [] : [];
   const summary = contentSummary(rows, {
     day: date,

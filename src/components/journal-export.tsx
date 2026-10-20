@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { journalReport } from "@/lib/journal-report";
 import type { OpsData } from "@/lib/ops";
+import { usePathname } from "next/navigation";
+import { workspaceFromPathname } from "@/lib/workspace-api";
 
 export function JournalExport({
   data,
@@ -18,6 +20,8 @@ export function JournalExport({
   excludeTests: boolean;
   onExcludeTests: (value: boolean) => void;
 }) {
+  const workspace = workspaceFromPathname(usePathname());
+  const scopeLabel = workspace === "FRENGLE" ? "회사" : "개인";
   const [preview, setPreview] = useState<{
     day: string;
     text: string;
@@ -29,7 +33,7 @@ export function JournalExport({
       aria-labelledby="journal-export-heading"
     >
       <div className="ops-journal-export-heading">
-        <h3 id="journal-export-heading">PERSONAL 일지 요약·내보내기</h3>
+        <h3 id="journal-export-heading">{workspace} 일지 요약·내보내기</h3>
         <p>
           선택 날짜의 실제 작업 구간으로 미리보기를 생성합니다. 외부 전송 없이
           Markdown 파일로 저장합니다.
@@ -54,12 +58,12 @@ export function JournalExport({
           onClick={() => {
             setPreview({
               day,
-              text: journalReport(data, day, now, excludeTests).text,
+              text: journalReport(data, day, now, excludeTests, workspace).text,
             });
             setNotice("");
           }}
         >
-          개인 일지 미리보기 생성
+          {scopeLabel} 일지 미리보기 생성
         </button>
         <button
           type="button"
@@ -71,7 +75,7 @@ export function JournalExport({
             );
             const link = document.createElement("a");
             link.href = url;
-            link.download = `MY-OPS-PERSONAL-${preview.day}.md`;
+            link.download = `MY-OPS-${workspace}-${preview.day}.md`;
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -79,20 +83,15 @@ export function JournalExport({
             setNotice("미리보기 내용의 파일 다운로드를 요청했습니다.");
           }}
         >
-          개인 일지 Markdown 저장
+          {scopeLabel} 일지 Markdown 저장
         </button>
       </div>
-      {!enabled ? (
-        <p>
-          PERSONAL 로그인과 DB 조회 완료가 필요합니다. 회사 보고서는
-          미연결입니다.
-        </p>
-      ) : null}
+      {!enabled ? <p>{workspace} 로그인과 DB 조회 완료가 필요합니다.</p> : null}
       {preview && preview.day === day ? (
         <label className="ops-journal-preview">
           <span>내보낼 내용 (생성 시점의 기록)</span>
           <textarea
-            aria-label="개인 일지 내보내기 미리보기"
+            aria-label={`${scopeLabel} 일지 내보내기 미리보기`}
             readOnly
             value={preview.text}
             rows={12}

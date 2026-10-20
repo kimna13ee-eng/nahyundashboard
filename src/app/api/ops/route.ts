@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
 import { json, sameOrigin } from "@/lib/http";
-import { personalClient, personalConfigured } from "@/lib/supabase/server";
+import {
+  workspaceSession,
+  WorkspaceAccessError,
+} from "@/lib/workspaces/server";
 import { parseResource, resources, uuid, type Resource } from "@/lib/ops";
 import { parseTimerRequest, timerRpcFailure } from "@/lib/timer-request";
 const tables: Record<string, string> = {
@@ -17,30 +20,12 @@ const tables: Record<string, string> = {
   prompt_versions: "ops_prompt_versions",
 };
 async function handle(req: NextRequest) {
-  if (
-    !["PERSONAL", "ALL"].includes(
-      req.nextUrl.searchParams.get("workspace") || "",
-    )
-  )
-    return json(
-      {
-        error:
-          "FRENGLE 실제 저장소는 미연결입니다. 개인 DB에 회사 자료를 저장하지 않습니다.",
-      },
-      403,
-    );
   if (req.method !== "GET" && !sameOrigin(req))
     return json({ error: "허용되지 않은 요청입니다." }, 403);
-  if (!personalConfigured())
-    return json({ error: "PERSONAL 환경변수가 필요합니다." }, 503);
   try {
-    const client = await personalClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await client.auth.getUser();
-    if (authError || !user)
-      return json({ error: "개인 계정 로그인이 필요합니다." }, 401);
+    const { client, user, workspace } = await workspaceSession(
+      req.nextUrl.searchParams,
+    );
     if (req.method === "GET") {
       const serverNow = new Date().toISOString();
       const [results, deletedSchedules] = await Promise.all([
@@ -70,7 +55,7 @@ async function handle(req: NextRequest) {
         return json(
           {
             error:
-              "DB 조회에 실패했습니다. SQL012 설치 상태와 조회 권한을 확인해 주세요.",
+              "업무 저장소를 조회하지 못했습니다. 연결과 조회 권한을 확인해 주세요.",
           },
           503,
         );
@@ -115,7 +100,8 @@ async function handle(req: NextRequest) {
             ? ["deleted_schedules"]
             : []),
         ],
-        companyConnected: false,
+        workspace,
+        companyConnected: workspace === "FRENGLE",
       });
     }
     const body = await req.json();
@@ -218,6 +204,8 @@ async function handle(req: NextRequest) {
         ? json({ row: data }, req.method === "POST" ? 201 : 200)
         : json({ error: "항목을 찾을 수 없습니다." }, 404);
   } catch (e) {
+    if (e instanceof WorkspaceAccessError)
+      return json({ error: e.message }, e.status);
     return json(
       {
         error:

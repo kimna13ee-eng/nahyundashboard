@@ -3,6 +3,8 @@ import { taskCategorySeconds } from "@/lib/work-kind";
 import { taskCategories, taskCategoryLabels } from "@/lib/task-process";
 import { isVerificationRecord } from "@/lib/content-analytics";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { workspaceFromPathname } from "@/lib/workspace-api";
 import {
   intervalSeconds,
   intervalSecondsForDay,
@@ -22,6 +24,7 @@ export function AnalyticsPanel({
   now: number;
   day: string;
 }) {
+  const workspace = workspaceFromPathname(usePathname());
   const [excludeTests, setExcludeTests] = useState(true);
   const [date, setDate] = useState(day);
   const tasks = (data.tasks || []).filter(
@@ -49,7 +52,9 @@ export function AnalyticsPanel({
   return (
     <section className="ops-card">
       <h2>Analytics</h2>
-      <p>실제 PERSONAL 작업 구간 기준 · 선택 날짜 {date}</p>
+      <p>
+        실제 {workspace} 작업 구간 기준 · 선택 날짜 {date}
+      </p>
       <div className="ops-analytics-toolbar">
         <label>
           기준 날짜

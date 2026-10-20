@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
 import { json, sameOrigin } from "@/lib/http";
-import { personalClient, personalConfigured } from "@/lib/supabase/server";
+import {
+  workspaceSession,
+  WorkspaceAccessError,
+} from "@/lib/workspaces/server";
 import { uuid, seoulDate } from "@/lib/ops";
 import {
   parseCapture,
@@ -15,22 +18,12 @@ const tables = {
   runs: "ops_recurrence_runs",
 };
 async function handle(req: NextRequest) {
-  if (
-    !["PERSONAL", "ALL"].includes(
-      req.nextUrl.searchParams.get("workspace") || "",
-    )
-  )
-    return json({ error: "FRENGLE 미연결" }, 403);
   if (req.method !== "GET" && !sameOrigin(req))
     return json({ error: "허용되지 않은 요청" }, 403);
-  if (!personalConfigured()) return json({ error: "PERSONAL 연결 필요" }, 503);
   try {
-    const client = await personalClient();
-    const {
-      data: { user },
-      error,
-    } = await client.auth.getUser();
-    if (error || !user) return json({ error: "개인 계정 로그인 필요" }, 401);
+    const { client, user, workspace } = await workspaceSession(
+      req.nextUrl.searchParams,
+    );
     if (req.method === "GET") {
       const results = await Promise.all(
         Object.entries(tables).map(async ([key, table]) => ({
@@ -48,10 +41,11 @@ async function handle(req: NextRequest) {
           ready: false,
           data: {},
           error:
-            "업무 흐름 SQL007 미적용 또는 조회 실패. 기존 기능은 계속 사용할 수 있습니다.",
+            "업무 흐름 저장소를 조회하지 못했습니다. 연결과 권한을 확인해 주세요.",
         });
       return json({
         ready: true,
+        workspace,
         data: Object.fromEntries(results.map((r) => [r.key, r.data])),
         truncated: results
           .filter((r) => (r.count || 0) > 1000)
@@ -63,7 +57,7 @@ async function handle(req: NextRequest) {
     if (b.action === "capture") {
       if (!["inbox", "task", "now", "schedule", "archive"].includes(b.mode))
         return json({ error: "수집 동작 확인 필요" }, 400);
-      const value = parseCapture(b.value);
+      const value = parseCapture(b.value, workspace);
       if (b.mode === "now") {
         const guard = await client.rpc("ops_timer_guard_ready");
         if (guard.error || guard.data !== true)
@@ -117,7 +111,7 @@ async function handle(req: NextRequest) {
         : json({ ok: true });
     }
     if (b.action === "inbox_update") {
-      const value = parseCapture(b.value);
+      const value = parseCapture(b.value, workspace);
       const r = await client
         .from(tables.inbox)
         .update(value)
@@ -211,6 +205,8 @@ async function handle(req: NextRequest) {
     }
     return json({ error: "지원하지 않는 동작" }, 400);
   } catch (e) {
+    if (e instanceof WorkspaceAccessError)
+      return json({ error: e.message }, e.status);
     return json(
       {
         error:

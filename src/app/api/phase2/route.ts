@@ -1,45 +1,39 @@
 import { NextRequest } from "next/server";
 import { json, sameOrigin } from "@/lib/http";
-import { personalClient, personalConfigured } from "@/lib/supabase/server";
+import {
+  workspaceSession,
+  WorkspaceAccessError,
+} from "@/lib/workspaces/server";
+import { workspaceAllowsPhase2 } from "@/lib/workspace-access";
 import { phase2Tables, parsePhase2, type Phase2Resource } from "@/lib/phase2";
 import { uuid } from "@/lib/ops";
 import { personalStages } from "@/lib/personal-content";
 async function handle(req: NextRequest) {
-  if (
-    !["PERSONAL", "ALL"].includes(
-      req.nextUrl.searchParams.get("workspace") || "",
-    )
-  )
-    return json({ error: "FRENGLE 저장소는 미연결입니다." }, 403);
   if (req.method !== "GET" && !sameOrigin(req))
     return json({ error: "허용되지 않은 요청입니다." }, 403);
-  if (!personalConfigured())
-    return json({ error: "PERSONAL 연결이 필요합니다." }, 503);
   try {
-    const client = await personalClient();
-    const {
-      data: { user },
-      error,
-    } = await client.auth.getUser();
-    if (error || !user)
-      return json({ error: "개인 계정 로그인이 필요합니다." }, 401);
+    const { client, user, workspace } = await workspaceSession(
+      req.nextUrl.searchParams,
+    );
     if (req.method === "GET") {
       const results = await Promise.all(
-        Object.entries(phase2Tables).map(async ([name, table]) => {
-          const result = await client
-            .from(table)
-            .select("*", { count: "exact" })
-            .eq("owner_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1000);
-          return { name, ...result };
-        }),
+        Object.entries(phase2Tables)
+          .filter(([name]) => workspaceAllowsPhase2(workspace, name))
+          .map(async ([name, table]) => {
+            const result = await client
+              .from(table)
+              .select("*", { count: "exact" })
+              .eq("owner_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1000);
+            return { name, ...result };
+          }),
       );
       if (results.some((r) => r.error))
         return json(
           {
             error:
-              "Phase 2 DB 조회 실패. 003 SQL 적용 여부와 권한을 확인해 주세요.",
+              "일정 저장소를 조회하지 못했습니다. 연결과 권한을 확인해 주세요.",
             migrationRequired: results.some(
               (r) => r.error?.code === "PGRST205" || r.error?.code === "42P01",
             ),
@@ -53,35 +47,48 @@ async function handle(req: NextRequest) {
         p_index: 1,
       });
       return json({
+        workspace,
         recurrenceArchive: !(
           await client.from("ops_recurrence").select("archived_at").limit(0)
         ).error,
-        contentHistory: !(
-          await client.from("ops_content_versions").select("id").limit(0)
-        ).error,
+        contentHistory:
+          workspace === "PERSONAL" &&
+          !(await client.from("ops_content_versions").select("id").limit(0))
+            .error,
         versions:
-          (
-            await client
-              .from("ops_content_versions")
-              .select("*")
-              .eq("owner_id", user.id)
-              .order("created_at", { ascending: false })
-              .limit(1000)
-          ).data || [],
+          workspace === "PERSONAL"
+            ? (
+                await client
+                  .from("ops_content_versions")
+                  .select("*")
+                  .eq("owner_id", user.id)
+                  .order("created_at", { ascending: false })
+                  .limit(1000)
+              ).data || []
+            : [],
         contentTasks:
-          (
-            await client
-              .from("ops_content_tasks")
-              .select("*")
-              .eq("owner_id", user.id)
-              .order("created_at", { ascending: false })
-              .limit(1000)
-          ).data || [],
-        personalContent: !(
-          await client.from("ops_content").select("personal_details").limit(0)
-        ).error,
+          workspace === "PERSONAL"
+            ? (
+                await client
+                  .from("ops_content_tasks")
+                  .select("*")
+                  .eq("owner_id", user.id)
+                  .order("created_at", { ascending: false })
+                  .limit(1000)
+              ).data || []
+            : [],
+        personalContent:
+          workspace === "PERSONAL" &&
+          !(
+            await client.from("ops_content").select("personal_details").limit(0)
+          ).error,
         calendarRecurrence: !capability.error,
-        data: Object.fromEntries(results.map((r) => [r.name, r.data])),
+        data: {
+          content: [],
+          inspiration: [],
+          leave: [],
+          ...Object.fromEntries(results.map((r) => [r.name, r.data])),
+        },
         truncated: results
           .filter((r) => (r.count || 0) > 1000)
           .map((r) => r.name),
@@ -114,6 +121,8 @@ async function handle(req: NextRequest) {
           : json({ error: "반복 일정을 찾을 수 없습니다." }, 404);
     }
     if (body.action === "content_task") {
+      if (workspace !== "PERSONAL")
+        return json({ error: "개인 콘텐츠는 PERSONAL에서 관리합니다." }, 403);
       if (!uuid(body.id) || !personalStages.includes(body.step))
         return json({ error: "콘텐츠·단계 확인 필요" }, 400);
       const result = await client.rpc("ops_content_task", {
@@ -162,6 +171,8 @@ async function handle(req: NextRequest) {
       body.resource === "exceptions"
     )
       return json({ error: "지원하지 않는 항목입니다." }, 400);
+    if (!workspaceAllowsPhase2(workspace, body.resource))
+      return json({ error: "이 항목은 PERSONAL에서 관리합니다." }, 403);
     const resource = body.resource as Phase2Resource;
     if (req.method !== "POST" && !uuid(body.id))
       return json({ error: "ID를 확인해 주세요." }, 400);
@@ -211,6 +222,8 @@ async function handle(req: NextRequest) {
         ? json({ row: result.data }, req.method === "POST" ? 201 : 200)
         : json({ error: "항목을 찾을 수 없습니다." }, 404);
   } catch (e) {
+    if (e instanceof WorkspaceAccessError)
+      return json({ error: e.message }, e.status);
     return json(
       {
         error:

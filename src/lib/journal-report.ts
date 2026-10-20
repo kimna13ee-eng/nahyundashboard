@@ -1,5 +1,6 @@
 import { intervalSecondsForDay, type OpsData } from "./ops.ts";
 import { isVerificationRecord } from "./content-analytics.ts";
+import type { ApiWorkspace } from "./workspace-api.ts";
 
 export function journalEntries(
   data: OpsData,
@@ -32,17 +33,18 @@ export function journalReport(
   day: string,
   now: number,
   excludeTests: boolean,
+  workspace: ApiWorkspace = "PERSONAL",
 ) {
   const entries = journalEntries(data, day, now, excludeTests);
   const total = entries.reduce((n, e) => n + e.seconds, 0);
   const lines = [
-    "# PERSONAL 작업 일지",
+    `# ${workspace} 작업 일지`,
     "",
     `날짜: ${day} (Asia/Seoul)`,
     `선택 날짜 작업 시간: ${(total / 60).toFixed(1)}분 · 작업 세션: ${entries.length}개`,
     `테스트 업무: ${excludeTests ? "제외" : "포함"} (미지정은 기존 제목 기준)`,
     "",
-    "조회된 PERSONAL 기록의 수동 요약입니다. 진행 중 구간은 생성 시각까지 계산합니다. 조회 제한이 있으면 전체 기록이 아닙니다.",
+    `조회된 ${workspace} 기록의 수동 요약입니다. 진행 중 구간은 생성 시각까지 계산합니다. 조회 제한이 있으면 전체 기록이 아닙니다.`,
     "",
   ];
   for (const e of entries) {

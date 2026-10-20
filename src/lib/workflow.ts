@@ -1,4 +1,5 @@
 import { containsSecret, uuid, type OpsRow } from "./ops.ts";
+import type { DataWorkspace } from "./workspace-access.ts";
 export const contactStates = {
   none: "해당 없음",
   planned: "연락 예정",
@@ -38,11 +39,12 @@ export function timestamp(value: unknown) {
     throw new Error("시각과 타임존을 확인해 주세요.");
   return new Date(value).toISOString();
 }
-export function parseCapture(raw: Record<string, unknown>) {
-  if (raw.workspace !== "PERSONAL")
-    throw new Error(
-      "FRENGLE 저장소는 미연결입니다. 개인 저장소에 회사 자료를 저장하지 않습니다.",
-    );
+export function parseCapture(
+  raw: Record<string, unknown>,
+  expectedWorkspace: DataWorkspace = "PERSONAL",
+) {
+  if (raw.workspace !== expectedWorkspace)
+    throw new Error("현재 워크스페이스와 저장 위치를 확인해 주세요.");
   if (raw.project_id && !uuid(raw.project_id))
     throw new Error("프로젝트 연결을 확인해 주세요.");
   return {

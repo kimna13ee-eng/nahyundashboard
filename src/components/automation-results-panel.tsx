@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
 import type { OpsRow } from "@/lib/ops";
 import {
@@ -93,6 +92,7 @@ export function AutomationResultsPanel({
   loading = false,
   compact = false,
   onViewAll,
+  workspace = "PERSONAL",
 }: {
   results: OpsRow[];
   ready: boolean;
@@ -101,9 +101,10 @@ export function AutomationResultsPanel({
   loading?: boolean;
   compact?: boolean;
   onViewAll?: () => void;
+  workspace?: AutomationWorkspace;
 }) {
   const rows =
-    enabled && ready ? automationReceiptRows(results, "PERSONAL") : [];
+    enabled && ready ? automationReceiptRows(results, workspace) : [];
   return (
     <section
       className={`ops-card ops-automation-results${compact ? " compact" : ""}`}
@@ -112,7 +113,9 @@ export function AutomationResultsPanel({
         <div>
           <h2>{compact ? "최근 자동화 결과" : "자동화 데이터"}</h2>
           <p>
-            PERSONAL · Metricool 데이터 확인{" "}
+            {workspace === "PERSONAL"
+              ? "PERSONAL · Metricool 데이터 확인"
+              : "FRENGLE · 출근 업무 · 키워드 순찰 · 사이트 소재"}{" "}
             {enabled && ready ? `· ${rows.length}건 수신` : ""}
           </p>
         </div>
@@ -134,7 +137,8 @@ export function AutomationResultsPanel({
       </div>
       {!enabled ? (
         <p className="ops-automation-state" role="status">
-          PERSONAL 계정으로 로그인하면 개인 자동화 결과를 볼 수 있습니다.
+          {workspace} 계정으로 로그인하면 이 공간의 자동화 결과를 볼 수
+          있습니다.
         </p>
       ) : loading && !ready ? (
         <p className="ops-automation-state" role="status">
@@ -147,13 +151,13 @@ export function AutomationResultsPanel({
         </p>
       ) : !rows.length ? (
         <p className="ops-automation-state">
-          아직 수신한 Metricool 결과가 없습니다. ChatGPT에서 결과가 전달되면
-          여기에 표시됩니다.
+          아직 수신한 {workspace === "PERSONAL" ? "Metricool" : "회사 자동화"}{" "}
+          결과가 없습니다. ChatGPT에서 결과가 전달되면 여기에 표시됩니다.
         </p>
       ) : (
         <AutomationReceiptList
           results={rows}
-          workspace="PERSONAL"
+          workspace={workspace}
           limit={compact ? 3 : undefined}
         />
       )}
@@ -161,15 +165,6 @@ export function AutomationResultsPanel({
         저장된 결과만 표시합니다. 수신 내역이 없다고 예약 작업이 실패한 것은
         아닙니다.
       </p>
-      <aside className="ops-automation-company">
-        <div>
-          <h3>FRENGLE 자동화 결과</h3>
-          <p>출근 업무 체크 · 키워드 검색 · 사이트 소재 추천</p>
-        </div>
-        <Link href="/frengle">
-          회사 결과 보기 <ArrowUpRight size={14} aria-hidden="true" />
-        </Link>
-      </aside>
     </section>
   );
 }

@@ -3,6 +3,8 @@ import { useState } from "react";
 import { OpsDialog } from "./ops-dialog";
 import { OpsFormActions } from "./ops-form-actions";
 import type { OpsRow } from "@/lib/ops";
+import { usePathname } from "next/navigation";
+import { workspaceFromPathname } from "@/lib/workspace-api";
 export function ParkFields() {
   return (
     <fieldset>
@@ -72,6 +74,7 @@ export function WorkflowInbox({
   onOpenTask?: (id: string) => void;
   canStart?: boolean;
 }) {
+  const workspace = workspaceFromPathname(usePathname());
   const [editor, setEditor] = useState<OpsRow | null>(null),
     [filter, setFilter] = useState("inbox"),
     [requestId, setRequestId] = useState<string | undefined>(undefined);
@@ -89,8 +92,8 @@ export function WorkflowInbox({
           <div>
             <h2>Quick Inbox</h2>
             <p>
-              PERSONAL · 미분류 아이디어와 돌발 업무. 등록만 하면 현재 타이머를
-              유지합니다.
+              {workspace} · 미분류 아이디어와 돌발 업무. 등록만 하면 현재
+              타이머를 유지합니다.
             </p>
           </div>
           <button
@@ -106,7 +109,7 @@ export function WorkflowInbox({
         {checking ? (
           <p role="status">저장소 연결을 확인하고 있습니다.</p>
         ) : !enabled ? (
-          <p role="status">연결된 PERSONAL 계정에서 사용할 수 있습니다.</p>
+          <p role="status">연결된 {workspace} 계정에서 사용할 수 있습니다.</p>
         ) : !ready ? (
           <p role="status">
             SQL007 적용 또는 연결 확인이 필요합니다. 기존 업무 등록은
@@ -160,7 +163,7 @@ export function WorkflowInbox({
                         action: "capture",
                         id: i.id,
                         mode: "archive",
-                        value: { ...i, workspace: "PERSONAL" },
+                        value: { ...i, workspace },
                       })
                     }
                   >
@@ -201,6 +204,7 @@ export function WorkflowInbox({
                 mode = submitter?.value || "inbox";
               const value = {
                 ...Object.fromEntries(f),
+                workspace,
                 schedule_at: f.get("schedule_at")
                   ? `${f.get("schedule_at")}:00+09:00`
                   : null,
@@ -235,11 +239,8 @@ export function WorkflowInbox({
               </label>
               <label>
                 워크스페이스
-                <select name="workspace" defaultValue="PERSONAL">
-                  <option value="PERSONAL">PERSONAL</option>
-                  <option value="FRENGLE" disabled>
-                    FRENGLE · 회사 저장소 미연결
-                  </option>
+                <select name="workspace" value={workspace} disabled>
+                  <option value={workspace}>{workspace}</option>
                 </select>
               </label>
               <label>
