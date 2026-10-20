@@ -1,5 +1,20 @@
-.editorial .ops-overview-today > .ops-section-head > .ops-primary {
-  flex-shrink: 0;
+.editorial .ops-overview-today > .ops-section-head {
+  flex-wrap: wrap;
+}
+.editorial .ops-overview-today > .ops-section-head > div:first-child {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.editorial .ops-overview-create-actions {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+}
+.editorial .ops-overview-create-actions > button {
+  flex: none;
   white-space: nowrap;
 }
 

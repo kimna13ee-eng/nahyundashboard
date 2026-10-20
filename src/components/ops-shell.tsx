@@ -1341,7 +1341,14 @@ export function OpsShell({
                 {heads(
                   "오늘 할 일",
                   `${today} · 미완료 프로세스와 진행 중 업무는 매일 표시 · 그 외 오늘 등록·마감 기준`,
-                  create("projects", "프로젝트 등록"),
+                  <div
+                    className="ops-overview-create-actions"
+                    role="group"
+                    aria-label="오늘 할 일 등록"
+                  >
+                    {create("tasks", "업무 등록", { dueDate: today })}
+                    {create("projects", "프로젝트 등록")}
+                  </div>,
                 )}
                 {taskList(todayTasks.pending)}
               </section>
