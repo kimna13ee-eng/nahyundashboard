@@ -76,3 +76,28 @@ Revision ce9b21d's original three-tab integration was manually deployed and
 verified 2026-10-19. The existing owner's source binding was verified again on
 2026-10-20, so this expansion needs no database migration or source reseeding.
 The 17-tab application expansion requires a new Render deployment.
+
+PERSONAL Overview also reads the existing performance tab as its first content
+panel, ahead of the work metrics and task lists. FRENGLE does not mount or fetch
+this panel. It uses the same authenticated source binding and read-only route;
+no additional database setup or source-sheet edits are required.
+
+The Overview performance score and totals use published Reels only. Repeated observations of the same
+content use the latest observation, and missing metrics remain missing rather
+than becoming zero. Reactions are likes + comments + saves + shares, only where
+all four values are present. A partial source response is labelled as partial.
+The score gives views, likes, comments, saves and shares equal 20% weights.
+Each value is divided by that metric's maximum among the current complete
+observations, then the five ratios are summed on a 100-point scale. A metric
+whose maximum is zero contributes zero points. Posts missing any of the five
+counts are excluded from both the score baseline and average. The headline
+score is the mean of the unrounded post scores, displayed to one decimal.
+This compares the user's recorded Reels against their own metric records;
+new records, changed observations or a partial response can change the baseline.
+
+The graph defaults to each post's score on a fixed 0–100 axis and also offers
+the six original count metrics. It shows the latest 12 posts in publication order with a selectable
+metric; its detail view retains the post's real numbers and source link.
+Sheet refresh time and metric observation date are separate. This view refreshes
+the values recorded in the sheet; it does not claim to query live Instagram
+statistics. The Content Studio shortcut opens the performance tab directly.

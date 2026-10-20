@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { ArrowUpRight, RefreshCw, Search } from "lucide-react";
 import { OpsDialog } from "./ops-dialog";
 import {
@@ -399,8 +405,14 @@ function SheetView({ tab }: { tab: SheetDefinition }) {
   );
 }
 
-export function PersonalSheetsPanel({ enabled }: { enabled: boolean }) {
-  const [tabId, setTabId] = useState<PersonalSheetTab>("planning");
+export function PersonalSheetsPanel({
+  enabled,
+  initialTab = "planning",
+}: {
+  enabled: boolean;
+  initialTab?: PersonalSheetTab;
+}) {
+  const [tabId, setTabId] = useState<PersonalSheetTab>(initialTab);
   const tab = sheetTabs.find((item) => item.id === tabId)!;
   const group = personalSheetGroups.find((item) => item.id === tab.group)!;
   return (
