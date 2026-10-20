@@ -1,10 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 test("업무 테스트 구분은 boolean/null만 허용하고 미전송 값은 보존", () => {
-  const value = { title: "QA 일반 업무", notes: "", due_date: null, status: "pending", priority: "normal" };
+  const value = {
+    title: "QA 일반 업무",
+    notes: "",
+    due_date: null,
+    status: "pending",
+    priority: "normal",
+  };
   for (const is_test of [true, false, null])
     assert.equal(
-      (parseResource("tasks", { ...value, is_test }) as Record<string, unknown>).is_test,
+      (parseResource("tasks", { ...value, is_test }) as Record<string, unknown>)
+        .is_test,
       is_test,
     );
   assert.equal(Object.hasOwn(parseResource("tasks", value), "is_test"), false);
@@ -134,6 +141,7 @@ test("일정의 timezone과 유효한 시간 범위", () => {
     starts_at: "2026-10-10T09:00:00+09:00",
     ends_at: "2026-10-10T10:00:00+09:00",
   });
+  assert.ok("starts_at" in value);
   assert.equal(value.starts_at, "2026-10-10T00:00:00.000Z");
   assert.throws(() =>
     parseResource("schedules", {

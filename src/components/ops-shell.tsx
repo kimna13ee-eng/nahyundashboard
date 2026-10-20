@@ -16,6 +16,10 @@ import { Phase2Panel } from "./phase2-panel";
 import { AnalyticsPanel } from "./analytics-panel";
 import { ContentAnalyticsPanel } from "./content-analytics-panel";
 import { PersonalSheetsPanel } from "./personal-sheets-panel";
+import {
+  YogaReminderPanel,
+  disconnectThisDevicePush,
+} from "./yoga-reminder-panel";
 import { journalEntries } from "@/lib/journal-report";
 import {
   dailyTaskGroups,
@@ -43,11 +47,15 @@ import {
   scheduleRangeError,
 } from "@/lib/schedule-form";
 import {
+  scheduleCategories,
+  scheduleCategoryLabels,
+} from "@/lib/schedule-category";
+import "@/app/schedule-category.css";
+import {
   LayoutDashboard,
   CalendarDays,
   FolderKanban,
   Workflow,
-  PanelsTopLeft,
   FileSpreadsheet,
   NotebookPen,
   Library,
@@ -72,6 +80,7 @@ import {
   longRunningInterval,
   scheduleOverlaps,
   seoulDate,
+  uuid,
   type OpsRow,
   type OpsData,
   type Resource,
@@ -83,8 +92,7 @@ const menus = [
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "automations", label: "Automations", icon: Workflow },
-  { id: "content", label: "Content Studio", icon: PanelsTopLeft },
-  { id: "personal-sheets", label: "내 SNS 스튜디오", icon: FileSpreadsheet },
+  { id: "personal-sheets", label: "Content Studio", icon: FileSpreadsheet },
   { id: "journal", label: "Work Journal", icon: NotebookPen },
   { id: "library", label: "Library", icon: Library },
   { id: "analytics", label: "Analytics", icon: ChartNoAxesCombined },
@@ -99,6 +107,23 @@ type Editor = {
   scheduleDate?: string;
 };
 const text = (v: unknown) => String(v ?? "");
+type ScheduleCategory = (typeof scheduleCategories)[number];
+function calendarCategory(row: OpsRow): ScheduleCategory {
+  if (row.source === "업무 마감" || text(row.source).startsWith("콘텐츠"))
+    return "work";
+  const value = text(row.category) as ScheduleCategory;
+  return scheduleCategories.includes(value) ? value : "other";
+}
+function scheduleVideoLink(value: unknown) {
+  try {
+    const url = new URL(text(value));
+    return url.protocol === "https:" && !url.username && !url.password
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
 function dateTime(v: unknown) {
   return v
     ? new Intl.DateTimeFormat("ko-KR", {
@@ -159,11 +184,13 @@ export function OpsShell() {
     "INITIALIZING" | "AUTHENTICATED" | "UNAUTHENTICATED" | "ERROR"
   >("INITIALIZING");
   const [calendarDetail, setCalendarDetail] = useState<OpsRow | null>(null);
+  const [linkedSchedule, setLinkedSchedule] = useState<string | null>(null);
   const noteWrites = useRef(new Set<string>());
   const startSubmit = useRef(false);
   const [contentFocus, setContentFocus] = useState<string | undefined>();
   const [taskClassification, setTaskClassification] = useState(false);
   const [taskProcessReady, setTaskProcessReady] = useState(false);
+  const [scheduleCategoryReady, setScheduleCategoryReady] = useState(false);
   const [automationResults, setAutomationResults] = useState<OpsRow[]>([]);
   const [automationReady, setAutomationReady] = useState(false);
   useEffect(() => {
@@ -212,6 +239,9 @@ export function OpsShell() {
     [search, setSearch] = useState(""),
     [libTab, setLibTab] = useState("prompt"),
     [calendarView, setCalendarView] = useState("month"),
+    [calendarCategoryFilter, setCalendarCategoryFilter] = useState<
+      ScheduleCategory | "all"
+    >("all"),
     [day, setDay] = useState(seoulDate()),
     [tick, setTick] = useState(() => Date.now()),
     [offset, setOffset] = useState(0),
@@ -290,6 +320,7 @@ export function OpsShell() {
       setWorkflowData(workflow.data || {});
       setTaskClassification(result.taskClassification === true);
       setTaskProcessReady(result.taskProcessReady === true);
+      setScheduleCategoryReady(result.scheduleCategoryReady === true);
       setTaskTestClassification(result.taskTestClassification === true);
       setLibraryWorkflow(result.libraryWorkflow === true);
       setOffset(Date.parse(result.serverNow) - Date.now());
@@ -313,6 +344,25 @@ export function OpsShell() {
   }, []);
   useEffect(() => {
     let mounted = true;
+    const params = new URLSearchParams(window.location.search);
+    const linkedDay = params.get("date") || "";
+    const parsedDay = Date.parse(`${linkedDay}T00:00:00Z`);
+    if (
+      params.get("view") === "calendar" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(linkedDay) &&
+      Number.isFinite(parsedDay) &&
+      new Date(parsedDay).toISOString().slice(0, 10) === linkedDay
+    ) {
+      queueMicrotask(() => {
+        if (!mounted) return;
+        setSpace("PERSONAL");
+        setView("calendar");
+        setCalendarView("day");
+        setDay(linkedDay);
+        const scheduleId = params.get("schedule");
+        if (uuid(scheduleId)) setLinkedSchedule(scheduleId);
+      });
+    }
     api("/api/session")
       .then((s) => {
         if (mounted) {
@@ -338,6 +388,32 @@ export function OpsShell() {
       generation.current++;
     };
   }, []);
+  useEffect(() => {
+    if (
+      !linkedSchedule ||
+      !dataReady ||
+      loading ||
+      !user ||
+      authState !== "AUTHENTICATED" ||
+      space !== "PERSONAL" ||
+      view !== "calendar"
+    )
+      return;
+    let mounted = true;
+    const linked = (data.schedules || []).find(
+      (item) => item.id === linkedSchedule,
+    );
+    queueMicrotask(() => {
+      if (!mounted) return;
+      if (linked) setCalendarDetail({ ...linked, source: "일정" });
+      else
+        setNotice("해당 일정이 삭제되었거나 현재 계정에서 조회되지 않습니다.");
+      setLinkedSchedule(null);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [linkedSchedule, dataReady, loading, user, authState, data, space, view]);
   useEffect(() => {
     if (user) {
       queueMicrotask(() => {
@@ -489,9 +565,12 @@ export function OpsShell() {
   async function logout() {
     setBusy(true);
     try {
+      await disconnectThisDevicePush().catch(() => undefined);
       await api("/api/auth", "POST", { action: "logout" });
       generation.current++;
       setUser(null);
+      setCalendarDetail(null);
+      setLinkedSchedule(null);
       setAuthState("UNAUTHENTICATED");
       setData({});
       setWorkflowData({});
@@ -511,6 +590,7 @@ export function OpsShell() {
     }
   }
   function move(id: string) {
+    setLinkedSchedule(null);
     setContentFocus(undefined);
     setView(id);
     setDetail(null);
@@ -520,7 +600,10 @@ export function OpsShell() {
   const visibleMenus = menus.filter(
     (menu) => menu.id !== "personal-sheets" || space === "PERSONAL",
   );
-  const title = menus.find((m) => m.id === view)?.label || "Overview";
+  const title =
+    view === "legacy-content"
+      ? "기존 콘텐츠 기록"
+      : menus.find((m) => m.id === view)?.label || "Overview";
   const taskActions = (t: OpsRow, showRecord = true) => (
     <div className="ops-actions">
       <button
@@ -844,6 +927,11 @@ export function OpsShell() {
   ];
   const calendarItems = allCalendarItems
     .filter(inRange)
+    .filter(
+      (item) =>
+        calendarCategoryFilter === "all" ||
+        calendarCategory(item) === calendarCategoryFilter,
+    )
     .sort((a, b) => text(a.starts_at).localeCompare(text(b.starts_at)));
   const weeklyItems = weeklyScheduleRows(allCalendarItems, today);
   function openWeeklyItem(item: OpsRow) {
@@ -919,6 +1007,8 @@ export function OpsShell() {
                 disabled={busy}
                 onChange={(e) => {
                   setSpace(e.target.value as Space);
+                  setLinkedSchedule(null);
+                  setCalendarDetail(null);
                   if (
                     view === "personal-sheets" &&
                     e.target.value !== "PERSONAL"
@@ -1258,6 +1348,16 @@ export function OpsShell() {
                                     {text(item.title)}
                                   </button>
                                   <small>{text(item.source)}</small>
+                                  <span
+                                    className="ops-schedule-category-badge"
+                                    data-category={calendarCategory(item)}
+                                  >
+                                    {
+                                      scheduleCategoryLabels[
+                                        calendarCategory(item)
+                                      ]
+                                    }
+                                  </span>
                                   {item.source === "일정" ? (
                                     <button
                                       className="ops-week-trash ops-danger"
@@ -1701,6 +1801,29 @@ export function OpsShell() {
                 >
                   <ChevronRight size={16} />
                 </button>
+                <label className="ops-calendar-category-filter">
+                  일정 분류
+                  <select
+                    value={calendarCategoryFilter}
+                    onChange={(event) =>
+                      setCalendarCategoryFilter(
+                        event.target.value as ScheduleCategory | "all",
+                      )
+                    }
+                  >
+                    <option value="all">전체</option>
+                    {scheduleCategories.map((category) => (
+                      <option value={category} key={category}>
+                        {scheduleCategoryLabels[category]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {space === "PERSONAL" ? (
+                  <a className="ops-yoga-settings-link" href="#yoga-reminder">
+                    운동 알림 <ArrowUpRight size={13} />
+                  </a>
+                ) : null}
               </div>
               {calendarView === "month" ? (
                 <div className="ops-month">
@@ -1758,6 +1881,12 @@ export function OpsShell() {
                                 >
                                   {calendarTitle(s)}
                                 </span>
+                                <small
+                                  className="ops-schedule-category-badge"
+                                  data-category={calendarCategory(s)}
+                                >
+                                  {scheduleCategoryLabels[calendarCategory(s)]}
+                                </small>
                               </button>
                             ))}
                         </div>
@@ -1779,6 +1908,12 @@ export function OpsShell() {
                       </span>
                     </button>
                     <small>
+                      <span
+                        className="ops-schedule-category-badge"
+                        data-category={calendarCategory(s)}
+                      >
+                        {scheduleCategoryLabels[calendarCategory(s)]}
+                      </span>{" "}
                       {text(s.source)} · {dateTime(s.starts_at)} –{" "}
                       {dateTime(s.ends_at)}
                     </small>
@@ -2128,7 +2263,7 @@ export function OpsShell() {
               refresh={() => void load()}
             />
           ) : null}
-          {view === "content" ? (
+          {view === "legacy-content" ? (
             <Phase2Panel
               key={"content:" + (user?.email || "signed-out") + space}
               resource="content"
@@ -2174,6 +2309,18 @@ export function OpsShell() {
                 now={tick + offset}
               />
             </>
+          ) : null}
+          {view === "calendar" && space === "PERSONAL" ? (
+            <div id="yoga-reminder">
+              <YogaReminderPanel
+                key={`push:${user?.email || "signed-out"}:${space}`}
+                enabled={
+                  Boolean(user) &&
+                  authState === "AUTHENTICATED" &&
+                  space === "PERSONAL"
+                }
+              />
+            </div>
           ) : null}
           {view === "calendar" ? (
             <Phase2Panel
@@ -2373,6 +2520,8 @@ export function OpsShell() {
           <dl className="ops-calendar-detail">
             <dt>분류</dt>
             <dd>{calendarLabel(calendarDetail)}</dd>
+            <dt>일정 분류</dt>
+            <dd>{scheduleCategoryLabels[calendarCategory(calendarDetail)]}</dd>
             <dt>일정 단계</dt>
             <dd>{text(calendarDetail.source)}</dd>
             <dt>시작 (서울 시간)</dt>
@@ -2389,6 +2538,21 @@ export function OpsShell() {
             </dd>
             <dt>메모</dt>
             <dd>{text(calendarDetail.notes) || "기록 없음"}</dd>
+            {calendarCategory(calendarDetail) === "exercise" &&
+            scheduleVideoLink(calendarDetail.video_url) ? (
+              <>
+                <dt>운동 영상</dt>
+                <dd>
+                  <a
+                    href={scheduleVideoLink(calendarDetail.video_url)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    운동 영상 열기 <ArrowUpRight size={14} />
+                  </a>
+                </dd>
+              </>
+            ) : null}
           </dl>
           <div className="ops-form-actions">
             <button type="button" data-dialog-close>
@@ -2404,7 +2568,7 @@ export function OpsShell() {
                   move("projects");
                   setDetail(id);
                 } else if (calendarDetail.content_id) {
-                  move("content");
+                  move("legacy-content");
                   setContentFocus(text(calendarDetail.content_id));
                 } else if (calendarDetail.source === "일정")
                   setEditor({ resource: "schedules", row: calendarDetail });
@@ -2601,6 +2765,7 @@ export function OpsShell() {
       ) : null}
       {editor ? (
         <ResourceEditor
+          scheduleCategoryReady={scheduleCategoryReady}
           taskTestClassification={taskTestClassification}
           taskProcessReady={taskProcessReady}
           libraryWorkflow={libraryWorkflow}
@@ -2834,6 +2999,7 @@ function Empty({ label }: { label: string }) {
   );
 }
 function ResourceEditor({
+  scheduleCategoryReady,
   taskTestClassification,
   taskProcessReady,
   libraryWorkflow,
@@ -2845,6 +3011,7 @@ function ResourceEditor({
   close,
   save,
 }: {
+  scheduleCategoryReady: boolean;
   taskTestClassification: boolean;
   taskProcessReady: boolean;
   libraryWorkflow: boolean;
@@ -2876,6 +3043,12 @@ function ResourceEditor({
     row.ends_at ? localDateTime(row.ends_at) : defaults.endsAt,
   );
   const [scheduleEndEdited, setScheduleEndEdited] = useState(Boolean(row.id));
+  const [scheduleCategory, setScheduleCategory] = useState<ScheduleCategory>(
+    scheduleCategories.includes(text(row.category) as ScheduleCategory)
+      ? (text(row.category) as ScheduleCategory)
+      : "other",
+  );
+  const [scheduleVideoUrl, setScheduleVideoUrl] = useState(text(row.video_url));
   const submitting = useRef(false);
   const scheduleError =
     resource === "schedules"
@@ -3170,6 +3343,52 @@ function ResourceEditor({
         ) : null}
         {resource === "schedules" ? (
           <>
+            <label>
+              일정 분류
+              <select
+                name="category"
+                aria-label="일정 분류"
+                value={scheduleCategory}
+                disabled={!scheduleCategoryReady}
+                onChange={(event) =>
+                  setScheduleCategory(event.target.value as ScheduleCategory)
+                }
+              >
+                {scheduleCategories.map((category) => (
+                  <option value={category} key={category}>
+                    {scheduleCategoryLabels[category]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {!scheduleCategoryReady ? (
+              <p className="ops-schedule-form-hint">
+                일정 분류 연결을 확인해 주세요. 기본 일정은 저장할 수 있습니다.
+              </p>
+            ) : null}
+            {scheduleCategoryReady && scheduleCategory === "exercise" ? (
+              <>
+                <label>
+                  요가·운동 영상 URL (선택)
+                  <input
+                    name="video_url"
+                    type="url"
+                    pattern="https://.+"
+                    inputMode="url"
+                    maxLength={2000}
+                    value={scheduleVideoUrl}
+                    onChange={(event) =>
+                      setScheduleVideoUrl(event.target.value)
+                    }
+                    placeholder="https://www.youtube.com/watch?v=..."
+                  />
+                </label>
+                <p className="ops-schedule-form-hint">
+                  이 일정 날짜의 밤 9시(한국시간) 알림에 사용할 영상입니다.
+                  iPhone에서는 홈 화면 앱의 ‘운동 알림’을 켜 주세요.
+                </p>
+              </>
+            ) : null}
             <label>
               시작 (서울 시간)
               <input

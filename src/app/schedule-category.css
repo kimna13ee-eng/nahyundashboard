@@ -1,0 +1,67 @@
+.editorial .ops-schedule-category-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 2px 6px;
+  border: 1px solid #e2dae9;
+  border-radius: 4px;
+  background: #f7f2fb;
+  color: #826b93;
+  font-size: 9px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.editorial .ops-schedule-category-badge[data-category="exercise"] {
+  border-color: #cce2d6;
+  background: #f0f7f3;
+  color: #658773;
+}
+.editorial .ops-schedule-category-badge[data-category="other"] {
+  border-color: #e4dfd8;
+  background: #f8f5f0;
+  color: #948471;
+}
+.editorial .ops-calendar-event > .ops-schedule-category-badge {
+  margin-top: 5px;
+}
+.editorial .ops-calendar-category-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #8e8297;
+  font-size: 11px;
+}
+.editorial .ops-calendar-category-filter select {
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #ded6e4;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+}
+.editorial .ops-yoga-settings-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 1px solid #ded6e4;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.editorial .ops-schedule-form-hint {
+  margin: 0;
+  color: #9889a2;
+  font-size: 11px;
+  line-height: 1.7;
+}
+#yoga-reminder {
+  scroll-margin-top: 20px;
+}
+@media (max-width: 640px) {
+  .editorial .ops-calendar-category-filter,
+  .editorial .ops-yoga-settings-link {
+    min-height: 44px;
+  }
+  .editorial .ops-calendar-category-filter select {
+    min-height: 44px;
+  }
+}

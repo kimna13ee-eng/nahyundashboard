@@ -1,5 +1,11 @@
 import { parseTask } from "./domain.ts";
 import { parseTaskCategory, parseProcessSteps } from "./task-process.ts";
+import {
+  parseScheduleCategory,
+  parseScheduleVideoUrl,
+} from "./schedule-category.ts";
+import { containsSecret } from "./secrets.ts";
+export { containsSecret } from "./secrets.ts";
 export type Resource =
   | "projects"
   | "tasks"
@@ -46,11 +52,6 @@ function choice(v: unknown, allowed: string[]) {
   if (typeof v !== "string" || !allowed.includes(v))
     throw new Error("선택 항목을 확인해 주세요.");
   return v;
-}
-export function containsSecret(s: string) {
-  return /(?:sk-(?:proj-|ant-)?[a-z0-9_-]{16,}|sb_secret_[a-z0-9_-]+|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|(?:api[_-]?key|password|비밀번호|secret|access[_-]?token)\s*[:=]\s*["']?[^\s"']{8,}|eyJ[a-zA-Z0-9_-]{15,}\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+)/i.test(
-    s,
-  );
 }
 export function parseResource(resource: Resource, raw: unknown) {
   if (!raw || typeof raw !== "object")
@@ -158,6 +159,12 @@ export function parseResource(resource: Resource, raw: unknown) {
       project_id: fk(v.project_id),
       notes: text(v.notes ?? "", 2000),
       timezone: "Asia/Seoul",
+      ...(v.category !== undefined
+        ? { category: parseScheduleCategory(v.category) }
+        : {}),
+      ...(v.video_url !== undefined
+        ? { video_url: parseScheduleVideoUrl(v.video_url) }
+        : {}),
     };
   }
   const kind = choice(v.kind, ["prompt", "skill"]),

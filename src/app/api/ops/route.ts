@@ -80,6 +80,12 @@ async function handle(req: NextRequest) {
         .limit(0);
       const guardCapability = await client.rpc("ops_timer_guard_ready");
       return json({
+        scheduleCategoryReady: !(
+          await client
+            .from("ops_schedules")
+            .select("category,video_url")
+            .limit(0)
+        ).error,
         taskProcessReady: !(
           await client
             .from("tasks")

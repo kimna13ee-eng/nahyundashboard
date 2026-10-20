@@ -373,11 +373,11 @@ export function PersonalSheetsPanel({ enabled }: { enabled: boolean }) {
   return (
     <section
       className="ops-card ops-personal-sheets"
-      aria-label="내 SNS 스튜디오"
+      aria-label="Content Studio"
     >
       <div className="ops-section-head">
         <div>
-          <h2>내 SNS 스튜디오</h2>
+          <h2>Content Studio</h2>
           <p>
             PERSONAL · 콘텐츠 제작과 운영, 캐릭터 가이드를 한곳에서 확인하세요.
           </p>

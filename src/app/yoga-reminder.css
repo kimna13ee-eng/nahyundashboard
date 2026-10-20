@@ -1,0 +1,66 @@
+.editorial .ops-yoga-reminder .ops-section-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.editorial .ops-push-status {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 1px solid #e0d9e5;
+  border-radius: 6px;
+  background: #faf7fc;
+  color: #9888a4;
+  font-size: 10px;
+}
+.editorial .ops-push-status.connected {
+  background: #f0f7f3;
+  border-color: #cee2d6;
+  color: #6c927a;
+}
+.editorial .ops-yoga-reminder-body {
+  display: grid;
+  gap: 14px;
+  padding: 0 var(--content-inset, 20px) 20px;
+}
+.editorial .ops-yoga-reminder-body > p {
+  margin: 0;
+  line-height: 1.8;
+  color: #96889e;
+  font-size: 12px;
+}
+.editorial .ops-yoga-reminder-body .ops-alert {
+  margin: 0;
+}
+.editorial .ops-push-info {
+  padding: 12px 14px;
+  border-radius: 7px;
+  background: #f7f4f9;
+  color: #9a86a8;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.editorial .ops-push-info ol {
+  margin: 9px 0 0;
+  padding-left: 20px;
+}
+.editorial .ops-push-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.editorial .ops-push-actions button {
+  padding: 8px 12px;
+}
+.editorial .ops-yoga-reminder-body > .ops-push-footnote {
+  color: #b0a3b8;
+  font-size: 10px;
+}
+@media (max-width: 640px) {
+  .editorial .ops-yoga-reminder .ops-section-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .editorial .ops-push-actions button {
+    min-height: 44px;
+  }
+}
