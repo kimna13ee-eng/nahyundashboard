@@ -22,7 +22,8 @@ import { YogaVideoFields } from "./yoga-video-fields";
 import { FrengleOverviewMemos } from "./frengle-overview-memos";
 import "./frengle-overview-layout.css";
 import "./personal-overview.css";
-import "./personal-jelly.css";
+import "./workspace-jelly.css";
+import "./frengle-jelly.css";
 import type { PersonalSheetTab } from "@/lib/personal-sheet-tabs";
 import {
   YogaReminderPanel,
@@ -84,7 +85,6 @@ import {
   Pause,
   Square,
   ArrowUpRight,
-  Command,
   Star,
   Copy,
   Trash2,
@@ -116,12 +116,30 @@ const menus = [
   { id: "analytics", label: "Analytics", icon: ChartNoAxesCombined },
   { id: "settings", label: "Settings", icon: Settings },
 ];
-const personalMenuChips: Record<string, { emoji: string; tone: string }> = {
+const workspaceMenuChips: Record<string, { emoji: string; tone: string }> = {
   overview: { emoji: "🎬", tone: "coral" },
   calendar: { emoji: "🗓️", tone: "mint" },
   "personal-sheets": { emoji: "✏️", tone: "lemon" },
   "yoga-planner": { emoji: "🧘", tone: "lavender" },
   settings: { emoji: "⚙️", tone: "sky" },
+  projects: { emoji: "🧩", tone: "lavender" },
+  automations: { emoji: "⚡", tone: "lemon" },
+  journal: { emoji: "📝", tone: "mint" },
+  library: { emoji: "📚", tone: "sky" },
+  analytics: { emoji: "📊", tone: "mint" },
+};
+const sectionChips: Record<string, { emoji: string; tone: string }> = {
+  Calendar: workspaceMenuChips.calendar,
+  "이번 주 일정": workspaceMenuChips.calendar,
+  계정: workspaceMenuChips.settings,
+  "FRENGLE 연결": workspaceMenuChips.settings,
+  "회사 및 외부 연결": workspaceMenuChips.settings,
+  "오늘 할 일": { emoji: "📌", tone: "coral" },
+  "오늘 완료 업무": { emoji: "✅", tone: "mint" },
+  "이어서 할 업무": { emoji: "⏯️", tone: "lemon" },
+  "프로젝트 프로세스": workspaceMenuChips.projects,
+  "Work Journal": workspaceMenuChips.journal,
+  Library: workspaceMenuChips.library,
 };
 type Editor = {
   resource: Resource;
@@ -837,14 +855,13 @@ export function OpsShell({
     <div className="ops-section-head">
       <div>
         <h2>
-          {space === "PERSONAL" &&
-          ["Calendar", "이번 주 일정", "계정"].includes(name) ? (
+          {sectionChips[name] ? (
             <span
               className="ops-jelly-section-chip"
-              data-tone={name === "계정" ? "sky" : "mint"}
+              data-tone={sectionChips[name].tone}
               aria-hidden="true"
             >
-              {name === "계정" ? "⚙️" : "🗓️"}
+              {sectionChips[name].emoji}
             </span>
           ) : null}
           {name}
@@ -1108,25 +1125,22 @@ export function OpsShell({
   }
   return (
     <div
-      className={`editorial${isPersonalLayout ? " is-personal-layout" : ""}${isPersonalLayout && active ? " has-active-timer" : ""}`}
+      className={`editorial is-jelly-layout${isPersonalLayout ? " is-personal-layout" : " is-frengle-layout"}${active ? " has-active-timer" : ""}`}
       data-personal-view={isPersonalLayout ? view : undefined}
+      data-jelly-view={view}
     >
       <aside className="ops-sidebar">
         <Link
           href={space === "FRENGLE" ? "/frengle" : "/"}
           className="ops-brand"
         >
-          {isPersonalLayout ? (
-            <span className="ops-personal-brand-mark" aria-hidden="true">
-              🫧
-            </span>
-          ) : (
-            <Command size={24} />
-          )}
+          <span className="ops-personal-brand-mark" aria-hidden="true">
+            {isPersonalLayout ? "🫧" : "💼"}
+          </span>
           MY OPS <small>OS / 01</small>
         </Link>
         <span className="ops-caption">
-          {isPersonalLayout ? "내 작업 공간" : "MY OPERATING SPACE"}
+          {isPersonalLayout ? "내 작업 공간" : "프렌글 작업 공간"}
         </span>
         <nav aria-label="주 메뉴">
           {visibleMenus.map((m) => (
@@ -1137,17 +1151,15 @@ export function OpsShell({
               className={view === m.id ? "active" : ""}
               onClick={() => move(m.id)}
             >
-              {isPersonalLayout ? (
-                <span
-                  className="ops-personal-nav-chip"
-                  data-tone={personalMenuChips[m.id]?.tone}
-                  aria-hidden="true"
-                >
-                  {personalMenuChips[m.id]?.emoji}
-                </span>
-              ) : (
-                <m.icon size={18} />
-              )}
+              <span
+                className="ops-personal-nav-chip"
+                data-tone={workspaceMenuChips[m.id]?.tone}
+                aria-hidden="true"
+              >
+                {m.id === "overview" && !isPersonalLayout
+                  ? "💼"
+                  : workspaceMenuChips[m.id]?.emoji}
+              </span>
               {m.label}
             </button>
           ))}
@@ -1213,7 +1225,7 @@ export function OpsShell({
                   setQuickLog(true);
                 }}
               >
-                Quick Log
+                빠른 기록
               </button>
             </div>
           ) : null}
@@ -1293,9 +1305,6 @@ export function OpsShell({
           ) : null}
           <div className="ops-heading">
             <div>
-              {space === "FRENGLE" ? (
-                <small>YOUR WORK, WITH INTENTION.</small>
-              ) : null}
               <h1>{title}</h1>
               <p>
                 {view === "overview"
@@ -1327,11 +1336,13 @@ export function OpsShell({
               }}
             />
           ) : null}
-          {space === "FRENGLE" || !user || configured !== true ? (
+          {!user ||
+          configured !== true ||
+          (space === "FRENGLE" && dataReady && !timerGuardReady) ? (
             <div className="ops-connection">
               <strong>
                 {space === "FRENGLE"
-                  ? "FRENGLE · 회사 업무 전용"
+                  ? "프렌글 업무 공간"
                   : isPersonalOverview
                     ? "콘텐츠와 일정"
                     : "개인 콘텐츠와 일정"}
@@ -1344,7 +1355,7 @@ export function OpsShell({
                       ? "콘텐츠 성과와 개인 일정을 한곳에서 확인하세요."
                       : space === "PERSONAL"
                         ? "콘텐츠 일정과 요가 계획을 편하게 관리하세요."
-                        : "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 자동화 데이터에는 수신된 결과를 표시합니다."
+                        : "프로젝트와 업무, 수신한 자동화 결과를 한곳에서 확인하세요."
                     : `설정에서 ${space} 계정으로 로그인하세요. 로그인 전에는 실제 데이터를 표시하지 않습니다.`}
               </p>
               {space === "FRENGLE" && user && dataReady && !timerGuardReady ? (
@@ -1638,7 +1649,7 @@ export function OpsShell({
               {space === "FRENGLE" ? (
                 <section className="ops-card">
                   {heads(
-                    "Quick Start / 중단한 업무",
+                    "이어서 할 업무",
                     "미완료 다음 액션을 확인하고 이어서 작업하세요.",
                   )}
                   {activeTask ? (
@@ -2775,7 +2786,7 @@ export function OpsShell({
           <footer>
             {space === "PERSONAL"
               ? "MY OPS · 나의 기록"
-              : "MY OPS · Editorial OS"}{" "}
+              : "FRENGLE · 업무 기록"}{" "}
             <span>
               {space === "PERSONAL"
                 ? "한국시간 기준"
@@ -2787,7 +2798,7 @@ export function OpsShell({
       {!isPersonalLayout || active ? (
         <div className="ops-timer">
           <div>
-            <small>{active ? "ACTIVE" : "TIME TRACKER"}</small>
+            <small>{active ? "진행 중" : "업무 타이머"}</small>
             <strong>{text(activeTask?.title) || "진행 중인 업무 없음"}</strong>
           </div>
           <code>{clock(activeSeconds)}</code>
@@ -2842,38 +2853,30 @@ export function OpsShell({
               aria-current={view === m.id ? "page" : undefined}
               onClick={() => move(m.id)}
             >
-              {isPersonalLayout ? (
-                <span
-                  className="ops-personal-nav-chip"
-                  data-tone={personalMenuChips[m.id]?.tone}
-                  aria-hidden="true"
-                >
-                  {personalMenuChips[m.id]?.emoji}
-                </span>
-              ) : (
-                <m.icon size={19} />
-              )}
+              <span
+                className="ops-personal-nav-chip"
+                data-tone={workspaceMenuChips[m.id]?.tone}
+                aria-hidden="true"
+              >
+                {m.id === "overview" && !isPersonalLayout
+                  ? "💼"
+                  : workspaceMenuChips[m.id]?.emoji}
+              </span>
               <span>{m.label}</span>
             </button>
           ))}
         <button
           data-section="settings"
-          className={
-            space === "PERSONAL" && view === "settings" ? "active" : undefined
-          }
+          className={view === "settings" ? "active" : undefined}
           onClick={() => setMoreMenu(true)}
         >
-          {isPersonalLayout ? (
-            <span
-              className="ops-personal-nav-chip"
-              data-tone="sky"
-              aria-hidden="true"
-            >
-              ⚙️
-            </span>
-          ) : (
-            <Settings size={19} />
-          )}
+          <span
+            className="ops-personal-nav-chip"
+            data-tone="sky"
+            aria-hidden="true"
+          >
+            ⚙️
+          </span>
           <span>더보기</span>
         </button>
       </nav>
@@ -2972,17 +2975,15 @@ export function OpsShell({
                   setMoreMenu(false);
                 }}
               >
-                {isPersonalLayout ? (
-                  <span
-                    className="ops-personal-nav-chip"
-                    data-tone={personalMenuChips[m.id]?.tone}
-                    aria-hidden="true"
-                  >
-                    {personalMenuChips[m.id]?.emoji}
-                  </span>
-                ) : (
-                  <m.icon size={18} />
-                )}
+                <span
+                  className="ops-personal-nav-chip"
+                  data-tone={workspaceMenuChips[m.id]?.tone}
+                  aria-hidden="true"
+                >
+                  {m.id === "overview" && !isPersonalLayout
+                    ? "💼"
+                    : workspaceMenuChips[m.id]?.emoji}
+                </span>
                 {m.label}
               </button>
             ))}

@@ -4,6 +4,10 @@ PERSONAL의 기존 다섯 메뉴에 사용자 지정 색상과 부드러운 카�
 스타일은 `.editorial.is-personal-layout` 안으로 한정하며 FRENGLE과 ALL의
 화면, 데이터 저장 위치와 업무 동작은 변경하지 않는다.
 
+이후 사용자 요청으로 FRENGLE에도 같은 테마를 확장했다. 공통 스타일은
+`workspace-jelly.css`의 `.is-jelly-layout`에서 관리하며 회사 전용 보정은
+`frengle-jelly.css`에 둔다. 확장 범위는 `FRENGLE_SOFT_JELLY.md`를 따른다.
+
 | 역할                    | 색상                         |
 | ----------------------- | ---------------------------- |
 | 배경 / 사이드바         | `#FFF8F1` / `#FFF1E8`        |

@@ -1,0 +1,295 @@
+/* Company surfaces use the shared jelly palette without changing their layout. */
+.editorial.is-frengle-layout[data-jelly-view="projects"] {
+  --jelly-accent: var(--jelly-lavender);
+  --jelly-tint: #f3edff;
+}
+.editorial.is-frengle-layout[data-jelly-view="automations"] {
+  --jelly-accent: var(--jelly-lemon);
+  --jelly-tint: #fff7dc;
+}
+.editorial.is-frengle-layout:is(
+    [data-jelly-view="journal"],
+    [data-jelly-view="analytics"]
+  ) {
+  --jelly-accent: var(--jelly-mint);
+  --jelly-tint: #eaf9f2;
+}
+.editorial.is-frengle-layout[data-jelly-view="library"] {
+  --jelly-accent: var(--jelly-lavender);
+  --jelly-tint: #f3edff;
+}
+.editorial.is-frengle-layout[data-jelly-view="settings"] {
+  --jelly-accent: var(--jelly-sky);
+  --jelly-tint: #eef8ff;
+}
+.editorial.is-frengle-layout
+  .ops-card:not(:where(.ops-frengle-memos))
+  > .ops-section-head {
+  background: var(--jelly-tint);
+  border-color: var(--jelly-line);
+}
+.editorial.is-frengle-layout .ops-overview-metrics > .ops-card:first-child {
+  background: #ffece5;
+}
+.editorial.is-frengle-layout .ops-overview-metrics > .ops-card:nth-child(2) {
+  background: #eaf7e9;
+}
+.editorial.is-frengle-layout .ops-overview-metrics > .ops-automation-metric {
+  background: #fff5d8;
+}
+.editorial.is-frengle-layout .ops-overview-metrics :is(small, strong) {
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout .ops-overview-metrics p,
+.editorial.is-frengle-layout .ops-overview-metric-note {
+  color: var(--jelly-muted);
+}
+.editorial.is-frengle-layout .ops-overview-today > .ops-section-head {
+  background: #fff0e9;
+}
+.editorial.is-frengle-layout .ops-overview-completed > .ops-section-head {
+  background: #eaf7e9;
+}
+.editorial.is-frengle-layout .ops-overview-week > .ops-section-head {
+  background: #e9faf3;
+}
+.editorial.is-frengle-layout .ops-overview-create-actions > button:last-child {
+  background: #eae0ff;
+}
+.editorial.is-frengle-layout .ops-task {
+  border-color: var(--jelly-line);
+}
+.editorial.is-frengle-layout :is(.ops-task-title, .ops-task-detail-title) {
+  color: var(--jelly-ink);
+  background: transparent;
+  border-color: transparent;
+}
+.editorial.is-frengle-layout .ops-task-title:hover:not(:disabled) {
+  background: #fff3ec;
+}
+.editorial.is-frengle-layout .ops-task-title small,
+.editorial.is-frengle-layout .ops-task-progress {
+  color: var(--jelly-muted);
+}
+.editorial.is-frengle-layout .ops-task .ops-task-complete {
+  background: #ffdfd4;
+  border-color: #efc9bf;
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout .ops-overview-completed .ops-task-complete {
+  background: #d9efda;
+  border-color: #b8d9bb;
+}
+.editorial.is-frengle-layout .ops-task .ops-actions button {
+  background: #fff8f1;
+  border-color: var(--jelly-line);
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout
+  .ops-task
+  .ops-actions
+  button:hover:not(:disabled) {
+  background: #ffe9de;
+}
+.editorial.is-frengle-layout .ops-badge {
+  border-radius: 999px;
+  color: var(--jelly-ink);
+  background: #f5ece5;
+}
+.editorial.is-frengle-layout .ops-badge.running {
+  background: #ffe1d6;
+}
+.editorial.is-frengle-layout .ops-badge.completed,
+.editorial.is-frengle-layout .ops-state-badge[data-state="completed"] {
+  background: #dcefd9;
+  color: #365440;
+}
+.editorial.is-frengle-layout .ops-badge.failed,
+.editorial.is-frengle-layout
+  .ops-state-badge:is([data-state="unconfirmed"], [data-state="delayed"]) {
+  background: #ffe2db;
+  color: #83423a;
+}
+.editorial.is-frengle-layout .ops-state-badge {
+  border-radius: 999px;
+  background: #f5ece5;
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout .ops-project-grid > .ops-project,
+.editorial.is-frengle-layout .ops-project-grid .ops-card {
+  border-color: var(--jelly-line);
+  border-radius: 20px;
+  background: #fcf9ff;
+  box-shadow: var(--jelly-shadow);
+}
+.editorial.is-frengle-layout .ops-project-grid .ops-card > .ops-project {
+  border: 0;
+  border-radius: 20px 20px 0 0;
+  background: #f3edff;
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout
+  .ops-project-grid
+  .ops-project:hover:not(:disabled),
+.editorial.is-frengle-layout .ops-project-grid .ops-project.selected {
+  background: #e9dfff;
+  border-color: #baa4e3;
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout .ops-project-category {
+  border-radius: 999px;
+  background: #e8ddfc;
+  color: #624a7d;
+}
+.editorial.is-frengle-layout .ops-project-desc,
+.editorial.is-frengle-layout .ops-project small {
+  color: var(--jelly-muted);
+}
+.editorial.is-frengle-layout .ops-project-process-editor {
+  border-color: #dfd1f2;
+  border-radius: 20px;
+  background: #faf6ff;
+}
+.editorial.is-frengle-layout .ops-project-step-check input {
+  accent-color: #8d74c5;
+}
+.editorial.is-frengle-layout
+  .ops-project-process-list
+  > li.is-complete
+  > input {
+  background: #edf6eb;
+  color: #536b58;
+}
+.editorial.is-frengle-layout
+  :is(
+    .ops-project-process-help,
+    .ops-project-process-empty,
+    .ops-project-process-status,
+    .ops-project-process-footer > span,
+    .ops-project-process-archive li span
+  ) {
+  color: var(--jelly-muted);
+}
+.editorial.is-frengle-layout .ops-tabs {
+  border-color: var(--jelly-line);
+}
+.editorial.is-frengle-layout .ops-tabs button.active {
+  border-color: var(--jelly-accent);
+  background: var(--jelly-tint);
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout .ops-automation-results > .ops-section-head {
+  background: #fff5d8;
+}
+.editorial.is-frengle-layout .ops-automation-receipt {
+  border-color: var(--jelly-line);
+  border-radius: 20px;
+  background: #fff9e9;
+}
+.editorial.is-frengle-layout .ops-automation-source {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #ffedb6;
+  color: #73562b;
+}
+.editorial.is-frengle-layout .ops-automation-chat,
+.editorial.is-frengle-layout .ops-automation-company > a {
+  background: #fff0bd;
+  border-color: #ebd59b;
+  border-radius: 999px;
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout .ops-automation-body {
+  border-color: var(--jelly-line);
+}
+.editorial.is-frengle-layout .ops-automation-body > summary {
+  background: #fff0c6;
+  color: #73562b;
+}
+.editorial.is-frengle-layout
+  :is(
+    .ops-automation-received,
+    .ops-automation-reported,
+    .ops-automation-no-link,
+    .ops-automation-state,
+    .ops-automation-help
+  ) {
+  color: var(--jelly-muted);
+}
+.editorial.is-frengle-layout .ops-journal-export {
+  border-color: #d8eade;
+  border-radius: 20px;
+  background: #eef9f2;
+}
+.editorial.is-frengle-layout .ops-journal-preview textarea {
+  background: #fffdfa;
+  border-color: #d8eade;
+}
+.editorial.is-frengle-layout .ops-note {
+  border-color: var(--jelly-line);
+}
+.editorial.is-frengle-layout :is(.ops-note, .ops-detail) pre {
+  border-color: var(--jelly-line);
+  border-radius: 16px;
+  background: #fff8f1;
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout :is(.ops-note, .ops-detail) a {
+  color: #7b4c45;
+}
+.editorial.is-frengle-layout .ops-note :is(small, p) {
+  color: var(--jelly-muted);
+}
+.editorial.is-frengle-layout[data-jelly-view="journal"] .ops-note {
+  background: #f7fcf8;
+}
+.editorial.is-frengle-layout[data-jelly-view="library"] .ops-note {
+  background: #fcf9ff;
+}
+.editorial.is-frengle-layout[data-jelly-view="library"] .ops-note pre {
+  background: #f5efff;
+}
+.editorial.is-frengle-layout .ops-analytics-metrics > div {
+  border-color: #d7e9dc;
+  border-radius: 20px;
+  background: #edf9f1;
+}
+.editorial.is-frengle-layout .ops-analytics-metrics > div:nth-child(2) {
+  background: #f3fbe9;
+}
+.editorial.is-frengle-layout .ops-analytics-metrics > div:nth-child(3) {
+  background: #eef9f9;
+}
+.editorial.is-frengle-layout .ops-analytics-metrics :is(span, strong) {
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout .ops-table-wrap {
+  border-color: var(--jelly-line);
+  border-radius: 16px;
+}
+.editorial.is-frengle-layout .ops-analytics-table th {
+  background: #def3e5;
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout .ops-analytics-table :is(th, td) {
+  border-color: #e4eee5;
+}
+.editorial.is-frengle-layout .ops-analytics-table tbody tr:nth-child(even) {
+  background: #f6fcf7;
+}
+.editorial.is-frengle-layout .ops-timer {
+  background: #fff5e9;
+  border-color: #ecd7c2;
+  border-radius: 20px;
+  box-shadow: var(--jelly-shadow);
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout .ops-timer :is(strong, code, small, button) {
+  color: var(--jelly-ink);
+}
+.editorial.is-frengle-layout[data-jelly-view="settings"]
+  .ops-card
+  > .ops-section-head {
+  background: #eef8ff;
+}

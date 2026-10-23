@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
-  ListTodo,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -441,8 +440,10 @@ export function FrengleOverviewMemos({ enabled }: { enabled: boolean }) {
       <header className="ops-frengle-memos-heading">
         <div>
           <span className="ops-frengle-memos-eyebrow">
-            <ListTodo size={14} />
-            MY CHECKLIST
+            <span className="ops-frengle-memos-chip" aria-hidden="true">
+              📝
+            </span>
+            나의 체크리스트
           </span>
           <h2 id="frengle-memos-title">
             메모 <span>{enabled && ready ? pending.length : "—"}</span>
