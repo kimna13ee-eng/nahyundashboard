@@ -21,6 +21,10 @@ FRENGLE. The core migration provides company projects, tasks, notes, schedules,
 timers, journal, library and recurrence. All company core tables enforce owner
 and company membership RLS; callable functions use invoker rights.
 
+FRENGLE Overview's independent memo checklist uses company SQL005 and
+`/api/frengle/memos`. Notes persist across days, support completion and a
+recoverable trash list, and never enter task counts or PERSONAL storage.
+
 Content Studio sheets, legacy personal content, inspiration, annual leave and
 Yoga Planner and exercise notifications stay in PERSONAL. PERSONAL navigation
 omits Work Journal and Analytics; FRENGLE retains them. Company automation receipts come from

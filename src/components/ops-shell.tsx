@@ -21,6 +21,8 @@ import { PersonalSheetsPanel } from "./personal-sheets-panel";
 import { PersonalPerformancePanel } from "./personal-performance-panel";
 import { YogaPlannerPanel } from "./yoga-planner-panel";
 import { YogaVideoFields } from "./yoga-video-fields";
+import { FrengleOverviewMemos } from "./frengle-overview-memos";
+import "./frengle-overview-layout.css";
 import "./personal-overview.css";
 import type { PersonalSheetTab } from "@/lib/personal-sheet-tabs";
 import {
@@ -1413,21 +1415,31 @@ export function OpsShell({
                     {today} · 전체: 미완료 프로세스와 진행 중·오늘 등록·마감
                     업무 · 완료: 오늘 완료 · 자동화: 수신 결과
                   </p>
-                  <section className="ops-card ops-overview-today">
-                    {heads(
-                      "오늘 할 일",
-                      `${today} · 미완료 프로세스와 진행 중 업무는 매일 표시 · 그 외 오늘 등록·마감 기준`,
-                      <div
-                        className="ops-overview-create-actions"
-                        role="group"
-                        aria-label="오늘 할 일 등록"
-                      >
-                        {create("tasks", "업무 등록", { dueDate: today })}
-                        {create("projects", "프로젝트 등록")}
-                      </div>,
-                    )}
-                    {taskList(todayTasks.pending)}
-                  </section>
+                  <div className="ops-frengle-overview-split">
+                    <section className="ops-card ops-overview-today">
+                      {heads(
+                        "오늘 할 일",
+                        `${today} · 미완료 프로세스와 진행 중 업무는 매일 표시 · 그 외 오늘 등록·마감 기준`,
+                        <div
+                          className="ops-overview-create-actions"
+                          role="group"
+                          aria-label="오늘 할 일 등록"
+                        >
+                          {create("tasks", "업무 등록", { dueDate: today })}
+                          {create("projects", "프로젝트 등록")}
+                        </div>,
+                      )}
+                      {taskList(todayTasks.pending)}
+                    </section>
+                    <FrengleOverviewMemos
+                      key={`company-memos:${user?.email || "signed-out"}`}
+                      enabled={
+                        Boolean(user) &&
+                        authState === "AUTHENTICATED" &&
+                        configured === true
+                      }
+                    />
+                  </div>
                   <section className="ops-card ops-overview-completed">
                     {heads(
                       "오늘 완료 업무",
