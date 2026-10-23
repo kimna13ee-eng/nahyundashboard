@@ -27,7 +27,9 @@ recoverable trash list, and never enter task counts or PERSONAL storage.
 
 Content Studio sheets, legacy personal content, inspiration, annual leave and
 Yoga Planner and exercise notifications stay in PERSONAL. PERSONAL navigation
-omits Work Journal and Analytics; FRENGLE retains them. Company automation receipts come from
+contains Overview, Calendar, Content Studio, Yoga Planner and Settings.
+Personal automation history stays inside Overview; FRENGLE retains its work
+menus and timers. Company automation receipts come from
 the company endpoint; PERSONAL receipts keep the personal endpoint. Logging out
 or changing accounts clears loaded records and automation receipts.
 

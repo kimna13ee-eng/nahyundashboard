@@ -11,29 +11,14 @@ import {
   validPersonalSpreadsheetId,
   type PersonalSheetTab,
 } from "../src/lib/personal-sheets.ts";
-import { personalSheetGroups } from "../src/lib/personal-sheet-tabs.ts";
 
 const spreadsheetId = "fixture_SHEET_ID_1234567890";
 
-test("개인 시트는 확인된 17개 탭·Google 호스트·제한된 조회 범위만 사용", () => {
+test("개인 시트는 기획·원고·발행성과 3개 탭과 제한된 Google 조회 범위만 사용", () => {
   const expectedTabs = {
     planning: ["1103", "03_기획"],
     drafts: ["1104", "04_원고"],
-    review: ["1105", "05_검수"],
     performance: ["1106", "06_발행성과"],
-    references: ["1101", "01_레퍼런스"],
-    research: ["1102", "02_리서치"],
-    grokInbox: ["1110", "10_Grok_인박스"],
-    characterBible: ["1111", "11_캐릭터_바이블"],
-    visualDna: ["1113", "13_셀카_비주얼DNA"],
-    characterInterpretation: ["1114", "14_통합_캐해"],
-    referenceInterpretation: ["1115", "15_레퍼런스_해석"],
-    calibration: ["1116", "16_콘텐츠_캘리브레이션"],
-    dashboard: ["1828527468", "00_대시보드"],
-    handoffs: ["1107", "07_인계로그"],
-    rules: ["1108", "08_직원규칙"],
-    agentGuide: ["1112", "12_에이전트_실행지침"],
-    settings: ["1109", "09_설정"],
   } as const;
   assert.deepEqual(
     Object.keys(personalSheetTabs).sort(),
@@ -41,11 +26,7 @@ test("개인 시트는 확인된 17개 탭·Google 호스트·제한된 조회 �
   );
   assert.equal(
     new Set(Object.values(personalSheetTabs).map((tab) => tab.gid)).size,
-    17,
-  );
-  assert.deepEqual(
-    personalSheetGroups.map((group) => group.id),
-    ["production", "research", "brand", "operations"],
+    3,
   );
   for (const invalid of [
     "__proto__",
@@ -59,24 +40,13 @@ test("개인 시트는 확인된 17개 탭·Google 호스트·제한된 조회 �
     assert.equal(isPersonalSheetTab(tab), true);
     assert.equal(personalSheetTabs[tab].gid, expectedTabs[tab][0]);
     assert.equal(personalSheetTabs[tab].title, expectedTabs[tab][1]);
-    assert.ok(
-      personalSheetGroups.some(
-        (group) => group.id === personalSheetTabs[tab].group,
-      ),
-    );
-    assert.equal(
-      personalSheetTabs[tab].layout,
-      tab === "dashboard" ? "grid" : "table",
-    );
+    assert.equal(personalSheetTabs[tab].layout, "table");
     const urls = personalSheetUrls(spreadsheetId, tab);
     const csv = new URL(urls.csvUrl);
     assert.equal(csv.origin, "https://docs.google.com");
     assert.equal(csv.pathname, `/spreadsheets/d/${spreadsheetId}/export`);
     assert.equal(csv.searchParams.get("gid"), personalSheetTabs[tab].gid);
-    assert.equal(
-      csv.searchParams.get("range"),
-      tab === "dashboard" ? "A1:Z1001" : "A1:Z1002",
-    );
+    assert.equal(csv.searchParams.get("range"), "A1:Z1002");
     assert.equal(csv.searchParams.get("format"), "csv");
     assert.equal(
       new URL(urls.sourceUrl).hash,
@@ -95,22 +65,11 @@ test("개인 시트는 확인된 17개 탭·Google 호스트·제한된 조회 �
   assert.throws(() => personalSheetUrls("https://evil.test", "planning"));
 });
 
-test("17개 탭 모두 CSV 문자열과 26열 상한을 지키며 대시보드만 첫 행을 데이터로 보존", () => {
+test("3개 시트는 CSV 문자열과 26열 상한을 지키며 첫 행을 헤더로 사용", () => {
   for (const tab of Object.keys(personalSheetTabs) as PersonalSheetTab[]) {
     const parsed = parseGoogleSheetCsv("열A,열B\r\n0,3.9%", tab);
-    assert.deepEqual(
-      parsed.columns,
-      tab === "dashboard" ? ["A", "B"] : ["열A", "열B"],
-    );
-    assert.deepEqual(
-      parsed.rows,
-      tab === "dashboard"
-        ? [
-            ["열A", "열B"],
-            ["0", "3.9%"],
-          ]
-        : [["0", "3.9%"]],
-    );
+    assert.deepEqual(parsed.columns, ["열A", "열B"]);
+    assert.deepEqual(parsed.rows, [["0", "3.9%"]]);
     const columns = Array.from(
       { length: 26 },
       (_, index) => `필드${index + 1}`,
@@ -126,47 +85,7 @@ test("17개 탭 모두 CSV 문자열과 26열 상한을 지키며 대시보드�
   }
 });
 
-test("시트 대시보드의 제목·지표 행은 헤더로 소실되지 않고 알파벳 열과 문자열로 표시", () => {
-  const result = parseGoogleSheetCsv(
-    '\uFEFFSNS 스튜디오,,,,\r\n\r\n"발행, 완료",0,3.9%,FALSE,\r\n',
-    "dashboard",
-  );
-  assert.deepEqual(result, {
-    columns: ["A", "B", "C", "D"],
-    rows: [
-      ["SNS 스튜디오", "", "", ""],
-      ["", "", "", ""],
-      ["발행, 완료", "0", "3.9%", "FALSE"],
-    ],
-    truncated: false,
-  });
-  assert.deepEqual(parseGoogleSheetCsv("SNS 스튜디오", "dashboard").rows, [
-    ["SNS 스튜디오"],
-  ]);
-  assert.deepEqual(parseGoogleSheetCsv("", "dashboard"), {
-    columns: [],
-    rows: [],
-    truncated: false,
-  });
-});
-
-test("대시보드는 원본 행 번호를 위해 중간·시작 빈 행을 유지하고 끝 빈 행만 제거", () => {
-  assert.deepEqual(
-    parseGoogleSheetCsv("SNS 제목\r\n\r\n지표,0\r\n,\r\n,\r\n", "dashboard"),
-    {
-      columns: ["A", "B"],
-      rows: [
-        ["SNS 제목", ""],
-        ["", ""],
-        ["지표", "0"],
-      ],
-      truncated: false,
-    },
-  );
-  assert.deepEqual(
-    parseGoogleSheetCsv("\r\n두 번째 행 제목\r\n", "dashboard").rows,
-    [[""], ["두 번째 행 제목"]],
-  );
+test("콘텐츠 시트는 빈 데이터 행을 생략하고 원문은 보존", () => {
   assert.deepEqual(
     parseGoogleSheetCsv("제목\r\n\r\n원고\r\n\r\n", "planning").rows,
     [["원고"]],
@@ -231,50 +150,6 @@ test("행 상한은1000건이며 다음 비어 있지 않은 행이 있으면 �
     parseGoogleSheetCsv("제목\r\na\r\n\r\n", "planning").truncated,
     false,
   );
-  const gridRows = Array.from({ length: 1001 }, (_, index) => `항목 ${index}`);
-  assert.deepEqual(
-    parseGoogleSheetCsv(gridRows.slice(0, 1000).join("\n"), "dashboard")
-      .rows[0],
-    ["항목 0"],
-  );
-  assert.equal(
-    parseGoogleSheetCsv(gridRows.slice(0, 1000).join("\n"), "dashboard")
-      .truncated,
-    false,
-  );
-  const truncatedGrid = parseGoogleSheetCsv(gridRows.join("\n"), "dashboard");
-  assert.equal(truncatedGrid.rows.length, 1000);
-  assert.deepEqual(truncatedGrid.rows.at(-1), ["항목 999"]);
-  assert.equal(truncatedGrid.truncated, true);
-});
-
-test("대시보드의1000행 상한은 빈 행을 포함한 원본 물리행 기준", () => {
-  const physicalRows = Array.from({ length: 1001 }, () => "");
-  physicalRows[0] = "첫 번째 행";
-  physicalRows[999] = "원본 1000행";
-  physicalRows[1000] = "원본 1001행";
-  const overflow = parseGoogleSheetCsv(physicalRows.join("\n"), "dashboard");
-  assert.equal(overflow.rows.length, 1000);
-  assert.deepEqual(overflow.rows[0], ["첫 번째 행"]);
-  assert.deepEqual(overflow.rows[1], [""]);
-  assert.deepEqual(overflow.rows[998], [""]);
-  assert.deepEqual(overflow.rows[999], ["원본 1000행"]);
-  assert.equal(overflow.truncated, true);
-  physicalRows[1000] = '""';
-  const blankSentinel = parseGoogleSheetCsv(
-    physicalRows.join("\n"),
-    "dashboard",
-  );
-  assert.equal(blankSentinel.rows.length, 1000);
-  assert.deepEqual(blankSentinel.rows[999], ["원본 1000행"]);
-  assert.equal(blankSentinel.truncated, false);
-  physicalRows[999] = "";
-  const trailingBlanks = parseGoogleSheetCsv(
-    physicalRows.join("\n"),
-    "dashboard",
-  );
-  assert.deepEqual(trailingBlanks.rows, [["첫 번째 행"]]);
-  assert.equal(trailingBlanks.truncated, false);
 });
 
 test("깨진 따옴표·허용 열 범위 초과·과도한 응답은 거절", () => {
@@ -304,10 +179,29 @@ test("허용 목록 밖 탭이나 잘못된 시트 ID는 외부 요청 전에 �
     "unknown-tab",
     "planning&gid=999",
     "../planning",
-  ])
+    "review",
+    "references",
+    "research",
+    "grokInbox",
+    "characterBible",
+    "visualDna",
+    "characterInterpretation",
+    "referenceInterpretation",
+    "calibration",
+    "dashboard",
+    "handoffs",
+    "rules",
+    "agentGuide",
+    "settings",
+  ]) {
+    assert.equal(isPersonalSheetTab(tab), false);
+    assert.throws(() =>
+      parseGoogleSheetCsv("제목\n원고", tab as PersonalSheetTab),
+    );
     await assert.rejects(
       fetchPersonalSheetCsv(spreadsheetId, tab as PersonalSheetTab, fetcher),
     );
+  }
   for (const id of [
     "",
     "https://evil.test/export",

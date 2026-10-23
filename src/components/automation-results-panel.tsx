@@ -1,4 +1,5 @@
 "use client";
+import { useId, useState } from "react";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
 import type { OpsRow } from "@/lib/ops";
 import {
@@ -91,6 +92,7 @@ export function AutomationResultsPanel({
   enabled = true,
   loading = false,
   compact = false,
+  inlineHistory = false,
   onViewAll,
   workspace = "PERSONAL",
 }: {
@@ -100,9 +102,14 @@ export function AutomationResultsPanel({
   enabled?: boolean;
   loading?: boolean;
   compact?: boolean;
+  inlineHistory?: boolean;
   onViewAll?: () => void;
   workspace?: AutomationWorkspace;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const historyId = useId();
+  const showInlineHistory =
+    compact && inlineHistory && workspace === "PERSONAL";
   const rows =
     enabled && ready ? automationReceiptRows(results, workspace) : [];
   return (
@@ -120,7 +127,18 @@ export function AutomationResultsPanel({
           </p>
         </div>
         <div className="ops-automation-actions">
-          {compact && onViewAll ? (
+          {showInlineHistory && rows.length > 3 ? (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={historyId}
+              onClick={() => setExpanded((current) => !current)}
+            >
+              {expanded
+                ? "전체 결과 접기"
+                : `전체 결과 펼치기 (${rows.length})`}
+            </button>
+          ) : compact && !showInlineHistory && onViewAll ? (
             <button type="button" onClick={onViewAll}>
               전체 결과 보기
             </button>
@@ -155,11 +173,13 @@ export function AutomationResultsPanel({
           결과가 없습니다. ChatGPT에서 결과가 전달되면 여기에 표시됩니다.
         </p>
       ) : (
-        <AutomationReceiptList
-          results={rows}
-          workspace={workspace}
-          limit={compact ? 3 : undefined}
-        />
+        <div id={historyId}>
+          <AutomationReceiptList
+            results={rows}
+            workspace={workspace}
+            limit={compact && !(showInlineHistory && expanded) ? 3 : undefined}
+          />
+        </div>
       )}
       <p className="ops-automation-help">
         저장된 결과만 표시합니다. 수신 내역이 없다고 예약 작업이 실패한 것은

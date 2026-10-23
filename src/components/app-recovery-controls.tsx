@@ -5,9 +5,11 @@ import { OpsDialog } from "./ops-dialog";
 export function AppRecoveryControls({
   refresh,
   loading,
+  simple = false,
 }: {
   refresh: () => Promise<unknown>;
   loading: boolean;
+  simple?: boolean;
 }) {
   const [online, setOnline] = useState(true);
   const [mode, setMode] = useState("브라우저");
@@ -88,37 +90,39 @@ export function AppRecoveryControls({
           />
           <span>데이터 새로고침</span>
         </button>
-        <details>
-          <summary>앱 사용 · 복구</summary>
-          <div>
-            <p>{mode} · 웹 후보 v2.0.0 · 온라인 연결 필요</p>
-            <p>
-              데이터 새로고침은 현재 화면을 유지합니다. 앱 다시 열기는 페이지
-              전체를 재시작합니다.
-            </p>
-            <p>
-              iPhone: Safari 공유 → 홈 화면에 추가. Android/PC: 브라우저 메뉴의
-              설치 또는 홈 화면에 추가. 기기별 설치 여부는 별도 확인이
-              필요합니다.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                if (document.querySelector("dialog[open]")) {
-                  setMessage(
-                    "입력창이 열려 있어 재시작을 막았습니다. 먼저 저장하거나 닫아 주세요.",
-                  );
-                  return;
-                }
-                setRestart(true);
-              }}
-            >
-              앱 다시 열기
-            </button>
-          </div>
-        </details>
+        {!simple ? (
+          <details>
+            <summary>앱 사용 · 복구</summary>
+            <div>
+              <p>{mode} · 웹 후보 v2.0.0 · 온라인 연결 필요</p>
+              <p>
+                데이터 새로고침은 현재 화면을 유지합니다. 앱 다시 열기는 페이지
+                전체를 재시작합니다.
+              </p>
+              <p>
+                iPhone: Safari 공유 → 홈 화면에 추가. Android/PC: 브라우저
+                메뉴의 설치 또는 홈 화면에 추가. 기기별 설치 여부는 별도 확인이
+                필요합니다.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (document.querySelector("dialog[open]")) {
+                    setMessage(
+                      "입력창이 열려 있어 재시작을 막았습니다. 먼저 저장하거나 닫아 주세요.",
+                    );
+                    return;
+                  }
+                  setRestart(true);
+                }}
+              >
+                앱 다시 열기
+              </button>
+            </div>
+          </details>
+        ) : null}
       </div>
-      {restart ? (
+      {!simple && restart ? (
         <OpsDialog
           title="앱을 다시 열까요?"
           busy={loading}

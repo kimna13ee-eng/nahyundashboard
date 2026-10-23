@@ -10,13 +10,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { OpsDialog } from "./ops-dialog";
 import { OpsFormActions } from "./ops-form-actions";
-import { DesktopDownload } from "./desktop-download";
 import { AppRecoveryControls } from "./app-recovery-controls";
 import { workspaceApiPath, type ApiWorkspace } from "@/lib/workspace-api";
 import { occurrences } from "@/lib/phase2";
 import { Phase2Panel } from "./phase2-panel";
 import { AnalyticsPanel } from "./analytics-panel";
-import { ContentAnalyticsPanel } from "./content-analytics-panel";
 import { PersonalSheetsPanel } from "./personal-sheets-panel";
 import { PersonalPerformancePanel } from "./personal-performance-panel";
 import { YogaPlannerPanel } from "./yoga-planner-panel";
@@ -130,7 +128,18 @@ type Editor = {
 function workspaceViewAllowed(view: string, workspace: ApiWorkspace) {
   if (["personal-sheets", "yoga-planner"].includes(view))
     return workspace === "PERSONAL";
-  if (["journal", "analytics"].includes(view)) return workspace === "FRENGLE";
+  if (
+    [
+      "projects",
+      "automations",
+      "library",
+      "journal",
+      "analytics",
+      "inbox",
+      "legacy-content",
+    ].includes(view)
+  )
+    return workspace === "FRENGLE";
   return true;
 }
 const text = (v: unknown) => String(v ?? "");
@@ -221,7 +230,6 @@ export function OpsShell({
   const noteWrites = useRef(new Set<string>());
   const startSubmit = useRef(false);
   const completionSubmit = useRef(false);
-  const [contentFocus, setContentFocus] = useState<string | undefined>();
   const [studioInitialTab, setStudioInitialTab] =
     useState<PersonalSheetTab>("planning");
   const [taskClassification, setTaskClassification] = useState(false);
@@ -654,7 +662,6 @@ export function OpsShell({
   function move(id: string) {
     setLinkedSchedule(null);
     setYogaFocus(undefined);
-    setContentFocus(undefined);
     setView(workspaceViewAllowed(id, space) ? id : "overview");
     setDetail(null);
     setSearch("");
@@ -668,8 +675,7 @@ export function OpsShell({
       ? "기존 콘텐츠 기록"
       : menus.find((m) => m.id === view)?.label || "Overview";
   const isPersonalOverview = space === "PERSONAL" && view === "overview";
-  const isPersonalLayout =
-    space === "PERSONAL" && ["overview", "yoga-planner"].includes(view);
+  const isPersonalLayout = space === "PERSONAL";
   function openTaskEditor(task: OpsRow) {
     if (isProjectProcess(task)) {
       const parent = projects.find((p) => p.id === task.project_id);
@@ -1054,7 +1060,11 @@ export function OpsShell({
   function openWeeklyItem(item: OpsRow) {
     if (item.source === "일정") {
       setEditor({ resource: "schedules", row: item });
-    } else if (item.source === "업무 마감" && item.task) {
+    } else if (
+      space === "FRENGLE" &&
+      item.source === "업무 마감" &&
+      item.task
+    ) {
       openTaskEditor(item.task as OpsRow);
     } else setCalendarDetail(item);
   }
@@ -1169,10 +1179,8 @@ export function OpsShell({
           ) : null}
           <div className="ops-header-utilities" aria-label="앱 관리">
             {" "}
-            {space === "PERSONAL" ? (
-              <DesktopDownload compact signedIn={Boolean(user)} />
-            ) : null}
             <AppRecoveryControls
+              simple={space === "PERSONAL"}
               loading={loading || busy || authState === "INITIALIZING"}
               refresh={async () => {
                 const session = await api("/api/session").catch(() => null);
@@ -1283,7 +1291,7 @@ export function OpsShell({
                 ? "FRENGLE · 회사 업무 전용"
                 : isPersonalOverview
                   ? "PERSONAL · CONTENT WORKSPACE"
-                  : "PERSONAL · 개인 프로젝트 전용"}
+                  : "PERSONAL · 개인 콘텐츠와 일정"}
             </strong>
             <p>
               {configured === false
@@ -1291,10 +1299,12 @@ export function OpsShell({
                 : user
                   ? isPersonalOverview
                     ? "콘텐츠 성과와 개인 일정을 한곳에서 확인하세요."
-                    : "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 자동화 데이터에는 수신된 결과를 표시합니다."
+                    : space === "PERSONAL"
+                      ? "콘텐츠 일정과 요가 계획을 편하게 관리하세요."
+                      : "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 자동화 데이터에는 수신된 결과를 표시합니다."
                   : `설정에서 ${space} 계정으로 로그인하세요. 로그인 전에는 실제 데이터를 표시하지 않습니다.`}
             </p>
-            {user && dataReady && !timerGuardReady ? (
+            {space === "FRENGLE" && user && dataReady && !timerGuardReady ? (
               <p role="status">
                 타이머 보호 연결 확인이 필요합니다. SQL010 적용 후 설정에서 DB
                 새로고침해 주세요.
@@ -1577,6 +1587,7 @@ export function OpsShell({
                 ready={automationReady}
                 enabled={Boolean(user)}
                 compact
+                inlineHistory={space === "PERSONAL"}
                 onViewAll={() => move("automations")}
                 refresh={() => void load()}
               />
@@ -1967,7 +1978,9 @@ export function OpsShell({
             <section className="ops-card">
               {heads(
                 "Calendar",
-                "Asia/Seoul · 연차 기록은 표시하지 않습니다.",
+                space === "PERSONAL"
+                  ? "콘텐츠 일정과 요가 계획을 함께 확인하세요."
+                  : "Asia/Seoul · 연차 기록은 표시하지 않습니다.",
                 space === "PERSONAL" ? (
                   <div
                     className="ops-overview-create-actions"
@@ -2148,48 +2161,50 @@ export function OpsShell({
                 <Empty label="이 기간에 등록된 일정이 없습니다." />
               )}
               <p className="ops-footnote">
-                반복 일정과 콘텐츠 발행 예정은 캘린더에 함께 표시됩니다.
-                아래에서 반복 회차를 관리하세요. 자동화 예정 시간은
-                미연결입니다.
+                {space === "PERSONAL"
+                  ? "요가 플래너에 등록한 영상도 같은 날짜에 표시됩니다."
+                  : "반복 일정과 콘텐츠 발행 예정은 캘린더에 함께 표시됩니다. 아래에서 반복 회차를 관리하세요. 자동화 예정 시간은 미연결입니다."}
               </p>
-              <details className="ops-detail">
-                <summary>일정 휴지통 ({deletedSchedules.length})</summary>
-                <p>삭제 후 12시간 동안 복구할 수 있습니다.</p>
-                {deletedSchedules.length ? (
-                  deletedSchedules.map((schedule) => (
-                    <div className="ops-entry" key={schedule.id}>
-                      <strong>{text(schedule.title)}</strong>
-                      <small>
-                        {dateTime(schedule.starts_at)} –{" "}
-                        {dateTime(schedule.ends_at)} ·{" "}
-                        {text(
-                          projects.find(
-                            (projectRow) =>
-                              projectRow.id === schedule.project_id,
-                          )?.title,
-                        ) || "연결 프로젝트 없음"}
-                      </small>
-                      <small>
-                        복구 가능 기한: {dateTime(schedule.purge_after)}
-                      </small>
-                      <button
-                        disabled={!canWrite}
-                        aria-label={`${schedule.title || "일정"} 복구`}
-                        onClick={() =>
-                          void mutate({
-                            action: "restore_schedule",
-                            id: schedule.id,
-                          })
-                        }
-                      >
-                        복구
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <Empty label="복구 가능한 삭제 일정이 없습니다." />
-                )}
-              </details>
+              {space === "FRENGLE" ? (
+                <details className="ops-detail">
+                  <summary>일정 휴지통 ({deletedSchedules.length})</summary>
+                  <p>삭제 후 12시간 동안 복구할 수 있습니다.</p>
+                  {deletedSchedules.length ? (
+                    deletedSchedules.map((schedule) => (
+                      <div className="ops-entry" key={schedule.id}>
+                        <strong>{text(schedule.title)}</strong>
+                        <small>
+                          {dateTime(schedule.starts_at)} –{" "}
+                          {dateTime(schedule.ends_at)} ·{" "}
+                          {text(
+                            projects.find(
+                              (projectRow) =>
+                                projectRow.id === schedule.project_id,
+                            )?.title,
+                          ) || "연결 프로젝트 없음"}
+                        </small>
+                        <small>
+                          복구 가능 기한: {dateTime(schedule.purge_after)}
+                        </small>
+                        <button
+                          disabled={!canWrite}
+                          aria-label={`${schedule.title || "일정"} 복구`}
+                          onClick={() =>
+                            void mutate({
+                              action: "restore_schedule",
+                              id: schedule.id,
+                            })
+                          }
+                        >
+                          복구
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <Empty label="복구 가능한 삭제 일정이 없습니다." />
+                  )}
+                </details>
+              ) : null}
             </section>
           ) : null}
           {view === "journal" ? (
@@ -2486,22 +2501,6 @@ export function OpsShell({
               refresh={() => void load()}
             />
           ) : null}
-          {view === "legacy-content" && space === "PERSONAL" ? (
-            <Phase2Panel
-              key={"content:" + (user?.email || "signed-out") + space}
-              resource="content"
-              initialContentId={contentFocus}
-              onOpenTask={async (id) => {
-                await load();
-                setDetail(id);
-                setTab("Overview");
-                setView("projects");
-              }}
-              enabled={Boolean(user)}
-              projects={projects}
-              day={day}
-            />
-          ) : null}
           {view === "personal-sheets" && space === "PERSONAL" ? (
             <PersonalSheetsPanel
               key={
@@ -2528,17 +2527,6 @@ export function OpsShell({
                 now={tick + offset}
                 day={day}
               />
-              {space === "PERSONAL" ? (
-                <ContentAnalyticsPanel
-                  key={
-                    "content-analytics:" + (user?.email || "signed-out") + space
-                  }
-                  enabled={Boolean(user)}
-                  projects={projects}
-                  day={day}
-                  now={tick + offset}
-                />
-              ) : null}
             </>
           ) : null}
           {view === "yoga-planner" && space === "PERSONAL" ? (
@@ -2595,26 +2583,42 @@ export function OpsShell({
             />
           ) : null}
           {view === "settings" ? (
-            <div className="ops-two">
+            <div
+              className={
+                space === "PERSONAL" ? "ops-personal-settings" : "ops-two"
+              }
+            >
               <section className="ops-card">
-                {heads(`${space} 연결`, "Supabase Auth + PostgreSQL")}
+                {heads(
+                  space === "PERSONAL" ? "계정" : `${space} 연결`,
+                  space === "PERSONAL"
+                    ? "로그인과 개인 설정"
+                    : "Supabase Auth + PostgreSQL",
+                )}
                 <div className="ops-detail">
-                  <p>
-                    환경변수:{" "}
-                    {configured === null
-                      ? "확인 중"
-                      : configured
-                        ? "필수값 설정됨"
-                        : "미설정"}
-                  </p>
-                  <p>
-                    DB:{" "}
-                    {error
-                      ? "오류 확인 필요"
-                      : user
-                        ? "조회 결과 확인"
-                        : "로그인 후 조회 검증 필요"}
-                  </p>
+                  {space === "PERSONAL" && configured === false ? (
+                    <p role="status">개인 계정 연결을 확인해 주세요.</p>
+                  ) : null}
+                  {space === "FRENGLE" ? (
+                    <>
+                      <p>
+                        환경변수:{" "}
+                        {configured === null
+                          ? "확인 중"
+                          : configured
+                            ? "필수값 설정됨"
+                            : "미설정"}
+                      </p>
+                      <p>
+                        DB:{" "}
+                        {error
+                          ? "오류 확인 필요"
+                          : user
+                            ? "조회 결과 확인"
+                            : "로그인 후 조회 검증 필요"}
+                      </p>
+                    </>
+                  ) : null}
                   {authState === "INITIALIZING" || authState === "ERROR" ? (
                     <p role="status">
                       {authState === "INITIALIZING"
@@ -2653,42 +2657,45 @@ export function OpsShell({
                     <>
                       <p>{user.email}</p>
                       <button disabled={busy} onClick={() => load()}>
-                        DB 새로고침
+                        {space === "PERSONAL"
+                          ? "데이터 새로고침"
+                          : "DB 새로고침"}
                       </button>
                       <button type="button" disabled={busy} onClick={logout}>
                         {space} 계정 로그아웃
                       </button>
                     </>
                   )}
-                  <p>
-                    공개 회원가입은 제공하지 않습니다. {space} 저장소의 계정을
-                    사용해 주세요.
-                  </p>
+                  {space === "FRENGLE" ? (
+                    <p>
+                      공개 회원가입은 제공하지 않습니다. {space} 저장소의 계정을
+                      사용해 주세요.
+                    </p>
+                  ) : null}
                 </div>
               </section>
-              <section className="ops-card">
-                {heads(
-                  "회사 및 외부 연결",
-                  "FRENGLE / ChatGPT / Claude / Codex",
-                )}
-                <div className="ops-detail">
-                  <p>
-                    {space} 저장소에 전달된 자동화 결과는 Automations에서
-                    확인하세요.
-                  </p>
-                  <p>
-                    워크스페이스를 바꾸면 해당 저장소의 계정과 데이터로 새로
-                    엽니다.
-                  </p>
-                  <button onClick={() => move("automations")}>
-                    자동화 데이터 보기
-                  </button>
-                </div>
-              </section>
+              {space === "FRENGLE" ? (
+                <section className="ops-card">
+                  {heads(
+                    "회사 및 외부 연결",
+                    "FRENGLE / ChatGPT / Claude / Codex",
+                  )}
+                  <div className="ops-detail">
+                    <p>
+                      {space} 저장소에 전달된 자동화 결과는 Automations에서
+                      확인하세요.
+                    </p>
+                    <p>
+                      워크스페이스를 바꾸면 해당 저장소의 계정과 데이터로 새로
+                      엽니다.
+                    </p>
+                    <button onClick={() => move("automations")}>
+                      자동화 데이터 보기
+                    </button>
+                  </div>
+                </section>
+              ) : null}
             </div>
-          ) : null}
-          {view === "settings" && space === "PERSONAL" ? (
-            <DesktopDownload signedIn={Boolean(user)} />
           ) : null}
           {view === "settings" && space === "PERSONAL" ? (
             <Phase2Panel
@@ -2763,9 +2770,9 @@ export function OpsShell({
             [
               "overview",
               "calendar",
-              "projects",
-              "library",
-              space === "PERSONAL" ? "yoga-planner" : "journal",
+              ...(space === "PERSONAL"
+                ? ["personal-sheets", "yoga-planner"]
+                : ["projects", "library", "journal"]),
             ].includes(m.id),
           )
           .map((m) => (
@@ -2803,12 +2810,17 @@ export function OpsShell({
             <dd>{dateTime(calendarDetail.ends_at)}</dd>
             <dt>상태</dt>
             <dd>{text(calendarDetail.status) || "기록 없음"}</dd>
-            <dt>프로젝트</dt>
-            <dd>
-              {text(
-                projects.find((p) => p.id === calendarDetail.project_id)?.title,
-              ) || "연결 없음"}
-            </dd>
+            {space === "FRENGLE" ? (
+              <>
+                <dt>프로젝트</dt>
+                <dd>
+                  {text(
+                    projects.find((p) => p.id === calendarDetail.project_id)
+                      ?.title,
+                  ) || "연결 없음"}
+                </dd>
+              </>
+            ) : null}
             <dt>메모</dt>
             <dd>{text(calendarDetail.notes) || "기록 없음"}</dd>
             {calendarCategory(calendarDetail) === "exercise" &&
@@ -2831,31 +2843,29 @@ export function OpsShell({
             <button type="button" data-dialog-close>
               닫기
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                const id =
-                  text(calendarDetail.task_id) ||
-                  text((calendarDetail.task as OpsRow | undefined)?.id);
-                if (id) {
-                  move("projects");
-                  setDetail(id);
-                } else if (calendarDetail.content_id) {
-                  move("legacy-content");
-                  setContentFocus(text(calendarDetail.content_id));
-                } else if (calendarDetail.source === "일정")
-                  setEditor({ resource: "schedules", row: calendarDetail });
-                setCalendarDetail(null);
-              }}
-              disabled={
-                !calendarDetail.content_id &&
-                !calendarDetail.task &&
-                !calendarDetail.task_id &&
-                calendarDetail.source !== "일정"
-              }
-            >
-              관련 콘텐츠 / 업무 열기
-            </button>
+            {space === "FRENGLE" || calendarDetail.source === "일정" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const id =
+                    text(calendarDetail.task_id) ||
+                    text((calendarDetail.task as OpsRow | undefined)?.id);
+                  if (id) {
+                    move("projects");
+                    setDetail(id);
+                  } else if (calendarDetail.source === "일정")
+                    setEditor({ resource: "schedules", row: calendarDetail });
+                  setCalendarDetail(null);
+                }}
+                disabled={
+                  !calendarDetail.task &&
+                  !calendarDetail.task_id &&
+                  calendarDetail.source !== "일정"
+                }
+              >
+                {space === "PERSONAL" ? "일정 수정" : "관련 콘텐츠 / 업무 열기"}
+              </button>
+            ) : null}
           </div>
         </OpsDialog>
       ) : null}

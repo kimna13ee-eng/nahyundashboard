@@ -156,6 +156,8 @@ function Phase2ResourcePanel({
   initialContentId,
 }: Phase2PanelProps) {
   const workspace = workspaceFromPathname(usePathname());
+  const simpleRecurrence =
+    workspace === "PERSONAL" && resource === "recurrence";
   const [data, setData] = useState<OpsData>({}),
     [ready, setReady] = useState(false),
     [loading, setLoading] = useState(true),
@@ -186,9 +188,10 @@ function Phase2ResourcePanel({
   const [contentTasks, setContentTasks] = useState<OpsRow[]>([]);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (simpleRecurrence) return;
     const interval = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [simpleRecurrence]);
   const [runReady, setRunReady] = useState(false),
     [runs, setRuns] = useState<OpsRow[]>([]);
   const [archiveFilter, setArchiveFilter] = useState("all");
@@ -207,7 +210,7 @@ function Phase2ResourcePanel({
       setContentHistory(r.contentHistory === true);
       setVersions(r.versions || []);
       setContentTasks(r.contentTasks || []);
-      if (resource === "recurrence") {
+      if (resource === "recurrence" && !simpleRecurrence) {
         const response = await fetch(workspaceApiPath("/api/workflow"), {
           cache: "no-store",
         });
@@ -228,7 +231,7 @@ function Phase2ResourcePanel({
     } finally {
       setLoading(false);
     }
-  }, [onCalendarData, resource]);
+  }, [onCalendarData, resource, simpleRecurrence]);
   useEffect(() => {
     let mounted = true;
     if (enabled)
@@ -269,7 +272,9 @@ function Phase2ResourcePanel({
       const loaded = await load();
       setNotice(
         loaded
-          ? "서버 저장 및 DB 재조회가 확인되었습니다."
+          ? simpleRecurrence
+            ? "반복 일정을 저장했어요."
+            : "서버 저장 및 DB 재조회가 확인되었습니다."
           : "서버 저장은 확인됐으나 재조회에 실패했습니다.",
       );
     } catch (e) {
@@ -348,7 +353,9 @@ function Phase2ResourcePanel({
             {resource === "leave"
               ? "PERSONAL 전용 · 업무 캘린더와 공유 보고서에 포함하지 않습니다."
               : resource === "recurrence"
-                ? "일·주·월·연 반복 · 월·연은 추가 SQL 적용 후 사용"
+                ? simpleRecurrence
+                  ? "선택한 기간의 반복 일정을 확인하세요."
+                  : "일·주·월·연 반복 · 월·연은 추가 SQL 적용 후 사용"
                 : `${workspace}에서 직접 등록한 자료`}
           </p>
         </div>
@@ -364,11 +371,21 @@ function Phase2ResourcePanel({
           {labels[resource]} 등록
         </button>
       </div>
-      {!enabled ? <p>{workspace} 로그인과 저장소 연결이 필요합니다.</p> : null}
-      {enabled && loading ? (
-        <p role="status">운영 DB에서 불러오는 중…</p>
+      {!enabled ? (
+        <p>
+          {simpleRecurrence
+            ? "로그인 후 반복 일정을 확인할 수 있어요."
+            : `${workspace} 로그인과 저장소 연결이 필요합니다.`}
+        </p>
       ) : null}
-      {enabled && !ready && !loading ? (
+      {enabled && loading ? (
+        <p role="status">
+          {simpleRecurrence
+            ? "반복 일정을 불러오는 중…"
+            : "운영 DB에서 불러오는 중…"}
+        </p>
+      ) : null}
+      {enabled && !ready && !loading && !simpleRecurrence ? (
         <p>
           DB 연결 확인 필요 · 새 운영 기능은 003 SQL 적용 후 사용할 수 있습니다.
         </p>
@@ -381,7 +398,7 @@ function Phase2ResourcePanel({
       {notice ? <p role="status">{notice}</p> : null}
       <div className="ops-resource-toolbar">
         <button disabled={!enabled || busy} onClick={() => load()}>
-          운영 DB 새로고침
+          {simpleRecurrence ? "새로고침" : "운영 DB 새로고침"}
         </button>
         <input
           aria-label={`${labels[resource]} 검색`}
@@ -426,7 +443,63 @@ function Phase2ResourcePanel({
         </p>
       ) : null}
       {filtered.slice(0, 300).map((r) =>
-        resource === "recurrence" ? (
+        resource === "recurrence" && simpleRecurrence ? (
+          <article className="ops-note ops-recurrence-row" key={r.id}>
+            <div className="ops-recurrence-info">
+              <strong>{String(r.title)}</strong>
+              <div className="ops-recurrence-meta">
+                <span>
+                  {
+                    fields.recurrence
+                      .find((field) => field.key === "frequency")
+                      ?.choices?.find(([value]) => value === r.frequency)?.[1]
+                  }
+                </span>
+                {Number(r.interval) > 1 ? (
+                  <span>간격 {String(r.interval)}</span>
+                ) : null}
+              </div>
+              <p className="ops-recurrence-time">
+                <time dateTime={String(r.starts_at)}>
+                  {local(r.starts_at).replace("T", " ")}
+                </time>
+                {" – "}
+                <time dateTime={String(r.ends_at)}>
+                  {local(r.ends_at).replace("T", " ")}
+                </time>
+              </p>
+              {r.notes ? <p>{String(r.notes)}</p> : null}
+            </div>
+            <div className="ops-row-actions">
+              <button
+                type="button"
+                disabled={!canWrite}
+                aria-label={`${r.title} 수정`}
+                onClick={() => {
+                  setError("");
+                  setScope("one");
+                  setUncertainSave(false);
+                  setEditor(r);
+                }}
+              >
+                수정
+              </button>
+              <button
+                type="button"
+                className="ops-danger"
+                disabled={!canWrite}
+                aria-label={`${r.title} 삭제`}
+                onClick={() => {
+                  setError("");
+                  setScope("one");
+                  setRemoval(r);
+                }}
+              >
+                삭제
+              </button>
+            </div>
+          </article>
+        ) : resource === "recurrence" ? (
           <RecurringScheduleRow
             key={r.id}
             row={r}
@@ -622,7 +695,7 @@ function Phase2ResourcePanel({
       {list.length > 300 ? (
         <p>한 화면에 최대 300건 표시합니다. 검색으로 범위를 좁혀 주세요.</p>
       ) : null}
-      {resource === "recurrence" ? (
+      {resource === "recurrence" && !simpleRecurrence ? (
         <details className="ops-note">
           <summary>반복 규칙 보관·복원</summary>
           <p>
@@ -658,13 +731,13 @@ function Phase2ResourcePanel({
           ))}
         </details>
       ) : null}
-      {resource === "recurrence" ? (
+      {resource === "recurrence" && !simpleRecurrence ? (
         <p className="ops-section-help">
           목록은 기준 날짜부터 최대 370일 범위이며 회차 계산은 최대
           10,000건입니다. 대량 기록의 전체 집계가 아닙니다.
         </p>
       ) : null}
-      {resource === "recurrence" && ready ? (
+      {resource === "recurrence" && ready && !simpleRecurrence ? (
         <>
           <p className="ops-section-help">
             {runReady
@@ -749,10 +822,12 @@ function Phase2ResourcePanel({
                   : "예정"}
               </p>
             ))}
-          <p>
-            자동화 예정 시간은 실행기 미연결로 표시하지 않습니다. 연차는
-            포함하지 않습니다.
-          </p>
+          {!simpleRecurrence ? (
+            <p>
+              자동화 예정 시간은 실행기 미연결로 표시하지 않습니다. 연차는
+              포함하지 않습니다.
+            </p>
+          ) : null}
         </>
       ) : null}
       {editor ? (

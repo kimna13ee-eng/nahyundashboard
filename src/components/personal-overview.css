@@ -1,4 +1,4 @@
-/* PERSONAL Overview and Yoga Planner share the calm frame. */
+/* PERSONAL uses one consistent frame across its five core views. */
 .editorial.is-personal-layout {
   background:
     radial-gradient(ellipse at 94% 5%, #ebe3f3 0, transparent 42%),
@@ -159,6 +159,16 @@
   margin-top: 32px;
   padding-top: 22px;
   border-top-color: #e7dfe9;
+}
+.editorial.is-personal-layout .ops-personal-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.editorial.is-personal-layout .ops-personal-settings > .ops-card {
+  min-width: 0;
+  margin: 0;
 }
 .editorial.is-personal-layout.has-active-timer .ops-main {
   padding-bottom: 140px;

@@ -10,7 +10,6 @@ import {
 import { ArrowUpRight, RefreshCw, Search } from "lucide-react";
 import { OpsDialog } from "./ops-dialog";
 import {
-  personalSheetGroups,
   personalSheetTabs,
   type PersonalSheetTab,
 } from "@/lib/personal-sheet-tabs";
@@ -154,8 +153,7 @@ function SheetView({ tab }: { tab: SheetDefinition }) {
   }, [refresh, detail]);
 
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
-  const isGrid = tab.layout === "grid";
-  const rowLabel = isGrid ? "행" : "항목";
+  const rowLabel = "항목";
   const filtered = (result?.rows || [])
     .map((row, index) => ({ row, index }))
     .filter(
@@ -244,9 +242,8 @@ function SheetView({ tab }: { tab: SheetDefinition }) {
       {result && filtered.length ? (
         <>
           <p className="ops-sheet-reading-hint">
-            {isGrid
-              ? "원본 셀 순서대로 표시합니다. 행 번호를 누르면 해당 행의 전체 내용을 볼 수 있습니다."
-              : "가로로 스크롤해 모든 열을 확인하고, 항목을 누르면 전체 내용을 볼 수 있습니다."}
+            가로로 스크롤해 모든 열을 확인하고, 항목을 누르면 전체 내용을 볼 수
+            있습니다.
           </p>
           <div
             className="ops-sheet-table-wrap"
@@ -255,12 +252,12 @@ function SheetView({ tab }: { tab: SheetDefinition }) {
             aria-label={`${tab.label} 시트 표. 가로 스크롤 가능`}
           >
             <table
-              className={`ops-sheet-table${isGrid ? " is-grid" : ""}`}
+              className="ops-sheet-table"
               style={
                 {
                   "--sheet-data-columns": Math.max(
                     0,
-                    result.columns.length - (isGrid ? 0 : 1),
+                    result.columns.length - 1,
                   ),
                 } as CSSProperties
               }
@@ -269,12 +266,11 @@ function SheetView({ tab }: { tab: SheetDefinition }) {
                 {result.sheetTitle} 읽기 전용 표
               </caption>
               <colgroup>
-                {isGrid ? <col className="ops-sheet-key-column" /> : null}
                 {result.columns.map((_, index) => (
                   <col
                     key={index}
                     className={
-                      index === 0 && !isGrid
+                      index === 0
                         ? "ops-sheet-key-column"
                         : "ops-sheet-data-column"
                     }
@@ -283,7 +279,6 @@ function SheetView({ tab }: { tab: SheetDefinition }) {
               </colgroup>
               <thead>
                 <tr>
-                  {isGrid ? <th scope="col">행</th> : null}
                   {result.columns.map((column, index) => (
                     <th key={index} scope="col">
                       {column || `열 ${index + 1}`}
@@ -306,27 +301,8 @@ function SheetView({ tab }: { tab: SheetDefinition }) {
                       });
                     }}
                   >
-                    {isGrid ? (
-                      <th scope="row">
-                        <button
-                          type="button"
-                          className="ops-sheet-grid-row-open"
-                          aria-label={`${tab.label} ${index + 1}행 전체 내용`}
-                          onClick={() =>
-                            setDetail({
-                              row,
-                              index,
-                              columns: result.columns,
-                              sheetTitle: result.sheetTitle,
-                            })
-                          }
-                        >
-                          {index + 1}
-                        </button>
-                      </th>
-                    ) : null}
                     {result.columns.map((_, columnIndex) =>
-                      columnIndex === 0 && !isGrid ? (
+                      columnIndex === 0 ? (
                         <th key={columnIndex} scope="row">
                           <button
                             type="button"
@@ -378,11 +354,7 @@ function SheetView({ tab }: { tab: SheetDefinition }) {
           <dl className="ops-sheet-detail">
             {detail.columns.map((column, index) => (
               <div key={index}>
-                <dt>
-                  {isGrid
-                    ? `${column || index + 1}열`
-                    : column || `열 ${index + 1}`}
-                </dt>
+                <dt>{column || `열 ${index + 1}`}</dt>
                 <dd>
                   <SheetCell value={detail.row[index] || ""} />
                 </dd>
@@ -414,7 +386,6 @@ export function PersonalSheetsPanel({
 }) {
   const [tabId, setTabId] = useState<PersonalSheetTab>(initialTab);
   const tab = sheetTabs.find((item) => item.id === tabId)!;
-  const group = personalSheetGroups.find((item) => item.id === tab.group)!;
   return (
     <section
       className="ops-card ops-personal-sheets"
@@ -423,9 +394,7 @@ export function PersonalSheetsPanel({
       <div className="ops-section-head">
         <div>
           <h2>Content Studio</h2>
-          <p>
-            PERSONAL · 콘텐츠 제작과 운영, 캐릭터 가이드를 한곳에서 확인하세요.
-          </p>
+          <p>기획·원고·발행 성과를 확인하세요.</p>
         </div>
         <span className="ops-sheet-readonly">읽기 전용</span>
       </div>
@@ -435,51 +404,25 @@ export function PersonalSheetsPanel({
         <>
           <nav className="ops-sheet-groups" aria-label="SNS 스튜디오 시트 선택">
             <div
-              className="ops-sheet-group-picker"
+              className="ops-sheet-tabs"
               role="group"
-              aria-label="스튜디오 분류 선택"
+              aria-label="콘텐츠 시트 선택"
             >
-              {personalSheetGroups.map((item) => (
+              {sheetTabs.map((item) => (
                 <button
                   type="button"
                   key={item.id}
-                  aria-pressed={tab.group === item.id}
-                  onClick={() => {
-                    if (item.id === tab.group) return;
-                    const first = sheetTabs.find(
-                      (sheet) => sheet.group === item.id,
-                    );
-                    if (first) setTabId(first.id);
-                  }}
+                  aria-pressed={tabId === item.id}
+                  onClick={() => setTabId(item.id)}
                 >
                   {item.label}
                 </button>
               ))}
             </div>
-            <div
-              className="ops-sheet-tabs"
-              role="group"
-              aria-label={`${group.label} 시트 선택`}
-            >
-              {sheetTabs
-                .filter((item) => item.group === group.id)
-                .map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    aria-pressed={tabId === item.id}
-                    onClick={() => setTabId(item.id)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-            </div>
           </nav>
           <SheetView key={tab.id} tab={tab} />
           <p className="ops-sheet-footer">
-            Google Sheets의 {sheetTabs.length}개 시트를 읽기 전용으로
-            조회합니다. 목록을 보는 동안 1분마다 새로 불러옵니다. 수정은 원본
-            시트에서 해 주세요.
+            읽기 전용 · 1분마다 새로고침 · 수정은 원본 시트에서 해 주세요.
           </p>
         </>
       )}

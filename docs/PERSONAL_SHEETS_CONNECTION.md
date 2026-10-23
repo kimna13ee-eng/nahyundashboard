@@ -1,5 +1,10 @@
 # PERSONAL SNS studio — 2026-10-20
 
+Current policy (2026-10-23): Content Studio exposes only 기획, 원고 and
+발행·성과. The 17-tab expansion described below is historical validation;
+its 14 additional tabs are no longer selectable or accepted by the API.
+The original workbook is unchanged. See `PERSONAL_SIMPLIFICATION.md`.
+
 The top-level 내 SNS 스튜디오 menu replaces 콘텐츠 시트 after Content Studio and is visible only in the
 PERSONAL workspace, including mobile More. Leaving PERSONAL returns to Overview
 and unmounts the panel. Login/user/tab changes abort pending reads and clear the
