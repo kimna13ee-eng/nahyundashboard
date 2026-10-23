@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
-import { ArrowUpRight, BarChart3, ChevronDown, RefreshCw } from "lucide-react";
+import { ArrowUpRight, ChevronDown, RefreshCw } from "lucide-react";
 import { OpsDialog } from "./ops-dialog";
 import { workspaceApiPath } from "@/lib/workspace-api";
 import {
@@ -315,7 +315,12 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
     >
       <div className="ops-reels-heading">
         <div>
-          <span className="ops-reels-eyebrow">PERSONAL · CONTENT STUDIO</span>
+          <span className="ops-reels-eyebrow">
+            <span className="ops-reels-icon-chip" aria-hidden="true">
+              🎬
+            </span>
+            나의 콘텐츠 기록
+          </span>
           <h2>릴스 발행 성과</h2>
           <p>
             {result?.source.truncated
@@ -352,7 +357,12 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
       </div>
       <div className="ops-reels-summary">
         <div className="ops-reels-stat is-primary">
-          <span>릴스 성과 점수</span>
+          <span className="ops-reels-stat-label">
+            <span className="ops-reels-stat-chip" aria-hidden="true">
+              🏅
+            </span>
+            릴스 성과 점수
+          </span>
           <strong>
             {summary ? (
               summary.performanceScore.value === null ? (
@@ -373,14 +383,24 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
           </small>
         </div>
         <div className="ops-reels-stat">
-          <span>총 조회수{result?.source.truncated ? " · 부분합" : ""}</span>
+          <span className="ops-reels-stat-label">
+            <span className="ops-reels-stat-chip" aria-hidden="true">
+              👀
+            </span>
+            총 조회수{result?.source.truncated ? " · 부분합" : ""}
+          </span>
           <strong>{ready ? number(summary.totals.views) : "—"}</strong>
           <small>
             {summary ? coverageText(summary, "views") : "발행 릴스 기준"}
           </small>
         </div>
         <div className="ops-reels-stat">
-          <span>총 반응{result?.source.truncated ? " · 부분합" : ""}</span>
+          <span className="ops-reels-stat-label">
+            <span className="ops-reels-stat-chip" aria-hidden="true">
+              💬
+            </span>
+            총 반응{result?.source.truncated ? " · 부분합" : ""}
+          </span>
           <strong>{ready ? number(summary.totals.reactions) : "—"}</strong>
           <small>
             {summary
@@ -430,7 +450,7 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
             <strong>
               {metricLabels[metric]} 랭킹
               <span className="ops-reels-top-label">
-                {expanded ? "ALL" : "TOP 3"}
+                {expanded ? "전체" : "상위 3"}
               </span>
             </strong>
             <span>
@@ -476,7 +496,9 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
             </>
           ) : (
             <div className="ops-reels-empty" role="status">
-              <BarChart3 size={24} aria-hidden="true" />
+              <span className="ops-reels-empty-chip" aria-hidden="true">
+                🎬
+              </span>
               <strong>
                 {!enabled
                   ? "개인 계정으로 로그인해 주세요."
@@ -612,7 +634,7 @@ export function PersonalPerformancePanel({ enabled, onOpenStudio }: Props) {
         </p>
         {sourceUrl ? (
           <a href={sourceUrl} target="_blank" rel="noopener noreferrer">
-            원본 Google Sheets <ArrowUpRight size={13} aria-hidden="true" />
+            원본 시트 <ArrowUpRight size={13} aria-hidden="true" />
           </a>
         ) : null}
       </div>

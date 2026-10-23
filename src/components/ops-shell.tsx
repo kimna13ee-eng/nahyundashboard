@@ -22,6 +22,7 @@ import { YogaVideoFields } from "./yoga-video-fields";
 import { FrengleOverviewMemos } from "./frengle-overview-memos";
 import "./frengle-overview-layout.css";
 import "./personal-overview.css";
+import "./personal-jelly.css";
 import type { PersonalSheetTab } from "@/lib/personal-sheet-tabs";
 import {
   YogaReminderPanel,
@@ -115,6 +116,13 @@ const menus = [
   { id: "analytics", label: "Analytics", icon: ChartNoAxesCombined },
   { id: "settings", label: "Settings", icon: Settings },
 ];
+const personalMenuChips: Record<string, { emoji: string; tone: string }> = {
+  overview: { emoji: "🎬", tone: "coral" },
+  calendar: { emoji: "🗓️", tone: "mint" },
+  "personal-sheets": { emoji: "✏️", tone: "lemon" },
+  "yoga-planner": { emoji: "🧘", tone: "lavender" },
+  settings: { emoji: "⚙️", tone: "sky" },
+};
 type Editor = {
   resource: Resource;
   row?: OpsRow;
@@ -828,7 +836,19 @@ export function OpsShell({
   const heads = (name: string, sub: string, action?: React.ReactNode) => (
     <div className="ops-section-head">
       <div>
-        <h2>{name}</h2>
+        <h2>
+          {space === "PERSONAL" &&
+          ["Calendar", "이번 주 일정", "계정"].includes(name) ? (
+            <span
+              className="ops-jelly-section-chip"
+              data-tone={name === "계정" ? "sky" : "mint"}
+              aria-hidden="true"
+            >
+              {name === "계정" ? "⚙️" : "🗓️"}
+            </span>
+          ) : null}
+          {name}
+        </h2>
         <p>{sub}</p>
       </div>
       {action}
@@ -1089,25 +1109,45 @@ export function OpsShell({
   return (
     <div
       className={`editorial${isPersonalLayout ? " is-personal-layout" : ""}${isPersonalLayout && active ? " has-active-timer" : ""}`}
+      data-personal-view={isPersonalLayout ? view : undefined}
     >
       <aside className="ops-sidebar">
         <Link
           href={space === "FRENGLE" ? "/frengle" : "/"}
           className="ops-brand"
         >
-          <Command size={24} />
+          {isPersonalLayout ? (
+            <span className="ops-personal-brand-mark" aria-hidden="true">
+              🫧
+            </span>
+          ) : (
+            <Command size={24} />
+          )}
           MY OPS <small>OS / 01</small>
         </Link>
-        <span className="ops-caption">MY OPERATING SPACE</span>
+        <span className="ops-caption">
+          {isPersonalLayout ? "내 작업 공간" : "MY OPERATING SPACE"}
+        </span>
         <nav aria-label="주 메뉴">
           {visibleMenus.map((m) => (
             <button
               key={m.id}
+              data-section={m.id}
               aria-current={view === m.id ? "page" : undefined}
               className={view === m.id ? "active" : ""}
               onClick={() => move(m.id)}
             >
-              <m.icon size={18} />
+              {isPersonalLayout ? (
+                <span
+                  className="ops-personal-nav-chip"
+                  data-tone={personalMenuChips[m.id]?.tone}
+                  aria-hidden="true"
+                >
+                  {personalMenuChips[m.id]?.emoji}
+                </span>
+              ) : (
+                <m.icon size={18} />
+              )}
               {m.label}
             </button>
           ))}
@@ -1253,7 +1293,9 @@ export function OpsShell({
           ) : null}
           <div className="ops-heading">
             <div>
-              <small>YOUR WORK, WITH INTENTION.</small>
+              {space === "FRENGLE" ? (
+                <small>YOUR WORK, WITH INTENTION.</small>
+              ) : null}
               <h1>{title}</h1>
               <p>
                 {view === "overview"
@@ -1285,35 +1327,37 @@ export function OpsShell({
               }}
             />
           ) : null}
-          <div className="ops-connection">
-            <strong>
-              {space === "FRENGLE"
-                ? "FRENGLE · 회사 업무 전용"
-                : isPersonalOverview
-                  ? "PERSONAL · CONTENT WORKSPACE"
-                  : "PERSONAL · 개인 콘텐츠와 일정"}
-            </strong>
-            <p>
-              {configured === false
-                ? "환경변수가 없습니다. 샘플 데이터와 임의의 통계를 표시하지 않습니다."
-                : user
-                  ? isPersonalOverview
-                    ? "콘텐츠 성과와 개인 일정을 한곳에서 확인하세요."
-                    : space === "PERSONAL"
-                      ? "콘텐츠 일정과 요가 계획을 편하게 관리하세요."
-                      : "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 자동화 데이터에는 수신된 결과를 표시합니다."
-                  : `설정에서 ${space} 계정으로 로그인하세요. 로그인 전에는 실제 데이터를 표시하지 않습니다.`}
-            </p>
-            {space === "FRENGLE" && user && dataReady && !timerGuardReady ? (
-              <p role="status">
-                타이머 보호 연결 확인이 필요합니다. SQL010 적용 후 설정에서 DB
-                새로고침해 주세요.
+          {space === "FRENGLE" || !user || configured !== true ? (
+            <div className="ops-connection">
+              <strong>
+                {space === "FRENGLE"
+                  ? "FRENGLE · 회사 업무 전용"
+                  : isPersonalOverview
+                    ? "콘텐츠와 일정"
+                    : "개인 콘텐츠와 일정"}
+              </strong>
+              <p>
+                {configured === false
+                  ? "환경변수가 없습니다. 샘플 데이터와 임의의 통계를 표시하지 않습니다."
+                  : user
+                    ? isPersonalOverview
+                      ? "콘텐츠 성과와 개인 일정을 한곳에서 확인하세요."
+                      : space === "PERSONAL"
+                        ? "콘텐츠 일정과 요가 계획을 편하게 관리하세요."
+                        : "DB 조회·저장 성공 여부는 요청 결과로 확인합니다. 자동화 데이터에는 수신된 결과를 표시합니다."
+                    : `설정에서 ${space} 계정으로 로그인하세요. 로그인 전에는 실제 데이터를 표시하지 않습니다.`}
               </p>
-            ) : null}
-            <button onClick={() => move("settings")}>
-              설정 <ArrowUpRight size={14} />
-            </button>
-          </div>
+              {space === "FRENGLE" && user && dataReady && !timerGuardReady ? (
+                <p role="status">
+                  타이머 보호 연결 확인이 필요합니다. SQL010 적용 후 설정에서 DB
+                  새로고침해 주세요.
+                </p>
+              ) : null}
+              <button onClick={() => move("settings")}>
+                설정 <ArrowUpRight size={14} />
+              </button>
+            </div>
+          ) : null}
           {error ? (
             <p className="ops-alert bad" role="alert">
               {error}
@@ -1975,7 +2019,7 @@ export function OpsShell({
             </section>
           ) : null}
           {view === "calendar" ? (
-            <section className="ops-card">
+            <section className="ops-card ops-calendar-board">
               {heads(
                 "Calendar",
                 space === "PERSONAL"
@@ -2091,8 +2135,14 @@ export function OpsShell({
                       const d =
                         day.slice(0, 8) + String(i + 1).padStart(2, "0");
                       return (
-                        <div key={d}>
+                        <div
+                          key={d}
+                          data-today={d === today || undefined}
+                          data-selected={d === day || undefined}
+                        >
                           <button
+                            className="ops-calendar-date"
+                            aria-current={d === today ? "date" : undefined}
                             onClick={() => {
                               setDay(d);
                               setCalendarView("day");
@@ -2106,6 +2156,7 @@ export function OpsShell({
                               <button
                                 key={s.id}
                                 className="ops-calendar-event"
+                                data-category={calendarCategory(s)}
                                 aria-label={`${calendarLabel(s)} ${text(s.title)} ${dateTime(s.starts_at)}`}
                                 onClick={() => setCalendarDetail(s)}
                               >
@@ -2136,6 +2187,7 @@ export function OpsShell({
                   <div className="ops-entry" key={s.id}>
                     <button
                       className="ops-calendar-event"
+                      data-category={calendarCategory(s)}
                       aria-label={`${calendarLabel(s)} ${text(s.title)}`}
                       onClick={() => setCalendarDetail(s)}
                     >
@@ -2721,7 +2773,14 @@ export function OpsShell({
             </section>
           ) : null}
           <footer>
-            MY OPS · Editorial OS <span>수동 등록과 실제 기록만 표시</span>
+            {space === "PERSONAL"
+              ? "MY OPS · 나의 기록"
+              : "MY OPS · Editorial OS"}{" "}
+            <span>
+              {space === "PERSONAL"
+                ? "한국시간 기준"
+                : "수동 등록과 실제 기록만 표시"}
+            </span>
           </footer>
         </main>
       </div>
@@ -2778,15 +2837,43 @@ export function OpsShell({
           .map((m) => (
             <button
               key={m.id}
+              data-section={m.id}
               className={view === m.id ? "active" : ""}
+              aria-current={view === m.id ? "page" : undefined}
               onClick={() => move(m.id)}
             >
-              <m.icon size={19} />
+              {isPersonalLayout ? (
+                <span
+                  className="ops-personal-nav-chip"
+                  data-tone={personalMenuChips[m.id]?.tone}
+                  aria-hidden="true"
+                >
+                  {personalMenuChips[m.id]?.emoji}
+                </span>
+              ) : (
+                <m.icon size={19} />
+              )}
               <span>{m.label}</span>
             </button>
           ))}
-        <button onClick={() => setMoreMenu(true)}>
-          <Settings size={19} />
+        <button
+          data-section="settings"
+          className={
+            space === "PERSONAL" && view === "settings" ? "active" : undefined
+          }
+          onClick={() => setMoreMenu(true)}
+        >
+          {isPersonalLayout ? (
+            <span
+              className="ops-personal-nav-chip"
+              data-tone="sky"
+              aria-hidden="true"
+            >
+              ⚙️
+            </span>
+          ) : (
+            <Settings size={19} />
+          )}
           <span>더보기</span>
         </button>
       </nav>
@@ -2879,12 +2966,23 @@ export function OpsShell({
             {visibleMenus.map((m) => (
               <button
                 key={m.id}
+                data-section={m.id}
                 onClick={() => {
                   move(m.id);
                   setMoreMenu(false);
                 }}
               >
-                <m.icon size={18} />
+                {isPersonalLayout ? (
+                  <span
+                    className="ops-personal-nav-chip"
+                    data-tone={personalMenuChips[m.id]?.tone}
+                    aria-hidden="true"
+                  >
+                    {personalMenuChips[m.id]?.emoji}
+                  </span>
+                ) : (
+                  <m.icon size={18} />
+                )}
                 {m.label}
               </button>
             ))}

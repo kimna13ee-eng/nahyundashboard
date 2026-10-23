@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Flower2,
   Pencil,
   Plus,
   Trash2,
@@ -120,14 +119,21 @@ export function YogaPlannerPanel({
     <section className="ops-yoga-planner" aria-label="요가 플래너 보드">
       <header className="ops-yoga-planner-heading">
         <div>
-          <span className="ops-yoga-planner-eyebrow">MY WEEKLY ROUTINE</span>
+          <span className="ops-yoga-planner-eyebrow">
+            <span className="ops-yoga-planner-icon" aria-hidden="true">
+              🧘
+            </span>
+            요가 플래너
+          </span>
           <h2>나를 위한 주간 요가</h2>
           <p>
             원하는 요일에 영상을 담고, 제목과 운동 시간을 한눈에 확인하세요.
           </p>
         </div>
         <div className="ops-yoga-planner-time">
-          <Bell size={16} aria-hidden="true" />
+          <span className="ops-yoga-planner-alarm-icon" aria-hidden="true">
+            🔔
+          </span>
           <div>
             <strong>오후 9:00</strong>
             <span>한국시간 · 링크를 등록한 날</span>
@@ -312,7 +318,12 @@ export function YogaPlannerPanel({
                   })
                 ) : (
                   <div className="ops-yoga-planner-empty">
-                    <Flower2 size={27} aria-hidden="true" />
+                    <span
+                      className="ops-yoga-planner-empty-icon"
+                      aria-hidden="true"
+                    >
+                      🌿
+                    </span>
                     <p>
                       보고 싶은 영상을
                       <br />
