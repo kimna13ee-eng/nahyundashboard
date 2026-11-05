@@ -33,12 +33,12 @@ import { journalEntries } from "@/lib/journal-report";
 import {
   dailyTaskGroups,
   dailyTaskSummary,
+  pinnedOverviewProjects,
   seoulWeek,
   taskCompletionTime,
   weeklyScheduleRows,
   weeklyScheduleTime,
 } from "@/lib/overview-summary";
-import { AutomationResultsPanel } from "./automation-results-panel";
 import { JournalExport } from "./journal-export";
 import { calendarLabel, calendarTitle } from "@/lib/mobile-calendar";
 import { contentCalendar } from "@/lib/personal-content";
@@ -73,7 +73,6 @@ import {
   LayoutDashboard,
   CalendarDays,
   FolderKanban,
-  Workflow,
   FileSpreadsheet,
   Flower2,
   NotebookPen,
@@ -108,7 +107,6 @@ const menus = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "projects", label: "Projects", icon: FolderKanban },
-  { id: "automations", label: "Automations", icon: Workflow },
   { id: "personal-sheets", label: "Content Studio", icon: FileSpreadsheet },
   { id: "yoga-planner", label: "Yoga Planner", icon: Flower2 },
   { id: "journal", label: "Work Journal", icon: NotebookPen },
@@ -123,7 +121,6 @@ const workspaceMenuChips: Record<string, { emoji: string; tone: string }> = {
   "yoga-planner": { emoji: "🧘", tone: "lavender" },
   settings: { emoji: "⚙️", tone: "sky" },
   projects: { emoji: "🧩", tone: "lavender" },
-  automations: { emoji: "⚡", tone: "lemon" },
   journal: { emoji: "📝", tone: "mint" },
   library: { emoji: "📚", tone: "sky" },
   analytics: { emoji: "📊", tone: "mint" },
@@ -133,7 +130,6 @@ const sectionChips: Record<string, { emoji: string; tone: string }> = {
   "이번 주 일정": workspaceMenuChips.calendar,
   계정: workspaceMenuChips.settings,
   "FRENGLE 연결": workspaceMenuChips.settings,
-  "회사 및 외부 연결": workspaceMenuChips.settings,
   "오늘 할 일": { emoji: "📌", tone: "coral" },
   "오늘 완료 업무": { emoji: "✅", tone: "mint" },
   "이어서 할 업무": { emoji: "⏯️", tone: "lemon" },
@@ -157,7 +153,6 @@ function workspaceViewAllowed(view: string, workspace: ApiWorkspace) {
   if (
     [
       "projects",
-      "automations",
       "library",
       "journal",
       "analytics",
@@ -263,28 +258,6 @@ export function OpsShell({
   const [projectProcessReady, setProjectProcessReady] = useState(false);
   const [scheduleCategoryReady, setScheduleCategoryReady] = useState(false);
   const [yogaMetadataReady, setYogaMetadataReady] = useState(false);
-  const [automationResults, setAutomationResults] = useState<OpsRow[]>([]);
-  const [automationReady, setAutomationReady] = useState(false);
-  useEffect(() => {
-    if (!user || !["overview", "automations"].includes(view)) return;
-    let mounted = true;
-    const interval = setInterval(async () => {
-      if (document.visibilityState !== "visible") return;
-      try {
-        const result = await api("/api/automation-results");
-        if (mounted) {
-          setAutomationResults(result.results || []);
-          setAutomationReady(result.ready === true);
-        }
-      } catch {
-        if (mounted) setAutomationReady(false);
-      }
-    }, 30000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, [user, space, view]);
   const [taskTestClassification, setTaskTestClassification] = useState(false);
   const [libraryWorkflow, setLibraryWorkflow] = useState(false);
   const [workflowReady, setWorkflowReady] = useState(false);
@@ -333,8 +306,6 @@ export function OpsShell({
     setWorkflowReady(false);
     setWorkflowChecked(false);
     setTimerGuardReady(false);
-    setAutomationResults([]);
-    setAutomationReady(false);
     setProjectProcessReady(false);
     setYogaMetadataReady(false);
   }, []);
@@ -378,21 +349,15 @@ export function OpsShell({
     const token = ++generation.current;
     setLoading(true);
     try {
-      const [result, workflow, automation] = await Promise.all([
+      const [result, workflow] = await Promise.all([
         api("/api/ops?workspace=PERSONAL"),
         api("/api/workflow?workspace=PERSONAL").catch(() => ({
           ready: false,
           data: {},
         })),
-        api("/api/automation-results").catch(() => ({
-          ready: false,
-          results: [],
-        })),
       ]);
       if (token !== generation.current) return;
       setData(result.data);
-      setAutomationResults(automation.results || []);
-      setAutomationReady(automation.ready === true);
       setTimerGuardReady(result.timerGuardReady === true);
       setDataReady(true);
       setWorkflowReady(workflow.ready === true);
@@ -932,8 +897,9 @@ export function OpsShell({
     </div>
   );
   const today = seoulDate(new Date(tick + offset));
-  const dailySummary = dailyTaskSummary(tasks, today);
-  const todayTasks = dailyTaskGroups(tasks, today);
+  const dailySummary = dailyTaskSummary(tasks, today, projects);
+  const todayTasks = dailyTaskGroups(tasks, today, projects);
+  const pinnedProjects = pinnedOverviewProjects(projects, tasks);
   const overviewWeek = seoulWeek(today);
   const filteredTasks = orderedProjectTasks(
     listedTasks.filter(
@@ -1355,7 +1321,7 @@ export function OpsShell({
                       ? "콘텐츠 성과와 개인 일정을 한곳에서 확인하세요."
                       : space === "PERSONAL"
                         ? "콘텐츠 일정과 요가 계획을 편하게 관리하세요."
-                        : "프로젝트와 업무, 수신한 자동화 결과를 한곳에서 확인하세요."
+                        : "프로젝트와 오늘의 업무를 한곳에서 확인하세요."
                     : `설정에서 ${space} 계정으로 로그인하세요. 로그인 전에는 실제 데이터를 표시하지 않습니다.`}
               </p>
               {space === "FRENGLE" && user && dataReady && !timerGuardReady ? (
@@ -1431,45 +1397,22 @@ export function OpsShell({
                     {[
                       ["전체 업무", dailySummary.total],
                       ["오늘 완료", todayTasks.completed.length],
-                      [
-                        "자동화 데이터",
-                        automationReady
-                          ? automationResults.filter(
-                              (r) =>
-                                seoulDate(new Date(String(r.received_at))) ===
-                                today,
-                            ).length
-                          : "미연결",
-                      ],
+                      ["미완료 프로젝트", pinnedProjects.length],
                     ].map(([label, value]) => {
                       const contents = (
                         <>
                           <small>{label}</small>
                           <strong>{user && !error ? value : "—"}</strong>
-                          {label === "자동화 데이터" ? (
-                            <span>
-                              수신 결과 확인 <ArrowUpRight size={14} />
-                            </span>
-                          ) : null}
                           <p>
-                            {label === "자동화 데이터"
-                              ? "오늘 수신한 회사 자동화 결과 · 최근 100건 기준"
+                            {label === "미완료 프로젝트"
+                              ? "완료할 때까지 오늘 할 일에 고정"
                               : label === "오늘 완료"
                                 ? `${today} · 오늘 완료한 업무`
                                 : `${today} · 미완료 프로세스와 오늘의 기존 업무`}
                           </p>
                         </>
                       );
-                      return label === "자동화 데이터" ? (
-                        <button
-                          className="ops-card ops-automation-metric"
-                          key={label}
-                          aria-label="자동화 데이터 · 수신 결과 확인"
-                          onClick={() => move("automations")}
-                        >
-                          {contents}
-                        </button>
-                      ) : (
+                      return (
                         <div className="ops-card" key={label}>
                           {contents}
                         </div>
@@ -1478,13 +1421,13 @@ export function OpsShell({
                   </div>
                   <p className="ops-overview-metric-note">
                     {today} · 전체: 미완료 프로세스와 진행 중·오늘 등록·마감
-                    업무 · 완료: 오늘 완료 · 자동화: 수신 결과
+                    업무 · 완료: 오늘 완료 · 프로젝트: 미완료 전체
                   </p>
                   <div className="ops-frengle-overview-split">
                     <section className="ops-card ops-overview-today">
                       {heads(
                         "오늘 할 일",
-                        `${today} · 미완료 프로세스와 진행 중 업무는 매일 표시 · 그 외 오늘 등록·마감 기준`,
+                        `${today} · 프로젝트는 완료할 때까지 고정 · 미완료 프로세스와 진행 중 업무도 매일 표시`,
                         <div
                           className="ops-overview-create-actions"
                           role="group"
@@ -1494,7 +1437,52 @@ export function OpsShell({
                           {create("projects", "프로젝트 등록")}
                         </div>,
                       )}
-                      {taskList(todayTasks.pending)}
+                      {pinnedProjects.length ? (
+                        <ul
+                          className="ops-overview-pinned-projects"
+                          aria-label="고정 프로젝트"
+                        >
+                          {pinnedProjects.map(
+                            ({ project: item, total, completed }) => (
+                              <li key={item.id}>
+                                <span
+                                  className="ops-overview-project-chip"
+                                  aria-hidden="true"
+                                >
+                                  🧩
+                                </span>
+                                <button
+                                  className="ops-overview-project-title"
+                                  disabled={!canWrite}
+                                  onClick={() =>
+                                    setEditor({
+                                      resource: "projects",
+                                      row: item,
+                                    })
+                                  }
+                                >
+                                  <strong>{text(item.title)}</strong>
+                                  <small>
+                                    {projectCategoryLabels[
+                                      item.project_category as keyof typeof projectCategoryLabels
+                                    ] || "기타"}
+                                    {" · "}
+                                    {total
+                                      ? `프로세스 ${completed}/${total} 완료`
+                                      : "프로세스 추가하기"}
+                                  </small>
+                                </button>
+                                <span className="ops-overview-project-status">
+                                  {item.status === "active" ? "진행" : "계획"}
+                                </span>
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      ) : null}
+                      {todayTasks.pending.length || !pinnedProjects.length
+                        ? taskList(todayTasks.pending)
+                        : null}
                     </section>
                     <FrengleOverviewMemos
                       key={`company-memos:${user?.email || "signed-out"}`}
@@ -1636,16 +1624,6 @@ export function OpsShell({
                   </table>
                 </div>
               </section>
-              <AutomationResultsPanel
-                workspace={space}
-                results={automationResults}
-                ready={automationReady}
-                enabled={Boolean(user)}
-                compact
-                inlineHistory={space === "PERSONAL"}
-                onViewAll={() => move("automations")}
-                refresh={() => void load()}
-              />
               {space === "FRENGLE" ? (
                 <section className="ops-card">
                   {heads(
@@ -2226,7 +2204,7 @@ export function OpsShell({
               <p className="ops-footnote">
                 {space === "PERSONAL"
                   ? "요가 플래너에 등록한 영상도 같은 날짜에 표시됩니다."
-                  : "반복 일정과 콘텐츠 발행 예정은 캘린더에 함께 표시됩니다. 아래에서 반복 회차를 관리하세요. 자동화 예정 시간은 미연결입니다."}
+                  : "반복 일정과 콘텐츠 발행 예정은 캘린더에 함께 표시됩니다. 아래에서 반복 회차를 관리하세요."}
               </p>
               {space === "FRENGLE" ? (
                 <details className="ops-detail">
@@ -2555,15 +2533,6 @@ export function OpsShell({
               ) : null}
             </section>
           ) : null}
-          {["automations"].includes(view) ? (
-            <AutomationResultsPanel
-              workspace={space}
-              results={automationResults}
-              ready={Boolean(user) && automationReady}
-              enabled={Boolean(user)}
-              refresh={() => void load()}
-            />
-          ) : null}
           {view === "personal-sheets" && space === "PERSONAL" ? (
             <PersonalSheetsPanel
               key={
@@ -2737,27 +2706,6 @@ export function OpsShell({
                   ) : null}
                 </div>
               </section>
-              {space === "FRENGLE" ? (
-                <section className="ops-card">
-                  {heads(
-                    "회사 및 외부 연결",
-                    "FRENGLE / ChatGPT / Claude / Codex",
-                  )}
-                  <div className="ops-detail">
-                    <p>
-                      {space} 저장소에 전달된 자동화 결과는 Automations에서
-                      확인하세요.
-                    </p>
-                    <p>
-                      워크스페이스를 바꾸면 해당 저장소의 계정과 데이터로 새로
-                      엽니다.
-                    </p>
-                    <button onClick={() => move("automations")}>
-                      자동화 데이터 보기
-                    </button>
-                  </div>
-                </section>
-              ) : null}
             </div>
           ) : null}
           {view === "settings" && space === "PERSONAL" ? (
@@ -2772,10 +2720,7 @@ export function OpsShell({
           {view === "journal" ? (
             <section className="ops-card">
               <h2>Daily Report</h2>
-              <p>
-                회사 공유 보고서 내보내기는 준비 중입니다. 자동화 데이터는
-                FRENGLE 회사 전용 포털에서 확인하세요.
-              </p>
+              <p>회사 공유 보고서 내보내기는 준비 중입니다.</p>
               <p>
                 PERSONAL 프로젝트·내부 메모·특이사항·업무 시간·연차·비밀정보는
                 제외합니다.

@@ -1,4 +1,3 @@
-import { automationReceiptRows } from "./automation-receipts.ts";
 import { type OpsRow } from "./ops.ts";
 import { isArchivedProjectProcess } from "./project-process-view.ts";
 import { workspaceApiPath, type ApiWorkspace } from "./workspace-api.ts";
@@ -12,9 +11,7 @@ export type WorkspaceSnapshot = {
   status: "loading" | "ready" | "signed-out" | "unconfigured" | "error";
   tasks: OpsRow[] | null;
   schedules: OpsRow[] | null;
-  results: OpsRow[] | null;
   opsError?: string;
-  resultsError?: string;
   message?: string;
   partial: boolean;
 };
@@ -29,7 +26,6 @@ export function emptyWorkspaceSnapshot(
     status,
     tasks: null,
     schedules: null,
-    results: null,
     partial: false,
     message,
   };
@@ -89,57 +85,45 @@ export async function loadWorkspaceSnapshot(
       );
     if (!record(session.user)) throw new Error("인증 응답 형식 오류");
 
-    const [ops, automation] = await Promise.allSettled([
-      get("/api/ops"),
-      get("/api/automation-results"),
-    ]);
-    const accessFailure = [ops, automation].find(
-      (result) =>
-        result.status === "rejected" &&
-        result.reason instanceof WorkspaceReadError &&
-        [401, 403].includes(result.reason.status),
-    );
-    if (accessFailure)
+    const ops = await get("/api/ops").catch((error: unknown) => {
+      if (
+        error instanceof WorkspaceReadError &&
+        [401, 403].includes(error.status)
+      )
+        throw error;
+      return null;
+    });
+
+    const snapshot = emptyWorkspaceSnapshot(workspace, "ready");
+    if (
+      ops?.workspace === workspace &&
+      record(ops.data) &&
+      rows(ops.data.tasks) &&
+      rows(ops.data.schedules)
+    ) {
+      snapshot.tasks = ops.data.tasks.filter(
+        (task) => !isArchivedProjectProcess(task),
+      );
+      snapshot.schedules = ops.data.schedules.filter(
+        (schedule) => !schedule.deleted_at,
+      );
+      snapshot.partial =
+        Array.isArray(ops.truncated) &&
+        ops.truncated.some((name) => name === "tasks" || name === "schedules");
+    } else
+      snapshot.opsError =
+        "업무·일정을 불러오지 못했어요. 해당 공간의 연결 상태를 확인해 주세요.";
+    return snapshot;
+  } catch (error) {
+    if (
+      error instanceof WorkspaceReadError &&
+      [401, 403].includes(error.status)
+    )
       return emptyWorkspaceSnapshot(
         workspace,
         "signed-out",
         "로그인 상태와 이 공간의 접근 권한을 확인해 주세요.",
       );
-
-    const snapshot = emptyWorkspaceSnapshot(workspace, "ready");
-    if (
-      ops.status === "fulfilled" &&
-      ops.value.workspace === workspace &&
-      record(ops.value.data) &&
-      rows(ops.value.data.tasks) &&
-      rows(ops.value.data.schedules)
-    ) {
-      snapshot.tasks = ops.value.data.tasks.filter(
-        (task) => !isArchivedProjectProcess(task),
-      );
-      snapshot.schedules = ops.value.data.schedules.filter(
-        (schedule) => !schedule.deleted_at,
-      );
-      snapshot.partial =
-        Array.isArray(ops.value.truncated) &&
-        ops.value.truncated.some(
-          (name) => name === "tasks" || name === "schedules",
-        );
-    } else
-      snapshot.opsError =
-        "업무·일정을 불러오지 못했어요. 해당 공간의 연결 상태를 확인해 주세요.";
-    if (
-      automation.status === "fulfilled" &&
-      automation.value.ready === true &&
-      rows(automation.value.results)
-    )
-      snapshot.results = automationReceiptRows(
-        automation.value.results,
-        workspace,
-      );
-    else snapshot.resultsError = "자동화 결과를 불러오지 못했어요.";
-    return snapshot;
-  } catch {
     return emptyWorkspaceSnapshot(
       workspace,
       "error",

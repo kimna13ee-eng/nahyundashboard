@@ -142,19 +142,6 @@
   font-size: 17px;
   color: #4b3c57;
 }
-.editorial .ops-personal-overview-grid .ops-automation-list {
-  padding: 0 22px 18px;
-}
-.editorial .ops-personal-overview-grid .ops-automation-receipt {
-  border: 0;
-  border-radius: 15px;
-  padding: 16px;
-  background: #f7f3f9;
-}
-.editorial .ops-personal-overview-grid .ops-automation-chat {
-  border-radius: 9px;
-  background: #ffffffa8;
-}
 .editorial.is-jelly-layout .ops-main footer {
   margin-top: 32px;
   padding-top: 22px;
@@ -217,8 +204,5 @@
   }
   .editorial .ops-personal-overview-grid .ops-section-head {
     padding: 18px 16px;
-  }
-  .editorial .ops-personal-overview-grid .ops-automation-list {
-    padding-inline: 16px;
   }
 }

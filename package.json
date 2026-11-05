@@ -18,7 +18,6 @@
     "test:demo": "node tests/e2e.cjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.1",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.3",
     "lucide-react": "1.54.0",

@@ -55,8 +55,6 @@ test("ALL reads both existing sessions and storage routes independently using GE
           truncated: [],
         },
       },
-      "/api/automation-results": { body: { ready: true, results: [] } },
-      "/api/frengle/results": { body: { ready: true, results: [] } },
     },
     requests,
   );
@@ -66,7 +64,13 @@ test("ALL reads both existing sessions and storage routes independently using GE
   ]);
   assert.equal(personal.tasks?.[0].title, "개인 업무");
   assert.equal(company.tasks?.[0].title, "회사 업무");
-  assert.equal(requests.length, 6);
+  assert.equal(requests.length, 4);
+  assert.deepEqual(requests.map(({ url }) => url).sort(), [
+    "/api/frengle/session",
+    "/api/ops?workspace=FRENGLE",
+    "/api/ops?workspace=PERSONAL",
+    "/api/session",
+  ]);
   assert.ok(
     requests.every(
       ({ init }) =>
@@ -91,7 +95,6 @@ test("missing company login never queries its data or substitutes personal data"
   assert.equal(result.status, "signed-out");
   assert.equal(result.tasks, null);
   assert.equal(result.schedules, null);
-  assert.equal(result.results, null);
   assert.deepEqual(
     requests.map(({ url }) => url),
     ["/api/frengle/session"],
@@ -120,13 +123,11 @@ test("mismatched ops response cannot be displayed under a different workspace", 
           data: { tasks: [{ id: "p", title: "개인 자료" }], schedules: [] },
         },
       },
-      "/api/frengle/results": { body: { ready: true, results: [] } },
     }),
   );
   assert.equal(result.tasks, null);
   assert.equal(result.schedules, null);
   assert.ok(result.opsError);
-  assert.deepEqual(result.results, []);
 });
 
 test("permission failures clear the entire affected workspace snapshot", async () => {
@@ -136,12 +137,6 @@ test("permission failures clear the entire affected workspace snapshot", async (
     reader({
       "/api/frengle/session": { body: { configured: true, user: {} } },
       "/api/ops?workspace=FRENGLE": {
-        body: {
-          workspace: "FRENGLE",
-          data: { tasks: [{ id: "t" }], schedules: [] },
-        },
-      },
-      "/api/frengle/results": {
         status: 403,
         body: { error: "membership required" },
       },
@@ -149,35 +144,30 @@ test("permission failures clear the entire affected workspace snapshot", async (
   );
   assert.equal(result.status, "signed-out");
   assert.equal(result.tasks, null);
-  assert.equal(result.results, null);
 });
 
-test("storage failure clears only failed data; automation source scopes remain enforced", async () => {
+test("storage failure leaves unavailable counts explicit without reading retired automation routes", async () => {
+  const requests: { url: string; init?: RequestInit }[] = [];
   const result = await loadWorkspaceSnapshot(
     "PERSONAL",
     new AbortController().signal,
-    reader({
-      "/api/session": { body: { configured: true, user: {} } },
-      "/api/ops?workspace=PERSONAL": {
-        status: 503,
-        body: { error: "unavailable" },
-      },
-      "/api/automation-results": {
-        body: {
-          ready: true,
-          results: [
-            { id: "company", source: "frengle_keywords" },
-            { id: "mine", source: "metricool_personal" },
-          ],
+    reader(
+      {
+        "/api/session": { body: { configured: true, user: {} } },
+        "/api/ops?workspace=PERSONAL": {
+          status: 503,
+          body: { error: "unavailable" },
         },
       },
-    }),
+      requests,
+    ),
   );
   assert.equal(result.tasks, null);
   assert.ok(result.opsError);
+  assert.equal(result.schedules, null);
   assert.deepEqual(
-    result.results?.map((row) => row.id),
-    ["mine"],
+    requests.map(({ url }) => url),
+    ["/api/session", "/api/ops?workspace=PERSONAL"],
   );
 });
 
@@ -208,7 +198,6 @@ test("archived and deleted rows are excluded and API row-limit warnings are reta
           truncated: ["tasks"],
         },
       },
-      "/api/automation-results": { body: { ready: false, results: [] } },
     }),
   );
   assert.deepEqual(
@@ -220,8 +209,6 @@ test("archived and deleted rows are excluded and API row-limit warnings are reta
     ["live"],
   );
   assert.equal(result.partial, true);
-  assert.equal(result.results, null);
-  assert.ok(result.resultsError);
 });
 
 test("calendar keeps workspace identity and excludes malformed dates without inventing occurrences", () => {
@@ -240,13 +227,11 @@ test("calendar keeps workspace identity and excludes malformed dates without inv
       },
       { id: "bad", starts_at: "invalid", ends_at: "invalid" },
     ],
-    results: [],
   };
   const company = {
     ...emptyWorkspaceSnapshot("FRENGLE", "ready"),
     tasks: [{ id: "same", title: "회사 마감", due_date: "2026-10-20" }],
     schedules: [],
-    results: [],
   };
   const before = JSON.stringify(personal);
   const items = [

@@ -3,12 +3,133 @@ import assert from "node:assert/strict";
 import {
   dailyTaskGroups,
   dailyTaskSummary,
+  pinnedOverviewProjects,
   seoulWeek,
   taskCompletionTime,
   weeklyScheduleRows,
   weeklyScheduleTime,
 } from "../src/lib/overview-summary.ts";
 import { projectProcessSteps } from "../src/lib/project-process-view.ts";
+
+test("미완료 프로젝트는 날짜·단계 유무와 무관하게 고정되고 프로젝트 완료 후에만 빠진다", () => {
+  const projects = [
+    {
+      id: "empty",
+      status: "planning",
+      created_at: "2026-01-01T00:00:00Z",
+      due_date: "2027-01-01",
+    },
+    { id: "in-progress", status: "active" },
+    { id: "steps-done", status: "active" },
+    { id: "finished", status: "completed" },
+  ];
+  const tasks = [
+    {
+      id: "pending",
+      project_id: "in-progress",
+      project_step_id: "a",
+      status: "pending",
+    },
+    {
+      id: "done",
+      project_id: "in-progress",
+      project_step_id: "b",
+      status: "completed",
+    },
+    {
+      id: "archived",
+      project_id: "in-progress",
+      project_step_id: "c",
+      status: "pending",
+      project_step_archived_at: "2026-11-01T00:00:00Z",
+    },
+    { id: "legacy", project_id: "in-progress", status: "pending" },
+    {
+      id: "last",
+      project_id: "steps-done",
+      project_step_id: "a",
+      status: "completed",
+    },
+  ];
+  const snapshot = JSON.stringify({ projects, tasks });
+  assert.deepEqual(
+    pinnedOverviewProjects(projects, tasks).map(
+      ({ project, total, completed }) => ({
+        id: project.id,
+        total,
+        completed,
+      }),
+    ),
+    [
+      { id: "empty", total: 0, completed: 0 },
+      { id: "in-progress", total: 2, completed: 1 },
+      { id: "steps-done", total: 1, completed: 1 },
+    ],
+  );
+  assert.equal(JSON.stringify({ projects, tasks }), snapshot);
+  projects[0].status = "completed";
+  assert.equal(
+    pinnedOverviewProjects(projects, tasks).some(
+      ({ project }) => project.id === "empty",
+    ),
+    false,
+  );
+  projects[0].status = "planning";
+  assert.equal(pinnedOverviewProjects(projects, tasks)[0].project.id, "empty");
+});
+
+test("완료된 프로젝트의 남은 단계는 오늘 할 일에서 빠지고 실제 오늘 완료 기록은 유지한다", () => {
+  const projects = [{ id: "closed", status: "completed" }];
+  const tasks = [
+    {
+      id: "left",
+      project_id: "closed",
+      project_step_id: "a",
+      status: "pending",
+      due_date: "2026-11-05",
+    },
+    {
+      id: "done",
+      project_id: "closed",
+      project_step_id: "b",
+      status: "completed",
+      completed_at: "2026-11-05T01:00:00Z",
+    },
+    {
+      id: "legacy",
+      project_id: "closed",
+      status: "pending",
+      due_date: "2026-11-05",
+    },
+    {
+      id: "unloaded",
+      project_id: "not-loaded",
+      project_step_id: "a",
+      status: "pending",
+    },
+  ];
+  const groups = dailyTaskGroups(tasks, "2026-11-05", projects);
+  assert.deepEqual(
+    groups.pending.map((task) => task.id),
+    ["legacy", "unloaded"],
+  );
+  assert.deepEqual(
+    groups.completed.map((task) => task.id),
+    ["done"],
+  );
+  assert.deepEqual(dailyTaskSummary(tasks, "2026-11-05", projects), {
+    total: 3,
+    completed: 1,
+  });
+  projects[0].status = "active";
+  assert.deepEqual(
+    dailyTaskGroups(tasks, "2026-11-05", projects).pending.map(
+      (task) => task.id,
+    ),
+    ["left", "legacy", "unloaded"],
+  );
+});
+
 test("오늘 등록 또는 마감 업무를 서울 날짜로 중복 없이 집계", () => {
   const tasks = [
     {

@@ -141,10 +141,6 @@
   --nav-accent: var(--jelly-lavender);
   --nav-tint: #eee7ff;
 }
-.editorial.is-jelly-layout [data-section="automations"] {
-  --nav-accent: var(--jelly-lemon);
-  --nav-tint: #fff5d8;
-}
 .editorial.is-jelly-layout
   :is([data-section="journal"], [data-section="analytics"]) {
   --nav-accent: var(--jelly-mint);
@@ -390,25 +386,6 @@
 }
 .editorial.is-jelly-layout .ops-sheet-meta {
   color: var(--jelly-muted);
-}
-.editorial.is-jelly-layout .ops-automation-results > .ops-section-head {
-  background: #fff6d8;
-}
-.editorial.is-jelly-layout .ops-automation-receipt {
-  border-radius: 16px;
-  background: #fff7e5;
-  border-color: var(--jelly-line);
-}
-.editorial.is-jelly-layout .ops-automation-source {
-  color: #87622f;
-}
-.editorial.is-jelly-layout .ops-automation-chat {
-  background: #fff0bc;
-  border-radius: 999px;
-  color: var(--jelly-ink);
-}
-.editorial.is-jelly-layout .ops-automation-receipt :is(h3, h3 a) {
-  color: var(--jelly-ink);
 }
 .editorial.is-jelly-layout .ops-personal-settings > .ops-card {
   background: #fffaf4;

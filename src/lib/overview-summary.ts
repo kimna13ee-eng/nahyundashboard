@@ -3,7 +3,34 @@ import {
   isArchivedProjectProcess,
   isProjectProcess,
   orderedProjectTasks,
+  projectProcessSteps,
 } from "./project-process-view.ts";
+
+/** A project stays on Overview until its own status is completed. */
+export function pinnedOverviewProjects(projects: OpsRow[], tasks: OpsRow[]) {
+  return projects
+    .filter((project) =>
+      ["planning", "active"].includes(String(project.status)),
+    )
+    .map((project) => {
+      const steps = projectProcessSteps(tasks, project.id);
+      return {
+        project,
+        total: steps.length,
+        completed: steps.filter((step) => step.done).length,
+      };
+    });
+}
+
+function hasCompletedParent(task: OpsRow, projects: OpsRow[]) {
+  return (
+    isProjectProcess(task) &&
+    projects.some(
+      (project) =>
+        project.id === task.project_id && project.status === "completed",
+    )
+  );
+}
 
 export function taskCompletionTime(task: OpsRow) {
   // A missing column means the completion-timestamp migration is not installed.
@@ -13,12 +40,17 @@ export function taskCompletionTime(task: OpsRow) {
   return Number.isFinite(Date.parse(String(value))) ? String(value) : null;
 }
 
-export function dailyTaskGroups(tasks: OpsRow[], day: string) {
+export function dailyTaskGroups(
+  tasks: OpsRow[],
+  day: string,
+  projects: OpsRow[] = [],
+) {
   const pending = tasks.filter((task) => {
     const created = Date.parse(String(task.created_at));
     return (
       task.status !== "completed" &&
       !isArchivedProjectProcess(task) &&
+      !hasCompletedParent(task, projects) &&
       (isProjectProcess(task) ||
         task.status === "running" ||
         task.due_date === day ||
@@ -86,13 +118,18 @@ export function weeklyScheduleTime(item: OpsRow, day: string) {
   return `${start <= lower ? "00:00" : format(start)}–${end >= upper ? "24:00" : format(end)}`;
 }
 
-export function dailyTaskSummary(tasks: OpsRow[], day: string) {
+export function dailyTaskSummary(
+  tasks: OpsRow[],
+  day: string,
+  projects: OpsRow[] = [],
+) {
   const daily = tasks.filter((task) => {
     if (isProjectProcess(task)) {
       const at = taskCompletionTime(task);
       return task.status === "completed"
         ? Boolean(at && seoulDate(new Date(at)) === day)
-        : !isArchivedProjectProcess(task);
+        : !isArchivedProjectProcess(task) &&
+            !hasCompletedParent(task, projects);
     }
     const created = Date.parse(String(task.created_at));
     const completedAt =

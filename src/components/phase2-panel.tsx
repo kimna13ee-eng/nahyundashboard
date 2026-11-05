@@ -823,10 +823,7 @@ function Phase2ResourcePanel({
               </p>
             ))}
           {!simpleRecurrence ? (
-            <p>
-              자동화 예정 시간은 실행기 미연결로 표시하지 않습니다. 연차는
-              포함하지 않습니다.
-            </p>
+            <p>연차는 포함하지 않습니다.</p>
           ) : null}
         </>
       ) : null}

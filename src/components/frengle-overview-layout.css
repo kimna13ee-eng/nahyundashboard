@@ -26,6 +26,57 @@
   flex-wrap: wrap;
   justify-content: flex-start;
 }
+.editorial .ops-overview-pinned-projects {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.editorial .ops-overview-pinned-projects > li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 15px var(--content-inset, 20px);
+  border-bottom: 1px solid var(--jelly-line, #f0e0d4);
+  background: #fcf9ff;
+}
+.editorial .ops-overview-project-chip {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #eae0ff;
+}
+.editorial .ops-overview-pinned-projects .ops-overview-project-title {
+  display: grid;
+  justify-content: start;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  color: var(--jelly-ink, #3d2c2e);
+  box-shadow: none;
+}
+.editorial .ops-overview-project-title strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.editorial .ops-overview-project-title small {
+  font-size: 11px;
+  color: var(--jelly-muted, #786462);
+}
+.editorial .ops-overview-project-status {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eee4ff;
+  color: #624a7d;
+  font-size: 11px;
+  white-space: nowrap;
+}
 .editorial .ops-frengle-overview-split .ops-task {
   grid-template-columns: 48px minmax(0, 1fr) auto;
   gap: 7px 10px;

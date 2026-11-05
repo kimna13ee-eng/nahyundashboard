@@ -10,11 +10,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  automationReceiptTime,
-  automationSourceLabel,
-  chatGptSourceUrl,
-} from "@/lib/automation-receipts";
-import {
   allWorkspaces,
   emptyWorkspaceSnapshot,
   loadWorkspaceSnapshot,
@@ -39,6 +34,16 @@ function Badge({ workspace }: { workspace: ApiWorkspace }) {
 
 function formatDay(day: string) {
   return day ? `${Number(day.slice(5, 7))}.${Number(day.slice(8, 10))}` : "—";
+}
+
+function checkedTime(value: string) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function calendarHref(item: OpsRow & { workspace: ApiWorkspace }, day: string) {
@@ -121,21 +126,6 @@ export function AllWorkspacesOverview() {
         )
     : [];
   const week = today ? weeklyScheduleRows(items, today) : [];
-  const recent = allWorkspaces
-    .flatMap((workspace) =>
-      (snapshots[workspace].results || []).map(
-        (result): OpsRow & { workspace: ApiWorkspace } => ({
-          ...result,
-          workspace,
-        }),
-      ),
-    )
-    .sort(
-      (a, b) =>
-        (Date.parse(String(b.received_at)) || 0) -
-        (Date.parse(String(a.received_at)) || 0),
-    )
-    .slice(0, 6);
   const incomplete = allWorkspaces.some(
     (workspace) =>
       snapshots[workspace].tasks === null ||
@@ -201,7 +191,7 @@ export function AllWorkspacesOverview() {
             <div>
               <p className="ops-all-eyebrow">ALL WORKSPACES</p>
               <h1>하루를 한눈에</h1>
-              <p>PERSONAL과 FRENGLE의 일정과 최근 소식을 함께 확인하세요.</p>
+              <p>PERSONAL과 FRENGLE의 업무와 일정을 함께 확인하세요.</p>
             </div>
             <button
               type="button"
@@ -223,7 +213,6 @@ export function AllWorkspacesOverview() {
             {allWorkspaces.map((workspace) => {
               const snapshot = snapshots[workspace];
               const home = workspaceHome(workspace);
-              const latest = snapshot.results?.[0];
               const count =
                 snapshot.schedules !== null && snapshot.tasks !== null && today
                   ? workspaceCalendarItems(snapshot).filter((item) =>
@@ -265,35 +254,12 @@ export function AllWorkspacesOverview() {
                       </dd>
                     </div>
                   </dl>
-                  <div className="ops-all-latest">
-                    <span>최근 자동화 수신</span>
-                    <strong>
-                      {snapshot.results === null
-                        ? "—"
-                        : latest
-                          ? automationSourceLabel(latest.source)
-                          : "아직 수신한 결과가 없어요"}
-                    </strong>
-                    {latest ? (
-                      <time dateTime={String(latest.received_at)}>
-                        {automationReceiptTime(latest.received_at)}
-                      </time>
-                    ) : null}
-                  </div>
                   {snapshot.status === "ready" ? (
                     <>
                       {snapshot.opsError ? (
                         <p className="ops-all-error" role="status">
                           {snapshot.opsError}{" "}
                           <Link href={`${home}?view=settings`}>설정 확인</Link>
-                        </p>
-                      ) : null}
-                      {snapshot.resultsError ? (
-                        <p className="ops-all-error" role="status">
-                          {snapshot.resultsError}{" "}
-                          <Link href={`${home}?view=automations`}>
-                            자동화 확인
-                          </Link>
                         </p>
                       ) : null}
                       {snapshot.partial ? (
@@ -412,63 +378,12 @@ export function AllWorkspacesOverview() {
                 ))}
               </div>
             </section>
-
-            <section
-              className="ops-all-card ops-all-automations"
-              aria-labelledby="all-auto-title"
-            >
-              <div className="ops-all-card-section-heading">
-                <h2 id="all-auto-title">최근 자동화 데이터</h2>
-                <span>최근 6건</span>
-              </div>
-              {recent.length ? (
-                <div className="ops-all-auto-list">
-                  {recent.map((result) => {
-                    const href = chatGptSourceUrl(result.source_url);
-                    return (
-                      <article key={`${result.workspace}:${result.id}`}>
-                        <Badge workspace={result.workspace} />
-                        <span className="ops-all-auto-source">
-                          {automationSourceLabel(result.source)}
-                        </span>
-                        <h3>{result.title || "자동화 결과"}</h3>
-                        <time dateTime={String(result.received_at)}>
-                          {automationReceiptTime(result.received_at)} 수신
-                        </time>
-                        <Link
-                          href={`${workspaceHome(result.workspace)}?view=automations`}
-                        >
-                          저장된 결과 보기{" "}
-                          <ArrowUpRight size={13} aria-hidden="true" />
-                        </Link>
-                        {href ? (
-                          <a
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            ChatGPT 대화 열기{" "}
-                            <ArrowUpRight size={13} aria-hidden="true" />
-                          </a>
-                        ) : null}
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="ops-all-empty">
-                  {refreshing
-                    ? "최근 결과를 확인하고 있어요…"
-                    : "불러온 자동화 결과가 없어요."}
-                </p>
-              )}
-            </section>
           </div>
           <footer className="ops-all-footer">
             <span>등록·수정은 각 워크스페이스에서 할 수 있어요.</span>
             <span>
               {checkedAt
-                ? `${automationReceiptTime(checkedAt)} 확인 · 1분마다 갱신`
+                ? `${checkedTime(checkedAt)} 확인 · 1분마다 갱신`
                 : "각 공간 연결 확인 중"}
             </span>
           </footer>

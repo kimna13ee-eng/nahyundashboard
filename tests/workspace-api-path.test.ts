@@ -47,11 +47,10 @@ test("URL resolver는 공유 API의 이전·중복 workspace query를 덮어씀"
   }
 });
 
-test("URL resolver는 로그인·세션·자동화 결과의 독립 endpoint를 선택", () => {
+test("URL resolver는 로그인·세션의 독립 endpoint를 선택", () => {
   for (const [personal, company] of [
     ["/api/auth", "/api/frengle/auth"],
     ["/api/session", "/api/frengle/session"],
-    ["/api/automation-results", "/api/frengle/results"],
   ]) {
     assert.equal(workspaceApiPath(personal, "FRENGLE"), company);
     assert.equal(workspaceApiPath(personal, "PERSONAL"), personal);

@@ -6,29 +6,15 @@
   flex-direction: column;
   padding: 24px;
 }
-.editorial .ops-overview-metrics > .ops-automation-metric {
-  align-items: flex-start;
-  width: 100%;
-  min-height: 0;
-  margin: 0 0 20px;
-  border-color: #e8e4df;
-  border-radius: 14px;
-  background: var(--paper, #fff);
-  font: inherit;
-  line-height: inherit;
-  text-align: left;
-}
 .editorial .ops-overview-metric-note {
   display: none;
 }
-.editorial .ops-overview-metrics > .ops-card > small,
-.editorial .ops-overview-metrics .ops-automation-metric > small {
+.editorial .ops-overview-metrics > .ops-card > small {
   display: block;
   font-size: 11px;
   line-height: 18px;
 }
-.editorial .ops-overview-metrics > .ops-card > strong,
-.editorial .ops-overview-metrics .ops-automation-metric > strong {
+.editorial .ops-overview-metrics > .ops-card > strong {
   display: block;
   margin: 18px 0;
   font-size: 32px;
@@ -39,15 +25,6 @@
 .editorial .ops-overview-metrics > .ops-card > p {
   margin: auto 0 0;
   padding: 0;
-  line-height: 16px;
-}
-.editorial .ops-automation-metric > span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 10px;
-  color: #81718d;
-  font-size: 11px;
   line-height: 16px;
 }
 .editorial .ops-task {
@@ -218,8 +195,7 @@
     font-size: 24px;
     line-height: 32px;
   }
-  .editorial .ops-overview-metrics > .ops-card > p,
-  .editorial .ops-overview-metrics > .ops-automation-metric > span {
+  .editorial .ops-overview-metrics > .ops-card > p {
     display: none;
   }
   .editorial .ops-overview-metric-note {

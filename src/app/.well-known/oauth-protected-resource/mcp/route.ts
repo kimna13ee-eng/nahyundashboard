@@ -1,14 +1,1 @@
-export function GET() {
-  const app = process.env.APP_PUBLIC_URL;
-  const supabase = process.env.PERSONAL_SUPABASE_URL;
-  if (!app || !supabase)
-    return Response.json(
-      { error: "MCP configuration required" },
-      { status: 503 },
-    );
-  return Response.json({
-    resource: `${app.replace(/\/$/, "")}/mcp`,
-    authorization_servers: [`${supabase.replace(/\/$/, "")}/auth/v1`],
-    bearer_methods_supported: ["header"],
-  });
-}
+export { automationRetired as GET } from "@/lib/automation-retired";

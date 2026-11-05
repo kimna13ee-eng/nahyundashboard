@@ -3,10 +3,6 @@
   --jelly-accent: var(--jelly-lavender);
   --jelly-tint: #f3edff;
 }
-.editorial.is-frengle-layout[data-jelly-view="automations"] {
-  --jelly-accent: var(--jelly-lemon);
-  --jelly-tint: #fff7dc;
-}
 .editorial.is-frengle-layout:is(
     [data-jelly-view="journal"],
     [data-jelly-view="analytics"]
@@ -34,8 +30,8 @@
 .editorial.is-frengle-layout .ops-overview-metrics > .ops-card:nth-child(2) {
   background: #eaf7e9;
 }
-.editorial.is-frengle-layout .ops-overview-metrics > .ops-automation-metric {
-  background: #fff5d8;
+.editorial.is-frengle-layout .ops-overview-metrics > .ops-card:nth-child(3) {
+  background: #f3edff;
 }
 .editorial.is-frengle-layout .ops-overview-metrics :is(small, strong) {
   color: var(--jelly-ink);
@@ -177,45 +173,6 @@
   border-color: var(--jelly-accent);
   background: var(--jelly-tint);
   color: var(--jelly-ink);
-}
-.editorial.is-frengle-layout .ops-automation-results > .ops-section-head {
-  background: #fff5d8;
-}
-.editorial.is-frengle-layout .ops-automation-receipt {
-  border-color: var(--jelly-line);
-  border-radius: 20px;
-  background: #fff9e9;
-}
-.editorial.is-frengle-layout .ops-automation-source {
-  display: inline-block;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: #ffedb6;
-  color: #73562b;
-}
-.editorial.is-frengle-layout .ops-automation-chat,
-.editorial.is-frengle-layout .ops-automation-company > a {
-  background: #fff0bd;
-  border-color: #ebd59b;
-  border-radius: 999px;
-  color: var(--jelly-ink);
-}
-.editorial.is-frengle-layout .ops-automation-body {
-  border-color: var(--jelly-line);
-}
-.editorial.is-frengle-layout .ops-automation-body > summary {
-  background: #fff0c6;
-  color: #73562b;
-}
-.editorial.is-frengle-layout
-  :is(
-    .ops-automation-received,
-    .ops-automation-reported,
-    .ops-automation-no-link,
-    .ops-automation-state,
-    .ops-automation-help
-  ) {
-  color: var(--jelly-muted);
 }
 .editorial.is-frengle-layout .ops-journal-export {
   border-color: #d8eade;

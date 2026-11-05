@@ -45,11 +45,6 @@ export function workspaceApiPath(
     "/api/frengle/auth": ["/api/auth", "/api/frengle/auth"],
     "/api/session": ["/api/session", "/api/frengle/session"],
     "/api/frengle/session": ["/api/session", "/api/frengle/session"],
-    "/api/automation-results": [
-      "/api/automation-results",
-      "/api/frengle/results",
-    ],
-    "/api/frengle/results": ["/api/automation-results", "/api/frengle/results"],
   } as const;
   if (Object.hasOwn(identity, url.pathname)) {
     url.pathname =
