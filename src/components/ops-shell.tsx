@@ -16,7 +16,6 @@ import { occurrences } from "@/lib/phase2";
 import { Phase2Panel } from "./phase2-panel";
 import { AnalyticsPanel } from "./analytics-panel";
 import { PersonalSheetsPanel } from "./personal-sheets-panel";
-import { PersonalPerformancePanel } from "./personal-performance-panel";
 import { YogaPlannerPanel } from "./yoga-planner-panel";
 import { YogaVideoFields } from "./yoga-video-fields";
 import { FrengleOverviewMemos } from "./frengle-overview-memos";
@@ -24,7 +23,6 @@ import "./frengle-overview-layout.css";
 import "./personal-overview.css";
 import "./workspace-jelly.css";
 import "./frengle-jelly.css";
-import type { PersonalSheetTab } from "@/lib/personal-sheet-tabs";
 import {
   YogaReminderPanel,
   disconnectThisDevicePush,
@@ -251,8 +249,6 @@ export function OpsShell({
   const noteWrites = useRef(new Set<string>());
   const startSubmit = useRef(false);
   const completionSubmit = useRef(false);
-  const [studioInitialTab, setStudioInitialTab] =
-    useState<PersonalSheetTab>("planning");
   const [taskClassification, setTaskClassification] = useState(false);
   const [taskProcessReady, setTaskProcessReady] = useState(false);
   const [projectProcessReady, setProjectProcessReady] = useState(false);
@@ -1275,7 +1271,7 @@ export function OpsShell({
               <p>
                 {view === "overview"
                   ? space === "PERSONAL"
-                    ? "콘텐츠 흐름과 릴스 발행 성과를 한눈에 확인하세요."
+                    ? "콘텐츠 시트와 이번 주 일정을 한눈에 확인하세요."
                     : "오늘의 흐름을 정리하고, 중요한 일에 집중하세요."
                   : `${space === "PERSONAL" ? "개인" : "회사"} 데이터만 저장 · Asia/Seoul`}
               </p>
@@ -1318,7 +1314,7 @@ export function OpsShell({
                   ? "환경변수가 없습니다. 샘플 데이터와 임의의 통계를 표시하지 않습니다."
                   : user
                     ? isPersonalOverview
-                      ? "콘텐츠 성과와 개인 일정을 한곳에서 확인하세요."
+                      ? "콘텐츠 시트와 개인 일정을 한곳에서 확인하세요."
                       : space === "PERSONAL"
                         ? "콘텐츠 일정과 요가 계획을 편하게 관리하세요."
                         : "프로젝트와 오늘의 업무를 한곳에서 확인하세요."
@@ -1378,17 +1374,13 @@ export function OpsShell({
               }
             >
               {space === "PERSONAL" ? (
-                <PersonalPerformancePanel
-                  key={"performance:" + (user?.email || "signed-out")}
+                <PersonalSheetsPanel
+                  key={"overview-sheets:" + (user?.email || "signed-out")}
                   enabled={
                     Boolean(user) &&
                     authState === "AUTHENTICATED" &&
                     configured === true
                   }
-                  onOpenStudio={() => {
-                    setStudioInitialTab("performance");
-                    move("personal-sheets");
-                  }}
                 />
               ) : null}
               {space === "FRENGLE" ? (
@@ -2535,13 +2527,7 @@ export function OpsShell({
           ) : null}
           {view === "personal-sheets" && space === "PERSONAL" ? (
             <PersonalSheetsPanel
-              key={
-                "personal-sheets:" +
-                (user?.email || "signed-out") +
-                space +
-                studioInitialTab
-              }
-              initialTab={studioInitialTab}
+              key={"personal-sheets:" + (user?.email || "signed-out") + space}
               enabled={
                 Boolean(user) &&
                 authState === "AUTHENTICATED" &&
