@@ -55,6 +55,8 @@ import {
   isArchivedProjectProcess,
   projectProcessSteps,
   orderedProjectTasks,
+  projectMatchesStatus,
+  type ProjectStatusFilter,
 } from "@/lib/project-process-view";
 import {
   addSeoulMinutes,
@@ -252,6 +254,8 @@ export function OpsShell({
   const [taskClassification, setTaskClassification] = useState(false);
   const [taskProcessReady, setTaskProcessReady] = useState(false);
   const [projectProcessReady, setProjectProcessReady] = useState(false);
+  const [projectStatusFilter, setProjectStatusFilter] =
+    useState<ProjectStatusFilter>("open");
   const [scheduleCategoryReady, setScheduleCategoryReady] = useState(false);
   const [yogaMetadataReady, setYogaMetadataReady] = useState(false);
   const [taskTestClassification, setTaskTestClassification] = useState(false);
@@ -532,7 +536,17 @@ export function OpsShell({
       setBusy(true);
       setError("");
       try {
-        await api("/api/ops?workspace=PERSONAL", method, body);
+        const saved = await api("/api/ops?workspace=PERSONAL", method, body);
+        if (
+          method === "POST" &&
+          body &&
+          typeof body === "object" &&
+          "resource" in body &&
+          body.resource === "projects"
+        ) {
+          setProjectStatusFilter("all");
+          setProject(saved.row?.id || "all");
+        }
         setEditor(null);
         setDeleteTarget(null);
         setSummary(null);
@@ -897,10 +911,25 @@ export function OpsShell({
   const todayTasks = dailyTaskGroups(tasks, today, projects);
   const pinnedProjects = pinnedOverviewProjects(projects, tasks);
   const overviewWeek = seoulWeek(today);
+  const visibleProjects = projects.filter((p) =>
+    projectMatchesStatus(p, projectStatusFilter),
+  );
+  const selectedProject = visibleProjects.some((p) => p.id === project)
+    ? project
+    : "all";
+  const visibleProjectIds = new Set(visibleProjects.map((p) => p.id));
+  const knownProjectIds = new Set(projects.map((p) => p.id));
+  const projectTasks = listedTasks.filter((task) =>
+    projectStatusFilter === "all"
+      ? true
+      : task.project_id && knownProjectIds.has(text(task.project_id))
+        ? visibleProjectIds.has(text(task.project_id))
+        : projectStatusFilter === "open",
+  );
   const filteredTasks = orderedProjectTasks(
-    listedTasks.filter(
+    projectTasks.filter(
       (t) =>
-        (project === "all" || t.project_id === project) &&
+        (selectedProject === "all" || t.project_id === selectedProject) &&
         text(t.title).toLowerCase().includes(search.toLowerCase()),
     ),
   );
@@ -1734,17 +1763,54 @@ export function OpsShell({
                   새로고침해 주세요.
                 </p>
               ) : null}
+              <div
+                className="ops-tabs ops-project-status-tabs"
+                role="group"
+                aria-label="프로젝트 상태 필터"
+              >
+                {(
+                  [
+                    [
+                      "open",
+                      "진행",
+                      projects.filter((p) => p.status !== "completed").length,
+                    ],
+                    [
+                      "completed",
+                      "완료",
+                      projects.filter((p) => p.status === "completed").length,
+                    ],
+                    ["all", "전체", projects.length],
+                  ] as const
+                ).map(([value, label, count]) => (
+                  <button
+                    key={value}
+                    className={projectStatusFilter === value ? "active" : ""}
+                    aria-pressed={projectStatusFilter === value}
+                    onClick={() => {
+                      setProjectStatusFilter(value);
+                      setProject("all");
+                    }}
+                  >
+                    {label} {count}
+                  </button>
+                ))}
+              </div>
               <div className="ops-project-grid">
                 <button
-                  className={`ops-project ${project === "all" ? "selected" : ""}`}
+                  className={`ops-project ${selectedProject === "all" ? "selected" : ""}`}
                   onClick={() => setProject("all")}
                 >
                   <strong>전체 프로세스·업무</strong>
-                  <small>{listedTasks.length}개</small>
+                  <small>{projectTasks.length}개</small>
                 </button>
-                {projects.map((p) => {
+                {visibleProjects.map((p) => {
                   const list = listedTasks.filter((t) => t.project_id === p.id),
-                    done = list.filter((t) => t.status === "completed").length,
+                    steps = projectProcessSteps(tasks, p.id),
+                    total = steps.length || list.length,
+                    done = steps.length
+                      ? steps.filter((step) => step.done).length
+                      : list.filter((t) => t.status === "completed").length,
                     ids = new Set(
                       tasks
                         .filter((t) => t.project_id === p.id)
@@ -1758,7 +1824,7 @@ export function OpsShell({
                   return (
                     <div className="ops-card" key={p.id}>
                       <button
-                        className="ops-project"
+                        className={`ops-project ${selectedProject === p.id ? "selected" : ""}`}
                         onClick={() => setProject(p.id)}
                       >
                         <strong>{text(p.title)}</strong>
@@ -1767,12 +1833,19 @@ export function OpsShell({
                             p.project_category as keyof typeof projectCategoryLabels
                           ] || "기타"}
                         </span>
+                        <span
+                          className={`ops-project-state ${p.status === "completed" ? "is-complete" : ""}`}
+                        >
+                          {p.status === "completed"
+                            ? "완료"
+                            : p.status === "active"
+                              ? "진행"
+                              : "계획"}
+                        </span>
                         <small>
-                          {done}/{list.length} 완료 ·{" "}
-                          {list.length
-                            ? Math.round((done / list.length) * 100)
-                            : 0}
-                          %
+                          {steps.length ? "프로세스 " : "연결 업무 "}
+                          {done}/{total} 완료 ·{" "}
+                          {total ? Math.round((done / total) * 100) : 0}%
                         </small>
                         <small>
                           작업 시간{" "}
@@ -1792,6 +1865,13 @@ export function OpsShell({
                   );
                 })}
               </div>
+              {!visibleProjects.length ? (
+                <p className="ops-empty">
+                  {projectStatusFilter === "completed"
+                    ? "아직 완료한 프로젝트가 없어요."
+                    : "진행 중인 프로젝트가 없어요."}
+                </p>
+              ) : null}
               <section className="ops-card">
                 {heads(
                   "프로젝트 프로세스",

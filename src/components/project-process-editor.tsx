@@ -115,8 +115,8 @@ export function ProjectProcessEditor({
         value={serialized}
       />
       <p className="ops-project-process-help">
-        단계를 입력하고 완료한 항목을 체크하세요. 제거한 단계는 오늘 할 일에서
-        빠지고 기존 작업 기록은 보관됩니다.
+        모든 단계를 체크해 저장하면 프로젝트가 완료됩니다. 완료를 취소하거나 새
+        단계를 추가하면 자동 완료된 프로젝트가 다시 진행으로 바뀝니다.
       </p>
       {steps.length ? (
         <ol className="ops-project-process-list">

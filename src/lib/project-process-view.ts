@@ -1,6 +1,20 @@
 import type { OpsRow } from "./ops.ts";
 import type { ProcessStep } from "./task-process.ts";
 
+export type ProjectStatusFilter = "open" | "completed" | "all";
+
+export function projectMatchesStatus(
+  project: OpsRow,
+  filter: ProjectStatusFilter,
+) {
+  return (
+    filter === "all" ||
+    (filter === "completed"
+      ? project.status === "completed"
+      : project.status !== "completed")
+  );
+}
+
 export function isProjectProcess(task: OpsRow) {
   return Boolean(task.project_id && task.project_step_id);
 }

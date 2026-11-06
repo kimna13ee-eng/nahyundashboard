@@ -184,3 +184,21 @@
     border-bottom: 0;
   }
 }
+
+.editorial .ops-project-status-tabs {
+  margin: 0 0 20px;
+  flex-wrap: wrap;
+}
+.editorial .ops-project-state {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eee4ff;
+  color: #624a7d;
+  font-size: 11px;
+}
+.editorial .ops-project-state.is-complete {
+  background: #e5f5e9;
+  color: #326844;
+}
