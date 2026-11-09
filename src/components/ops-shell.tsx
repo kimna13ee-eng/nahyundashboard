@@ -19,6 +19,9 @@ import { PersonalSheetsPanel } from "./personal-sheets-panel";
 import { YogaPlannerPanel } from "./yoga-planner-panel";
 import { YogaVideoFields } from "./yoga-video-fields";
 import { FrengleOverviewMemos } from "./frengle-overview-memos";
+import { PersonalRecordsPanel } from "./personal-records-panel";
+import { PersonalDayPanel } from "./personal-day-panel";
+import "./personal-life-home.css";
 import "./frengle-overview-layout.css";
 import "./personal-overview.css";
 import "./workspace-jelly.css";
@@ -105,6 +108,7 @@ import {
 import { statusLabels, type Status } from "@/lib/domain";
 const menus = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "personal-records", label: "나의 기록", icon: NotebookPen },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "personal-sheets", label: "Content Studio", icon: FileSpreadsheet },
@@ -116,6 +120,7 @@ const menus = [
 ];
 const workspaceMenuChips: Record<string, { emoji: string; tone: string }> = {
   overview: { emoji: "🎬", tone: "coral" },
+  "personal-records": { emoji: "📝", tone: "lemon" },
   calendar: { emoji: "🗓️", tone: "mint" },
   "personal-sheets": { emoji: "✏️", tone: "lemon" },
   "yoga-planner": { emoji: "🧘", tone: "lavender" },
@@ -148,7 +153,7 @@ type Editor = {
   requireVideo?: boolean;
 };
 function workspaceViewAllowed(view: string, workspace: ApiWorkspace) {
-  if (["personal-sheets", "yoga-planner"].includes(view))
+  if (["personal-sheets", "yoga-planner", "personal-records"].includes(view))
     return workspace === "PERSONAL";
   if (
     [
@@ -668,15 +673,34 @@ export function OpsShell({
     setSearch("");
     setNotice("");
   }
-  const visibleMenus = menus.filter((menu) =>
-    workspaceViewAllowed(menu.id, space),
-  );
+  const personalMenuLabels: Record<string, string> = {
+    overview: "오늘",
+    "personal-records": "나의 기록",
+    "personal-sheets": "콘텐츠",
+    calendar: "캘린더",
+    "yoga-planner": "요가 플래너",
+    settings: "설정",
+  };
+  const visibleMenus = menus
+    .filter((menu) => workspaceViewAllowed(menu.id, space))
+    .map((menu) => ({
+      ...menu,
+      label:
+        space === "PERSONAL"
+          ? personalMenuLabels[menu.id] || menu.label
+          : menu.label,
+    }));
   const title =
     view === "legacy-content"
       ? "기존 콘텐츠 기록"
-      : menus.find((m) => m.id === view)?.label || "Overview";
+      : visibleMenus.find((m) => m.id === view)?.label || "Overview";
   const isPersonalOverview = space === "PERSONAL" && view === "overview";
   const isPersonalLayout = space === "PERSONAL";
+  const personalEnabled =
+    space === "PERSONAL" &&
+    Boolean(user) &&
+    authState === "AUTHENTICATED" &&
+    configured === true;
   function openTaskEditor(task: OpsRow) {
     if (isProjectProcess(task)) {
       const parent = projects.find((p) => p.id === task.project_id);
@@ -1131,7 +1155,7 @@ export function OpsShell({
           MY OPS <small>OS / 01</small>
         </Link>
         <span className="ops-caption">
-          {isPersonalLayout ? "내 작업 공간" : "프렌글 작업 공간"}
+          {isPersonalLayout ? "기록하고, 만들고, 쉬어가기" : "프렌글 작업 공간"}
         </span>
         <nav aria-label="주 메뉴">
           {visibleMenus.map((m) => (
@@ -1300,7 +1324,7 @@ export function OpsShell({
               <p>
                 {view === "overview"
                   ? space === "PERSONAL"
-                    ? "콘텐츠 시트와 이번 주 일정을 한눈에 확인하세요."
+                    ? "오늘의 일정, 나의 기록, 잠깐의 쉼을 한곳에."
                     : "오늘의 흐름을 정리하고, 중요한 일에 집중하세요."
                   : `${space === "PERSONAL" ? "개인" : "회사"} 데이터만 저장 · Asia/Seoul`}
               </p>
@@ -1403,14 +1427,85 @@ export function OpsShell({
               }
             >
               {space === "PERSONAL" ? (
-                <PersonalSheetsPanel
-                  key={"overview-sheets:" + (user?.email || "signed-out")}
-                  enabled={
-                    Boolean(user) &&
-                    authState === "AUTHENTICATED" &&
-                    configured === true
-                  }
-                />
+                <>
+                  <div className="ops-personal-home-top">
+                    <PersonalDayPanel
+                      today={today}
+                      items={
+                        weeklyItems.find((item) => item.day === today)?.items ||
+                        []
+                      }
+                      schedules={schedules}
+                      enabled={personalEnabled && dataReady}
+                      loading={
+                        authState === "INITIALIZING" ||
+                        (personalEnabled && !dataReady && !error)
+                      }
+                      canWrite={canWrite}
+                      onOpenSchedule={(item) =>
+                        item.category === "exercise" && !item.source
+                          ? setEditor({
+                              resource: "schedules",
+                              row: item,
+                              requireVideo: true,
+                            })
+                          : openWeeklyItem(
+                              item.source ? item : { ...item, source: "일정" },
+                            )
+                      }
+                      onCreateSchedule={() =>
+                        setEditor({
+                          resource: "schedules",
+                          scheduleDate: today,
+                        })
+                      }
+                      onOpenCalendar={() => {
+                        setDay(today);
+                        move("calendar");
+                      }}
+                      onOpenYoga={() => {
+                        setDay(today);
+                        move("yoga-planner");
+                      }}
+                      onCreateYoga={() =>
+                        setEditor({
+                          resource: "schedules",
+                          scheduleDate: today,
+                          scheduleCategory: "exercise",
+                          requireVideo: true,
+                        })
+                      }
+                    />
+                    <PersonalRecordsPanel
+                      key={"home-records:" + (user?.email || "signed-out")}
+                      enabled={personalEnabled}
+                      compact
+                      onOpenAll={() => move("personal-records")}
+                    />
+                  </div>
+                  <section
+                    className="ops-personal-content-intro"
+                    aria-label="콘텐츠 작업 바로가기"
+                  >
+                    <div>
+                      <span className="ops-life-chip" aria-hidden="true">
+                        ✏️
+                      </span>
+                      <h2>떠오른 생각을, 다음 콘텐츠로</h2>
+                      <p>소재를 모으고 기획·원고·발행 기록을 이어가요.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => move("personal-sheets")}
+                    >
+                      소재 노트 열기 <ArrowUpRight size={16} />
+                    </button>
+                  </section>
+                  <PersonalSheetsPanel
+                    key={"overview-sheets:" + (user?.email || "signed-out")}
+                    enabled={personalEnabled}
+                  />
+                </>
               ) : null}
               {space === "FRENGLE" ? (
                 <>
@@ -2606,13 +2701,24 @@ export function OpsShell({
             </section>
           ) : null}
           {view === "personal-sheets" && space === "PERSONAL" ? (
-            <PersonalSheetsPanel
-              key={"personal-sheets:" + (user?.email || "signed-out") + space}
-              enabled={
-                Boolean(user) &&
-                authState === "AUTHENTICATED" &&
-                configured === true
-              }
+            <div className="ops-personal-content-space">
+              <PersonalRecordsPanel
+                key={"idea-records:" + (user?.email || "signed-out")}
+                enabled={personalEnabled}
+                ideasOnly
+                compact
+                onOpenAll={() => move("personal-records")}
+              />
+              <PersonalSheetsPanel
+                key={"personal-sheets:" + (user?.email || "signed-out") + space}
+                enabled={personalEnabled}
+              />
+            </div>
+          ) : null}
+          {view === "personal-records" && space === "PERSONAL" ? (
+            <PersonalRecordsPanel
+              key={"personal-records:" + (user?.email || "signed-out")}
+              enabled={personalEnabled}
             />
           ) : null}
           {view === "analytics" ? (
@@ -2852,7 +2958,7 @@ export function OpsShell({
               "overview",
               "calendar",
               ...(space === "PERSONAL"
-                ? ["personal-sheets", "yoga-planner"]
+                ? ["personal-records", "yoga-planner"]
                 : ["projects", "library", "journal"]),
             ].includes(m.id),
           )

@@ -387,13 +387,10 @@ export function PersonalSheetsPanel({
   const [tabId, setTabId] = useState<PersonalSheetTab>(initialTab);
   const tab = sheetTabs.find((item) => item.id === tabId)!;
   return (
-    <section
-      className="ops-card ops-personal-sheets"
-      aria-label="Content Studio"
-    >
+    <section className="ops-card ops-personal-sheets" aria-label="콘텐츠 시트">
       <div className="ops-section-head">
         <div>
-          <h2>Content Studio</h2>
+          <h2>콘텐츠 시트</h2>
           <p>기획·원고·발행 성과를 확인하세요.</p>
         </div>
         <span className="ops-sheet-readonly">읽기 전용</span>
