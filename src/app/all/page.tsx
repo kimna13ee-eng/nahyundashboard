@@ -1,5 +1,5 @@
-import { AllWorkspacesOverview } from "@/components/all-workspaces-overview";
+import { redirect } from "next/navigation";
 
 export default function AllWorkspaces() {
-  return <AllWorkspacesOverview />;
+  redirect("/");
 }

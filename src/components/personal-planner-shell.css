@@ -1,0 +1,335 @@
+.personal-planner {
+  --ink: #3d2c2e;
+  --muted: #806e6c;
+  --line: #f0e0d4;
+  --bg: #fff8f1;
+  --planner-accent: #ff7a7a;
+  --planner-tint: #ffe9e3;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-noto-sans-kr), sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+  letter-spacing: -0.3px;
+  padding: env(safe-area-inset-top) 0 calc(94px + env(safe-area-inset-bottom));
+}
+.personal-planner.is-yoga {
+  --planner-accent: #c9b6ff;
+  --planner-tint: #f0eaff;
+}
+.personal-planner *,
+.personal-planner *::before,
+.personal-planner *::after {
+  box-sizing: border-box;
+}
+.personal-planner button,
+.personal-planner a {
+  touch-action: manipulation;
+}
+:where(.personal-planner) button {
+  min-height: 44px;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 600;
+}
+.personal-planner button:focus-visible,
+.personal-planner a:focus-visible {
+  outline: 3px solid #9472d5;
+  outline-offset: 3px;
+}
+:where(.personal-planner) input,
+:where(.personal-planner) select,
+:where(.personal-planner) textarea {
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink);
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #fffefb;
+  border-radius: 14px;
+  padding: 12px 14px;
+  min-height: 48px;
+}
+.personal-planner input[type="checkbox"],
+.personal-planner input[type="radio"] {
+  width: auto;
+  min-height: auto;
+}
+.personal-planner h1,
+.personal-planner h2,
+.personal-planner h3,
+.personal-planner h4 {
+  color: var(--ink);
+  letter-spacing: -0.7px;
+}
+.personal-planner .planner-header {
+  max-width: 1060px;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+}
+.planner-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 17px;
+}
+.planner-brand > span {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 15px;
+  background: #fff0e6;
+  font-size: 24px;
+}
+.personal-planner .planner-account {
+  width: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: #fffdfa;
+}
+.planner-account > span {
+  display: none;
+}
+.personal-planner .planner-main {
+  max-width: 1060px;
+  padding: 16px 18px 32px;
+  margin: auto;
+  min-width: 0;
+}
+.planner-page-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 6px 0 26px;
+}
+.planner-heading-chip {
+  display: grid;
+  place-items: center;
+  flex: 0 0 48px;
+  height: 48px;
+  font-size: 25px;
+  border-radius: 18px;
+  background: var(--planner-tint);
+}
+.planner-page-heading h1 {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+.planner-page-heading p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  word-break: keep-all;
+}
+.personal-planner .planner-tabs {
+  position: fixed;
+  z-index: 30;
+  left: 12px;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  max-width: 460px;
+  margin: auto;
+  padding: 6px;
+  border: 1px solid #efded2;
+  border-radius: 28px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  background: #fffdfaf5;
+  box-shadow: 0 8px 32px #3d2c2e18;
+  backdrop-filter: blur(16px);
+}
+.personal-planner .planner-tabs button {
+  display: flex;
+  gap: 9px;
+  padding: 9px 6px;
+  font-size: 12px;
+  min-height: 54px;
+  border-radius: 22px;
+  color: #76615f;
+}
+.personal-planner .planner-tabs button:first-child[aria-current] {
+  background: #ffe9e3;
+  color: #833f42;
+}
+.personal-planner .planner-tabs button:last-child[aria-current] {
+  background: #ede5ff;
+  color: #654795;
+}
+.planner-tab-icon {
+  font-size: 23px;
+}
+.planner-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 54px 24px;
+  background: #fffdfa;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  color: var(--muted);
+}
+.planner-loading > span {
+  font-size: 30px;
+}
+.planner-signin {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #fffdf9;
+  padding: 32px 24px;
+  max-width: 480px;
+  margin: 36px auto;
+  text-align: center;
+  box-shadow: 0 8px 24px #3d2c2e0a;
+}
+.planner-signin-icon {
+  font-size: 42px;
+  display: block;
+  margin-bottom: 16px;
+}
+.personal-planner .planner-signin h2 {
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+.planner-signin p {
+  color: var(--muted);
+  margin-bottom: 22px;
+}
+.personal-planner .planner-primary {
+  background: var(--planner-accent);
+  color: #3d2c2e;
+  padding-inline: 24px;
+}
+.personal-planner .planner-secondary {
+  background: var(--planner-tint);
+  border: 1px solid var(--line);
+}
+.personal-planner .planner-error,
+.personal-planner .ops-error {
+  color: #9e3747;
+  background: #fff0f0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  overflow-wrap: anywhere;
+}
+.personal-planner .ops-modal {
+  position: fixed;
+  margin: auto;
+  padding: 0;
+  width: min(600px, calc(100% - 24px));
+  max-height: min(88dvh, 900px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #fffdf9;
+  color: var(--ink);
+  box-shadow: 0 16px 60px #3d2c2e25;
+}
+.personal-planner .ops-modal::backdrop {
+  background: #3d2c2e60;
+  backdrop-filter: blur(3px);
+}
+.personal-planner .ops-modal .ops-section-head {
+  padding: 16px 18px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.personal-planner .ops-modal .ops-section-head h2 {
+  font-size: 19px;
+  margin: 0;
+}
+.personal-planner .ops-modal .ops-icon {
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+  font-size: 24px;
+  background: #f7efe8;
+}
+.personal-planner .ops-modal .ops-detail {
+  padding: 4px 20px 24px;
+}
+.personal-planner .ops-modal .ops-saving {
+  padding: 8px 20px;
+  color: var(--muted);
+}
+.personal-planner .ops-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.personal-planner .ops-danger {
+  background: #ffe4e7;
+  color: #9c3545;
+}
+.planner-login,
+.planner-account-body {
+  display: grid;
+  gap: 18px;
+}
+.planner-login label {
+  display: grid;
+  gap: 7px;
+  font-weight: 600;
+}
+.planner-login p,
+.planner-account-body p {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.planner-skip {
+  position: absolute;
+  left: 18px;
+  top: -100px;
+  z-index: 40;
+  background: #fff;
+  padding: 12px;
+  border-radius: 10px;
+}
+.planner-skip:focus {
+  top: 12px;
+}
+@media (min-width: 760px) {
+  .personal-planner .planner-header {
+    padding: 26px 28px 18px;
+  }
+  .personal-planner .planner-main {
+    padding: 24px 28px 48px;
+  }
+  .planner-page-heading {
+    margin-bottom: 32px;
+  }
+  .planner-page-heading h1 {
+    font-size: 32px;
+  }
+  .planner-page-heading p {
+    font-size: 14px;
+  }
+  .personal-planner .planner-account {
+    width: auto;
+    padding-inline: 14px;
+  }
+  .planner-account > span {
+    display: inline;
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .personal-planner * {
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,5 +1,5 @@
-import { OpsShell } from "@/components/ops-shell";
+import { redirect } from "next/navigation";
 
 export default function Frengle() {
-  return <OpsShell key="FRENGLE" workspace="FRENGLE" />;
+  redirect("/");
 }

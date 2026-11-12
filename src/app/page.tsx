@@ -1,4 +1,4 @@
-import { OpsShell } from "@/components/ops-shell";
+import { PersonalPlannerShell } from "@/components/personal-planner-shell";
 export default function Home() {
-  return <OpsShell key="PERSONAL" workspace="PERSONAL" />;
+  return <PersonalPlannerShell />;
 }
