@@ -36,7 +36,21 @@ type Props = {
 type Editor = { id: string; row?: OpsRow; date: string };
 type WeekData = { from: string; rows: OpsRow[]; truncated: boolean };
 type RequestBody = Record<string, unknown>;
-const weekdays = ["월", "화", "수", "목", "금", "토", "일"];
+const weeklyRoutine = [
+  { day: "월", activity: "근력" },
+  { day: "화", activity: "하체 스트레칭" },
+  { day: "수", activity: "어깨 스트레칭" },
+  { day: "목", activity: "전신 스트레칭" },
+  { day: "금", activity: "근력" },
+  { day: "토", activity: "스트레칭" },
+  { day: "일", activity: "스트레칭 혹은 반신욕" },
+] as const;
+
+function routineForDay(date: string) {
+  if (!validYogaDay(date)) return undefined;
+  const index = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
+  return weeklyRoutine[index];
+}
 
 class PlannerRequestError extends Error {
   constructor(
@@ -129,6 +143,8 @@ export function PersonalYogaSpace({
   const ready = enabled && data?.from === from;
   const summary = yogaWeekSummary(rows, week);
   const today = seoulDate();
+  const selectedRoutine = routineForDay(day)!;
+  const editorRoutine = editor ? routineForDay(editor.date) : undefined;
   const before = moveYogaDay(day, -7),
     after = moveYogaDay(day, 7);
 
@@ -216,6 +232,12 @@ export function PersonalYogaSpace({
       row,
       date: row ? yogaScheduleDay(row) || day : day,
     });
+  }
+  function changeEditorDate(value: string) {
+    if (busy || retryCreate) return;
+    setEditor((current) =>
+      current && current.date !== value ? { ...current, date: value } : current,
+    );
   }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -338,12 +360,12 @@ export function PersonalYogaSpace({
               type="button"
               key={date}
               className={`${date === day ? "selected " : ""}${date === today ? "today" : ""}`}
-              aria-label={`${displayDay(date, true)}${date === today ? " 오늘" : ""}`}
+              aria-label={`${displayDay(date, true)}${date === today ? " 오늘" : ""} · ${weeklyRoutine[index].activity}`}
               aria-pressed={date === day}
               disabled={busy}
               onClick={() => chooseDay(date)}
             >
-              <span>{weekdays[index]}</span>
+              <span>{weeklyRoutine[index].day}</span>
               <strong>{Number(date.slice(8))}</strong>
               <i
                 className={
@@ -402,6 +424,29 @@ export function PersonalYogaSpace({
           </div>
         </div>
       </div>
+      <section
+        className="personal-yoga-routine"
+        aria-labelledby="personal-yoga-routine-title"
+      >
+        <div className="personal-yoga-routine-heading">
+          <h2 id="personal-yoga-routine-title">요일별 운동</h2>
+          <span>매주 고정</span>
+        </div>
+        <dl>
+          {weeklyRoutine.map((routine) => (
+            <div
+              key={routine.day}
+              className={routine.day === selectedRoutine.day ? "selected" : ""}
+            >
+              <dt>
+                {routine.day}
+                <span className="sr-only">요일</span>
+              </dt>
+              <dd>{routine.activity}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
       {error ? (
         <div className="personal-yoga-error" role="alert">
           {error}
@@ -443,6 +488,13 @@ export function PersonalYogaSpace({
             <Bell size={14} /> 밤 9시 알림
           </span>
         </div>
+        <p className="personal-yoga-day-routine">
+          <span aria-hidden="true">🧘</span>
+          <span>
+            {selectedRoutine.day}요일 ·{" "}
+            <strong>{selectedRoutine.activity}</strong>
+          </span>
+        </p>
         {!enabled ? (
           <div className="personal-yoga-empty">
             <span aria-hidden="true">🌿</span>
@@ -522,7 +574,7 @@ export function PersonalYogaSpace({
         ) : (
           <div className="personal-yoga-empty">
             <span aria-hidden="true">🌿</span>
-            <h3>오늘은 어떤 요가를 할까요?</h3>
+            <h3>이날 운동에 맞는 영상을 골라보세요</h3>
             <p>따라 하고 싶은 영상 링크를 담아두세요.</p>
           </div>
         )}
@@ -572,10 +624,22 @@ export function PersonalYogaSpace({
                 name="date"
                 type="date"
                 required
-                defaultValue={editor.date}
+                value={editor.date}
                 disabled={busy || retryCreate}
+                onInput={(event) => changeEditorDate(event.currentTarget.value)}
+                onChange={(event) =>
+                  changeEditorDate(event.currentTarget.value)
+                }
               />
             </label>
+            <p className="personal-yoga-form-routine" aria-live="polite">
+              <span>이날의 운동</span>
+              <strong>
+                {editorRoutine
+                  ? `${editorRoutine.day}요일 · ${editorRoutine.activity}`
+                  : "운동할 날짜를 선택해 주세요."}
+              </strong>
+            </p>
             <p className="personal-yoga-form-time">
               <Bell size={14} /> 선택한 날짜 밤 9시에 알림
             </p>

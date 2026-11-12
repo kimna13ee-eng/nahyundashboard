@@ -323,7 +323,7 @@ export function PersonalPlannerShell() {
             <p>
               기존 PERSONAL 계정으로 로그인하면
               <br />
-              콘텐츠 시트와 요가 일정을 이어서 볼 수 있어요.
+              블로그 소재와 요가 일정을 이어서 볼 수 있어요.
             </p>
             {error && (
               <p role="alert" className="planner-error">

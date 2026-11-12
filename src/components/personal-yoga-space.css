@@ -121,6 +121,88 @@
   display: grid;
   gap: 14px;
 }
+.personal-planner .personal-yoga-routine {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e7d9f2;
+  border-radius: 20px;
+  background: #f7f0ff;
+}
+.personal-planner .personal-yoga-routine-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.personal-planner .personal-yoga-routine-heading h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.personal-planner .personal-yoga-routine-heading > span {
+  color: #7e668a;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.personal-planner .personal-yoga-routine dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+}
+.personal-planner .personal-yoga-routine dl > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: #fffdfb;
+}
+.personal-planner .personal-yoga-routine dl > div:last-child {
+  grid-column: 1 / -1;
+}
+.personal-planner .personal-yoga-routine dl > .selected {
+  border-color: #b99bdc;
+  background: #ebdfff;
+}
+.personal-planner .personal-yoga-routine dt {
+  flex: 0 0 18px;
+  color: #735187;
+  font-size: 12px;
+  font-weight: 700;
+}
+.personal-planner .personal-yoga-routine dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.personal-planner .personal-yoga-day-routine {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: -3px 0 0;
+  padding: 11px 14px;
+  border-radius: 15px;
+  background: #f2e9ff;
+  color: #6a4c7b;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.personal-planner .personal-yoga-day-routine > span:first-child {
+  font-size: 21px;
+  flex: 0 0 auto;
+}
+.personal-planner .personal-yoga-day-routine strong {
+  font-weight: 650;
+}
 .personal-planner .personal-yoga-day-title {
   display: flex;
   align-items: center;
@@ -436,6 +518,22 @@
   font-size: 12px;
   margin-top: -5px;
 }
+.personal-planner .personal-yoga-form-routine {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f2e9ff;
+  color: #6a4c7b;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.personal-planner .personal-yoga-form-routine > span {
+  font-size: 11px;
+  color: #84698f;
+}
 .personal-planner .personal-yoga-form .ops-yoga-video-fields {
   display: grid;
   gap: 17px;
@@ -482,6 +580,12 @@
   font-weight: 650;
 }
 @media (min-width: 720px) {
+  .personal-planner .personal-yoga-routine dl {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .personal-planner .personal-yoga-routine dl > div:last-child {
+    grid-column: span 2;
+  }
   .personal-planner .personal-yoga-calendar {
     padding: 20px 24px 16px;
   }

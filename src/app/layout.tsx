@@ -9,7 +9,7 @@ const notoSans = Noto_Sans_KR({
 export const metadata: Metadata = {
   title: "나의 플래너 · 콘텐츠와 요가",
   description:
-    "콘텐츠 기획·원고·성과와 주간 요가 영상을 한곳에서 확인하는 개인 플래너",
+    "주간 릴스 편성표·블로그 소재와 요일별 운동 영상을 한곳에서 관리하는 개인 플래너",
   appleWebApp: {
     capable: true,
     title: "나의 플래너",
