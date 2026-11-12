@@ -2,6 +2,132 @@
   min-width: 0;
   color: #3d2c2e;
 }
+.content-weekly {
+  min-width: 0;
+  margin-bottom: 28px;
+  padding: 20px 14px 14px;
+  border: 1px solid #f0e0d4;
+  border-radius: 20px;
+  background: #fff0e9;
+  box-shadow: 0 8px 24px #3d2c2e0d;
+}
+.content-weekly-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+}
+.content-weekly-account {
+  margin: 0 0 4px;
+  color: #994c48;
+  font-size: 13px;
+  font-weight: 650;
+}
+.content-weekly-heading h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 750;
+  line-height: 1.4;
+  word-break: keep-all;
+}
+.content-weekly-fixed {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #ffdbcf;
+  color: #85423e;
+  font-size: 11px;
+  font-weight: 650;
+}
+.content-weekly-caption {
+  margin: 10px 4px 16px;
+  color: #806860;
+  font-size: 12px;
+}
+.content-weekly-days {
+  display: grid;
+  gap: 7px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.content-weekly-day {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 68px;
+  padding: 12px 10px;
+  border-radius: 15px;
+  background: #fffdfa;
+}
+.content-weekly-day-label {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 34px;
+  border-radius: 12px;
+  background: #ffe4da;
+  color: #85423e;
+  font-size: 14px;
+  font-weight: 700;
+}
+.content-weekly-topic {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  line-height: 1.55;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.content-weekly-topic strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+.content-weekly-topic > span {
+  color: #806e6c;
+  font-size: 11px;
+}
+.content-weekly-time,
+.content-weekly-off {
+  color: #85423e;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.content-weekly-day.is-rest {
+  background: #edf7f0;
+}
+.content-weekly-day.is-rest .content-weekly-day-label {
+  background: #cdefd9;
+  color: #35614a;
+}
+.content-weekly-off {
+  color: #35614a;
+  font-size: 10px;
+}
+.content-weekly-day.is-weekend .content-weekly-day-label {
+  background: #eee5ff;
+  color: #65448c;
+}
+.content-weekly-day.is-weekend .content-weekly-time {
+  color: #65448c;
+}
+@media (min-width: 760px) {
+  .content-weekly {
+    padding: 24px;
+  }
+  .content-weekly-days {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .content-weekly-day.is-rest {
+    grid-column: 1 / -1;
+  }
+}
 .content-planner-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

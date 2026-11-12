@@ -14,6 +14,10 @@ The separately untracked diary app is not part of this release.
 - Content uses the same three read-only Google sheets (planning, drafts,
   publication/performance). Cards expose useful fields and an all-field detail
   dialog. Search covers every cell. Lists show 24 items at a time.
+- A fixed @ny.iro weekly reels schedule stays above the sheet tabs: Monday off,
+  Tuesday–Friday at 17:30 and Saturday–Sunday at 21:30 (Asia/Seoul), with the
+  user's recurring makeup themes. It is a display board, without scheduled posts
+  or database writes.
 - Yoga uses a seven-day selector and the selected day's video cards. Add/edit
   collects date, URL, title and optional minutes. Existing video-title lookup and
   iPhone push subscription remain available. Alerts still fire at 21:00 Seoul.
