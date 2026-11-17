@@ -1,10 +1,18 @@
 export const blogKeywordLimit = 500;
 export const blogKeywordColumns =
-  "id,keyword,used,deleted_at,created_at,updated_at";
+  "id,keyword,board,sub_keyword,summary,is_draft,used,deleted_at,created_at,updated_at";
 
-export type BlogKeyword = {
-  id: string;
+export const blogBoards = ["블러셔 진열대", "썼어유", "보통의날"] as const;
+export type BlogBoard = (typeof blogBoards)[number];
+type BlogPostDetails = {
   keyword: string;
+  board: BlogBoard | null;
+  sub_keyword: string;
+  summary: string;
+  is_draft: boolean;
+};
+export type BlogKeyword = BlogPostDetails & {
+  id: string;
   used: boolean;
   deleted_at: string | null;
   created_at: string;
@@ -12,8 +20,11 @@ export type BlogKeyword = {
 };
 export type BlogKeywordIdentity = { id: string; expectedUpdatedAt: string };
 export type BlogKeywordMutation =
-  | { action: "create"; id: string; keyword: string }
-  | ({ action: "update"; used: boolean } & BlogKeywordIdentity)
+  | { action: "create"; id: string; details: BlogPostDetails }
+  | ({
+      action: "update";
+      changes: Partial<BlogPostDetails & { used: boolean }>;
+    } & BlogKeywordIdentity)
   | { action: "delete" | "restore"; items: BlogKeywordIdentity[] };
 
 export class BlogKeywordInputError extends Error {}
@@ -67,6 +78,31 @@ function identity(raw: unknown): BlogKeywordIdentity {
     expectedUpdatedAt: token(value.expectedUpdatedAt),
   };
 }
+function postText(raw: unknown, label: string, max: number, required = false) {
+  if (typeof raw !== "string") fail(`${label} 입력을 확인해 주세요.`);
+  const text = raw.trim();
+  if (
+    (required && !text) ||
+    text.includes("\0") ||
+    Array.from(text).length > max
+  )
+    fail(
+      `${label} 항목을 ${required ? "1~" : "최대 "}${max}자로 입력해 주세요.`,
+    );
+  return text;
+}
+function boardValue(raw: unknown) {
+  if (raw === null) return null;
+  const board = blogBoards.find((name) => name === raw);
+  if (!board) fail("블로그 게시판을 확인해 주세요.");
+  return board;
+}
+function checkValue(raw: unknown) {
+  if (typeof raw !== "boolean") fail("체크 상태를 확인해 주세요.");
+  return raw;
+}
+const detailKeys = ["keyword", "board", "sub_keyword", "summary", "is_draft"];
+
 export function parseBlogKeywordMutation(
   raw: unknown,
   method: string,
@@ -89,21 +125,44 @@ export function parseBlogKeywordMutation(
     return { action: method === "DELETE" ? "delete" : "restore", items };
   }
   if (method === "POST") {
-    keys(value, ["id", "keyword"]);
-    if (typeof value.keyword !== "string") fail("키워드를 입력해 주세요.");
-    const keyword = value.keyword.trim();
-    if (!keyword || Array.from(keyword).length > 200 || keyword.includes("\0"))
-      fail("키워드는 1~200자로 입력해 주세요.");
-    return { action: "create", id: id(value.id), keyword };
+    keys(value, ["id", ...detailKeys]);
+    return {
+      action: "create",
+      id: id(value.id),
+      details: {
+        keyword: postText(value.keyword, "메인 키워드", 200, true),
+        board: boardValue("board" in value ? value.board : null),
+        sub_keyword: postText(
+          "sub_keyword" in value ? value.sub_keyword : "",
+          "서브 키워드",
+          200,
+        ),
+        summary: postText(
+          "summary" in value ? value.summary : "",
+          "글 내용",
+          1000,
+        ),
+        is_draft: checkValue("is_draft" in value ? value.is_draft : false),
+      },
+    };
   }
   if (method === "PATCH") {
-    keys(value, ["id", "used", "expectedUpdatedAt"]);
-    if (typeof value.used !== "boolean")
-      fail("키워드 사용 상태를 확인해 주세요.");
+    keys(value, ["id", "used", "expectedUpdatedAt", ...detailKeys]);
+    const changes: Partial<BlogPostDetails & { used: boolean }> = {};
+    if ("keyword" in value)
+      changes.keyword = postText(value.keyword, "메인 키워드", 200, true);
+    if ("board" in value) changes.board = boardValue(value.board);
+    if ("sub_keyword" in value)
+      changes.sub_keyword = postText(value.sub_keyword, "서브 키워드", 200);
+    if ("summary" in value)
+      changes.summary = postText(value.summary, "글 내용", 1000);
+    if ("is_draft" in value) changes.is_draft = checkValue(value.is_draft);
+    if ("used" in value) changes.used = checkValue(value.used);
+    if (Object.keys(changes).length === 0) fail("수정할 항목을 선택해 주세요.");
     return {
       action: "update",
       id: id(value.id),
-      used: value.used,
+      changes,
       expectedUpdatedAt: token(value.expectedUpdatedAt),
     };
   }
@@ -120,6 +179,10 @@ export function publicBlogKeyword(row: BlogKeyword): BlogKeyword {
   return {
     id: row.id,
     keyword: row.keyword,
+    board: row.board,
+    sub_keyword: row.sub_keyword,
+    summary: row.summary,
+    is_draft: row.is_draft,
     used: row.used,
     deleted_at: row.deleted_at,
     created_at: row.created_at,

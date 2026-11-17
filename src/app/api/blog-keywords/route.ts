@@ -92,7 +92,7 @@ async function handle(req: NextRequest) {
     if (value.action === "create") {
       const result = await client
         .from(table)
-        .insert({ id: value.id, keyword: value.keyword })
+        .insert({ id: value.id, ...value.details })
         .select(blogKeywordColumns)
         .eq("owner_id", user.id)
         .maybeSingle();
@@ -106,7 +106,11 @@ async function handle(req: NextRequest) {
         if (existing.error) return failure(existing.error);
         // A lost create response may be retried, but may never undo a later check/delete.
         return existing.data &&
-          existing.data.keyword === value.keyword &&
+          existing.data.keyword === value.details.keyword &&
+          existing.data.board === value.details.board &&
+          existing.data.sub_keyword === value.details.sub_keyword &&
+          existing.data.summary === value.details.summary &&
+          existing.data.is_draft === value.details.is_draft &&
           !existing.data.used &&
           !existing.data.deleted_at
           ? json({ item: existing.data })
@@ -119,7 +123,7 @@ async function handle(req: NextRequest) {
     if (value.action === "update") {
       const result = await client
         .from(table)
-        .update({ used: value.used })
+        .update(value.changes)
         .eq("id", value.id)
         .eq("owner_id", user.id)
         .eq("updated_at", value.expectedUpdatedAt)

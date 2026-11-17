@@ -288,7 +288,7 @@
   background: #f7e9e2;
 }
 .makeup-upload {
-  height: clamp(150px, 25dvh, 245px);
+  min-height: 78px;
   cursor: pointer;
   border: 1px dashed #bc8795;
 }
@@ -296,9 +296,68 @@
   outline: 3px solid #9472d5;
   outline-offset: 3px;
 }
-.makeup-upload img,
 .makeup-full img {
   object-fit: contain;
+}
+.makeup-batch-count {
+  padding-bottom: 8px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.makeup-batch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+  align-content: start;
+  max-height: 36dvh;
+  overflow-y: auto;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.makeup-batch-preview {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: #f7e9e2;
+}
+.makeup-batch-preview img {
+  object-fit: cover;
+}
+.makeup-batch-preview button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: radial-gradient(circle, #fffaf4ed 45%, transparent 48%);
+  color: #68404b;
+  font-size: 18px;
+}
+.makeup-batch-saved {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #fffaf4f0;
+  color: #3c6050;
+  font-size: 11px;
+}
+.makeup-batch-grid .makeup-error,
+.makeup-skipped {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.makeup-skipped summary {
+  cursor: pointer;
+  color: #92384e;
 }
 .makeup-upload > span {
   position: relative;

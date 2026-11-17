@@ -1,14 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Plus, RefreshCw, Trash2, Undo2 } from "lucide-react";
-import { blogKeywordLimit, type BlogKeyword } from "@/lib/blog-keywords";
+import { Pencil, Plus, RefreshCw, Trash2, Undo2 } from "lucide-react";
+import {
+  blogBoards,
+  blogKeywordLimit,
+  type BlogBoard,
+  type BlogKeyword,
+} from "@/lib/blog-keywords";
 import { OpsDialog } from "./ops-dialog";
 import "./blog-keywords.css";
 
 type Props = { enabled: boolean; onSessionExpired?: () => void };
 type Identity = { id: string; expectedUpdatedAt: string };
-type Create = { id: string; keyword: string };
+type Fields = Pick<
+  BlogKeyword,
+  "keyword" | "sub_keyword" | "summary" | "board" | "is_draft"
+>;
+type Create = Fields & { id: string };
+type Editor = { original: BlogKeyword | null; fields: Fields };
+
+function fieldsOf(row?: Partial<Fields> | null): Fields {
+  return {
+    keyword: row?.keyword ?? "",
+    sub_keyword: row?.sub_keyword ?? "",
+    summary: row?.summary ?? "",
+    board: row?.board ?? null,
+    is_draft: row?.is_draft ?? false,
+  };
+}
 
 class KeywordRequestError extends Error {
   constructor(
@@ -60,13 +80,11 @@ function KeywordCollection({
   const [error, setError] = useState("");
   const [stale, setStale] = useState(false);
   const [notice, setNotice] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [keyword, setKeyword] = useState("");
+  const [editor, setEditor] = useState<Editor | null>(null);
   const [uncertainCreate, setUncertainCreate] = useState(false);
   const [deleting, setDeleting] = useState<BlogKeyword[] | null>(null);
   const [undo, setUndo] = useState<BlogKeyword[]>([]);
   const pendingCreate = useRef<Create | null>(null);
-  const input = useRef<HTMLInputElement | null>(null);
   const lock = useRef(true);
   const active = useRef(true);
   const mutation = useRef<AbortController | null>(null);
@@ -82,9 +100,6 @@ function KeywordCollection({
       mutation.current?.abort();
     };
   }, []);
-  useEffect(() => {
-    if (adding) input.current?.focus();
-  }, [adding]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -103,17 +118,11 @@ function KeywordCollection({
         setStale(false);
         setError("");
         const pending = pendingCreate.current;
-        if (
-          pending &&
-          rows.some(
-            (row) => row.id === pending.id && row.keyword === pending.keyword,
-          )
-        ) {
+        if (pending && rows.some((row) => row.id === pending.id)) {
           pendingCreate.current = null;
           setUncertainCreate(false);
-          setKeyword("");
-          setAdding(false);
-          setNotice("키워드가 저장된 것을 확인했어요.");
+          setEditor((current) => (current?.original ? current : null));
+          setNotice("소재가 저장된 것을 확인했어요.");
         }
       } catch (cause) {
         if (controller.signal.aborted) return;
@@ -185,12 +194,59 @@ function KeywordCollection({
     }
   }
 
-  function add(event: FormEvent) {
+  function openEditor(original: BlogKeyword | null) {
+    setEditor({
+      original,
+      fields: fieldsOf(original ?? pendingCreate.current),
+    });
+    setError("");
+    setNotice("");
+  }
+
+  function changeField<K extends keyof Fields>(key: K, value: Fields[K]) {
+    setEditor(
+      (current) =>
+        current && {
+          ...current,
+          fields: { ...current.fields, [key]: value },
+        },
+    );
+  }
+
+  function save(event: FormEvent) {
     event.preventDefault();
-    const value = keyword.trim();
-    if (!value || Array.from(value).length > 200 || lock.current) return;
+    if (!editor || blocked || lock.current || formUnavailable || invalidFields)
+      return;
+    const fields = {
+      ...editor.fields,
+      keyword: editor.fields.keyword.trim(),
+      sub_keyword: editor.fields.sub_keyword.trim(),
+      summary: editor.fields.summary.trim(),
+    };
+    if (editor.original) {
+      const original = fieldsOf(editor.original);
+      const changes = Object.fromEntries(
+        (Object.keys(fields) as (keyof Fields)[])
+          .filter((key) => fields[key] !== original[key])
+          .map((key) => [key, fields[key]]),
+      );
+      if (!Object.keys(changes).length) {
+        setEditor(null);
+        return;
+      }
+      void mutate(
+        "PATCH",
+        { ...identity(editor.original), ...changes },
+        ({ item }) => {
+          replaceItem(item);
+          setEditor(null);
+          setNotice("소재를 수정했어요.");
+        },
+      );
+      return;
+    }
     if (!pendingCreate.current)
-      pendingCreate.current = { id: crypto.randomUUID(), keyword: value };
+      pendingCreate.current = { id: crypto.randomUUID(), ...fields };
     void mutate(
       "POST",
       pendingCreate.current,
@@ -208,26 +264,33 @@ function KeywordCollection({
         );
         pendingCreate.current = null;
         setUncertainCreate(false);
-        setKeyword("");
-        setAdding(false);
-        setNotice("키워드를 추가했어요.");
+        setEditor(null);
+        setNotice("소재를 추가했어요.");
       },
       true,
     );
   }
 
-  function toggle(item: BlogKeyword) {
+  function replaceItem(item: BlogKeyword) {
+    setItems((current) =>
+      current.map((row) => (row.id === item.id ? item : row)),
+    );
+  }
+
+  function toggle(item: BlogKeyword, key: "used" | "is_draft") {
     void mutate(
       "PATCH",
-      { ...identity(item), used: !item.used },
+      { ...identity(item), [key]: !item[key] },
       ({ item: updated }) => {
-        setItems((current) =>
-          current.map((row) => (row.id === updated.id ? updated : row)),
-        );
+        replaceItem(updated);
         setNotice(
-          updated.used
-            ? "쓴 소재로 체크했어요."
-            : "아직 안 쓴 소재로 바꿨어요.",
+          key === "is_draft"
+            ? updated.is_draft
+              ? "임시저장으로 표시했어요."
+              : "임시저장 표시를 해제했어요."
+            : updated.used
+              ? "쓴 소재로 체크했어요."
+              : "아직 안 쓴 소재로 바꿨어요.",
         );
       },
     );
@@ -276,6 +339,32 @@ function KeywordCollection({
 
   const checked = items.filter((item) => item.used);
   const blocked = !loaded || loading || busy || stale;
+  const latest =
+    editor?.original && items.find((item) => item.id === editor.original?.id);
+  const formUnavailable = Boolean(
+    editor?.original && editor.original.updated_at !== latest?.updated_at,
+  );
+  const frozen =
+    busy ||
+    loading ||
+    stale ||
+    formUnavailable ||
+    (!editor?.original && uncertainCreate);
+  const fields = editor?.fields;
+  const tooLong =
+    fields &&
+    (Array.from(fields.keyword.trim()).length > 200 ||
+      Array.from(fields.sub_keyword.trim()).length > 200 ||
+      Array.from(fields.summary.trim()).length > 1000);
+  const invalidFields = !fields?.board || !fields.keyword.trim() || tooLong;
+  const errorPanel = error && (
+    <div className="blog-keywords-error" role="alert">
+      <p>{error}</p>
+      <button type="button" disabled={busy || loading} onClick={refresh}>
+        {stale ? "최신 목록 불러오기" : "다시 불러오기"}
+      </button>
+    </div>
+  );
 
   return (
     <section
@@ -286,73 +375,148 @@ function KeywordCollection({
       <header className="blog-keywords-heading">
         <div>
           <h2 id="blog-keywords-title">블로그 소재 수집</h2>
-          <p>생각난 키워드를 담아두고, 포스팅을 마치면 체크해요.</p>
         </div>
         <button
           type="button"
           className="blog-keywords-add"
           aria-label="키워드 추가"
-          aria-expanded={adding}
-          aria-controls="blog-keywords-add-form"
-          disabled={blocked || adding}
-          onClick={() => setAdding(true)}
+          aria-haspopup="dialog"
+          disabled={blocked || !!editor}
+          onClick={() => openEditor(null)}
         >
           <Plus size={22} aria-hidden="true" />
         </button>
       </header>
 
-      {adding && (
-        <form
-          id="blog-keywords-add-form"
-          className="blog-keywords-form"
-          onSubmit={add}
+      {editor && fields && (
+        <OpsDialog
+          key={editor.original?.updated_at ?? "add"}
+          title={editor.original ? "블로그 소재 수정" : "블로그 소재 추가"}
+          busy={busy}
+          close={() => setEditor(null)}
         >
-          <label htmlFor="blog-keyword-input">추가할 키워드</label>
-          <input
-            ref={input}
-            id="blog-keyword-input"
-            name="keyword"
-            type="text"
-            value={keyword}
-            maxLength={200}
-            required
-            placeholder="예: 겨울 보습 루틴"
-            disabled={busy || uncertainCreate}
-            autoComplete="off"
-            onChange={(event) => {
-              setKeyword(event.target.value);
-              pendingCreate.current = null;
-            }}
-          />
-          {uncertainCreate && (
-            <p className="blog-keywords-pending">
-              저장 여부를 확인하지 못했어요. 같은 키워드로 다시 확인하면 중복
-              등록되지 않아요.
-            </p>
-          )}
-          <div className="blog-keywords-form-actions">
-            <button
-              type="button"
-              disabled={busy || uncertainCreate}
-              onClick={() => setAdding(false)}
-            >
-              닫기
-            </button>
-            <button type="submit" disabled={blocked || !keyword.trim()}>
-              {busy ? "저장 중…" : uncertainCreate ? "다시 확인" : "추가"}
-            </button>
-          </div>
-        </form>
+          <form className="blog-keywords-form" onSubmit={save}>
+            <label>
+              게시판
+              <select
+                name="board"
+                required
+                value={fields.board ?? ""}
+                disabled={frozen}
+                onChange={(event) =>
+                  changeField("board", event.target.value as BlogBoard)
+                }
+              >
+                <option value="" disabled>
+                  게시판 선택
+                </option>
+                {blogBoards.map((board) => (
+                  <option key={board} value={board}>
+                    {board}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              메인 키워드
+              <input
+                name="keyword"
+                required
+                autoComplete="off"
+                value={fields.keyword}
+                disabled={frozen}
+                placeholder="예: 봄웜 블러셔"
+                onChange={(event) => changeField("keyword", event.target.value)}
+              />
+            </label>
+            <label>
+              서브 키워드
+              <input
+                name="sub_keyword"
+                autoComplete="off"
+                value={fields.sub_keyword}
+                disabled={frozen}
+                placeholder="예: 코랄, 발색 비교"
+                onChange={(event) =>
+                  changeField("sub_keyword", event.target.value)
+                }
+              />
+            </label>
+            <label>
+              글 내용 요약
+              <textarea
+                name="summary"
+                rows={3}
+                value={fields.summary}
+                disabled={frozen}
+                placeholder="어떤 글을 쓸지 짧게 적어주세요."
+                onChange={(event) => changeField("summary", event.target.value)}
+              />
+            </label>
+            <label className="blog-keywords-status">
+              <input
+                type="checkbox"
+                name="is_draft"
+                className="blog-keywords-check"
+                checked={fields.is_draft}
+                disabled={frozen}
+                onChange={(event) =>
+                  changeField("is_draft", event.target.checked)
+                }
+              />
+              임시저장
+            </label>
+            {tooLong && (
+              <p role="alert" className="blog-keywords-pending">
+                키워드는 각각 200자, 글 내용 요약은 1,000자까지 입력할 수
+                있어요.
+              </p>
+            )}
+            {!editor.original && uncertainCreate && (
+              <p className="blog-keywords-pending">
+                저장 응답을 받지 못했어요. ‘다시 확인’을 누르면 같은 소재의 저장
+                여부를 확인해요.
+              </p>
+            )}
+            {errorPanel}
+            {formUnavailable && (
+              <div className="blog-keywords-error" role="alert">
+                <p>
+                  {latest
+                    ? "다른 곳에서 수정된 소재예요. 최신 내용으로 다시 열면 지금 입력한 내용이 교체돼요."
+                    : "현재 목록에 이 소재가 없어 수정할 수 없어요."}
+                </p>
+                {latest && (
+                  <button
+                    type="button"
+                    disabled={busy || loading}
+                    onClick={() => openEditor(latest)}
+                  >
+                    최신 내용으로 다시 열기
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="blog-keywords-form-actions">
+              <button type="button" data-dialog-close disabled={busy}>
+                취소
+              </button>
+              <button
+                type="submit"
+                disabled={blocked || formUnavailable || !!invalidFields}
+              >
+                {busy
+                  ? "저장 중…"
+                  : !editor.original && uncertainCreate
+                    ? "다시 확인"
+                    : "저장"}
+              </button>
+            </div>
+          </form>
+        </OpsDialog>
       )}
 
-      {error && (
-        <div className="blog-keywords-error" role="alert">
-          <p>{error}</p>
-          <button type="button" disabled={busy || loading} onClick={refresh}>
-            {stale ? "최신 목록 불러오기" : "다시 불러오기"}
-          </button>
-        </div>
-      )}
+      {!editor && errorPanel}
       {(notice || undo.length > 0) && (
         <div className="blog-keywords-notice" role="status">
           <span>{notice}</span>
@@ -401,20 +565,57 @@ function KeywordCollection({
           <ul className="blog-keywords-list" aria-label="블로그 키워드 목록">
             {items.map((item) => (
               <li key={item.id} className={item.used ? "is-used" : ""}>
-                <label className="blog-keywords-row">
-                  <input
-                    className="blog-keywords-check"
-                    type="checkbox"
-                    checked={item.used}
+                <div className="blog-keywords-row">
+                  <button
+                    type="button"
+                    className="blog-keywords-edit"
                     disabled={blocked}
-                    aria-label={`${item.keyword} 쓴 소재로 표시`}
-                    onChange={() => toggle(item)}
-                  />
-                  <span className="blog-keywords-word">{item.keyword}</span>
-                  {item.used && (
-                    <span className="blog-keywords-used">썼어요</span>
+                    aria-label={`${item.keyword} 소재 수정`}
+                    onClick={() => openEditor(item)}
+                  >
+                    <span>
+                      <span className="blog-keywords-board">
+                        {item.board ?? "게시판 미지정"}
+                      </span>
+                      <strong className="blog-keywords-word">
+                        {item.keyword}
+                      </strong>
+                    </span>
+                    <Pencil size={15} aria-hidden="true" />
+                  </button>
+                  {item.sub_keyword && (
+                    <p className="blog-keywords-sub">
+                      <span>서브</span> {item.sub_keyword}
+                    </p>
                   )}
-                </label>
+                  {item.summary && (
+                    <p className="blog-keywords-summary">{item.summary}</p>
+                  )}
+                  <div className="blog-keywords-statuses">
+                    <label className="blog-keywords-status">
+                      <input
+                        className="blog-keywords-check"
+                        type="checkbox"
+                        checked={!!item.is_draft}
+                        disabled={blocked}
+                        aria-label={`${item.keyword} 임시저장`}
+                        onChange={() => toggle(item, "is_draft")}
+                      />
+                      임시저장
+                    </label>
+                    <label className="blog-keywords-status">
+                      <input
+                        className="blog-keywords-check"
+                        type="checkbox"
+                        checked={item.used}
+                        disabled={blocked}
+                        aria-label={`${item.keyword} 쓴 소재로 표시`}
+                        onChange={() => toggle(item, "used")}
+                      />
+                      썼어요
+                    </label>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
@@ -423,7 +624,7 @@ function KeywordCollection({
 
       {checked.length > 0 && (
         <div className="blog-keywords-delete-area">
-          <p>체크한 소재를 한 번에 정리할 수 있어요.</p>
+          <p>‘썼어요’에 체크한 소재만 삭제해요.</p>
           <button
             type="button"
             disabled={blocked}

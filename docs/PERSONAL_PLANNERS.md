@@ -18,14 +18,17 @@ The separately untracked diary app is not part of this release.
   Tuesday–Friday at 17:30 and Saturday–Sunday at 21:30 (Asia/Seoul), with the
   user's recurring makeup themes. It is a display board, without scheduled posts
   or database writes.
-- Add keywords with the plus button. Checking a keyword records it as used for a
-  blog post. The same checked items can be deleted together and restored with undo.
+- Add topics with the plus button and choose 블러셔 진열대, 썼어유, or 보통의날.
+  Each topic has a main keyword, optional sub-keyword and short content summary.
+  임시저장 tracks a draft separately from the used checkbox. Only used items are
+  included in bulk deletion and undo.
   Keywords and used state are private to the signed-in PERSONAL account.
 - 메이크업 보드 (`/?view=makeup-board`) stores reference photos in the PERSONAL
   account. Each Monday starts a new selection. Removing a photo from a week's
   board keeps it in the archive and in other weeks where it was selected.
   The 여자, 남자 and 미분류 filters apply to both the selected week and the archive.
-  A look's category can be chosen at upload or changed when viewing the photo.
+  Choose several photos from the album to give them the same category and
+  optional weekly selection in one upload. Individual looks can be reclassified later.
 - Yoga uses a seven-day selector and the selected day's video cards. Add/edit
   collects date, URL, title and optional minutes. Existing video-title lookup and
   iPhone push subscription remain available. Alerts still fire at 21:00 Seoul.
@@ -53,6 +56,8 @@ Apply `supabase/personal/025_blog_keywords.sql` to the PERSONAL database before
 deploying the keyword inbox. It adds its own owner-scoped table and atomic batch
 delete/restore RPC. There are no environment-variable changes. It does not repurpose
 or delete old personal records, business data, or Google sheets.
+Apply `supabase/personal/028_blog_post_details.sql` for the board, sub-keyword,
+summary and draft fields. Existing topics keep their main keyword and used state.
 
 Apply `supabase/personal/026_makeup_board.sql`, then
 `supabase/personal/027_makeup_look_category.sql` to the PERSONAL database.

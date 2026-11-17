@@ -10,6 +10,10 @@ const migration = await readFile(
   "supabase/personal/025_blog_keywords.sql",
   "utf8",
 );
+const detailsMigration = await readFile(
+  "supabase/personal/028_blog_post_details.sql",
+  "utf8",
+);
 
 test("blog keyword storage isolates owners, validates fields and cannot permanently delete", async () => {
   const db = new PGlite();
@@ -142,6 +146,65 @@ test("blog keyword storage isolates owners, validates fields and cannot permanen
       ).prosecdef,
       false,
     );
+    // Upgrade an already populated archive without changing its ownership or edit token.
+    await db.exec(detailsMigration);
+    await db.exec(detailsMigration);
+    await become(owner);
+    const detailColumns = "keyword,board,sub_keyword,summary,is_draft,used";
+    assert.deepEqual(
+      await one(
+        `select ${detailColumns},updated_at from ops_blog_keywords where id=$1`,
+        [id],
+      ),
+      {
+        keyword: row.keyword,
+        board: null,
+        sub_keyword: "",
+        summary: "",
+        is_draft: false,
+        used: false,
+        updated_at: row.updated_at,
+      },
+    );
+    for (const board of ["블러셔 진열대", "썼어유", "보통의날"])
+      assert.equal(
+        (
+          await one(
+            "update ops_blog_keywords set board=$2 where id=$1 returning board",
+            [id, board],
+          )
+        ).board,
+        board,
+      );
+    for (const [field, bad] of [
+      ["board", "다른게시판"],
+      ["summary", "가".repeat(1001)],
+      ["sub_keyword", "가".repeat(201)],
+    ])
+      await assert.rejects(
+        db.query(`update ops_blog_keywords set ${field}=$2 where id=$1`, [
+          id,
+          bad,
+        ]),
+        /check constraint/i,
+      );
+    for (const field of ["id", "updated_at", "owner_id"])
+      await assert.rejects(
+        db.query(`update ops_blog_keywords set ${field}=${field} where id=$1`, [
+          id,
+        ]),
+        /permission denied/i,
+      );
+    await become(other);
+    assert.equal(
+      (
+        await db.query(
+          "update ops_blog_keywords set is_draft=true, summary='foreign' where id=$1 returning id",
+          [id],
+        )
+      ).rows.length,
+      0,
+    );
   } finally {
     await db.close();
   }
@@ -172,6 +235,7 @@ test("batch delete and undo are atomic across stale, unchecked, missing and fore
       create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
       grant usage on schema auth,public to authenticated,anon;`);
     await db.exec(migration);
+    await db.exec(detailsMigration);
     const ids = [randomUUID(), randomUUID(), randomUUID()];
     await become(owner);
     for (const id of ids)
@@ -186,6 +250,10 @@ test("batch delete and undo are atomic across stale, unchecked, missing and fore
     await db.query("update ops_blog_keywords set used=true where id=$1", [
       ids[1],
     ]);
+    await db.query(
+      "update ops_blog_keywords set board='썼어유',summary='요약',sub_keyword='립',is_draft=true where id=$1",
+      [ids[0]],
+    );
     const first = await read(ids[0]),
       second = await read(ids[1]),
       unchecked = await read(ids[2]);
@@ -247,6 +315,11 @@ test("batch delete and undo are atomic across stale, unchecked, missing and fore
     const restored = (await batch(deleted.map(reference), false)).rows;
     assert.equal(restored.length, 2);
     assert.ok(restored.every((row) => row.used && row.deleted_at === null));
+    const restoredArticle = restored.find((row) => row.id === ids[0]);
+    assert.equal(restoredArticle.is_draft, true);
+    assert.equal(restoredArticle.board, "썼어유");
+    assert.equal(restoredArticle.summary, "요약");
+    assert.equal(restoredArticle.sub_keyword, "립");
     for (const row of restored)
       assert.notEqual(
         row.token,

@@ -43,6 +43,12 @@ type Look = {
 };
 type Page = { items: Look[]; nextOffset: number | null };
 type Photo = { id: string; image: Blob; thumbnail: Blob };
+type UploadPhoto = Photo & {
+  filename: string;
+  preview: string;
+  saved: boolean;
+  error?: string;
+};
 type SessionProps = { onSessionExpired: () => void };
 const endpoint = "/api/makeup-looks";
 
@@ -385,102 +391,240 @@ function CategoryPicker({
   );
 }
 
+function uploadPhoto(
+  photo: Photo,
+  title: string,
+  category: LookCategory,
+  pickedWeek: string | null,
+  signal: AbortSignal,
+) {
+  const form = new FormData();
+  form.set("id", photo.id);
+  form.set("title", title);
+  form.set("image", photo.image, "look.jpg");
+  form.set("thumbnail", photo.thumbnail, "thumb.jpg");
+  if (category) form.set("category", category);
+  if (pickedWeek) form.set("week", pickedWeek);
+  return request<{ item: Look }>(endpoint, {
+    method: "POST",
+    body: form,
+    signal,
+  });
+}
+
 function UploadDialog({
+  week,
   weekName,
   defaultPick,
   initialCategory,
   close,
-  save,
+  onSaved,
   busy,
-  error,
+  setBusy,
+  onSessionExpired,
 }: {
+  week: string;
   weekName: string;
   defaultPick: boolean;
   initialCategory: LookCategory;
   close: () => void;
-  save: (
-    photo: Photo,
-    title: string,
-    picked: boolean,
-    category: LookCategory,
-  ) => void;
+  onSaved: (saved: number, picked: boolean, finished: boolean) => void;
   busy: boolean;
-  error: string;
+  setBusy: (value: boolean) => void;
+  onSessionExpired: () => void;
 }) {
-  const [photo, setPhoto] = useState<(Photo & { preview: string }) | null>(
-    null,
-  );
-  const [preparing, setPreparing] = useState(false);
+  const [photos, setPhotos] = useState<UploadPhoto[]>([]);
+  const [preparing, setPreparing] = useState("");
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const [attempted, setAttempted] = useState(false);
   const [title, setTitle] = useState("");
   const [picked, setPicked] = useState(defaultPick);
   const [category, setCategory] = useState(initialCategory);
-  const [notice, setNotice] = useState("");
-  const preview = photo?.preview;
-  const sequence = useRef(0);
-  useEffect(
-    () => () => {
-      sequence.current++;
-    },
-    [],
-  );
+  const operation = useRef<AbortController | null>(null);
+  const previews = useRef(new Set<string>());
+  const remaining = photos.filter((photo) => !photo.saved);
   useEffect(() => {
-    if (preview) return () => URL.revokeObjectURL(preview);
-  }, [preview]);
-  async function choose(file?: File) {
-    if (!file) return;
-    const turn = ++sequence.current;
-    setPreparing(true);
-    setPhoto(null);
-    setNotice("");
+    const urls = previews.current;
+    return () => {
+      operation.current?.abort();
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+  async function choose(files: File[]) {
+    if (!files.length || operation.current || attempted) return;
+    const controller = new AbortController();
+    operation.current = controller;
+    const rejected: string[] = [];
     try {
-      const prepared = await preparePhoto(file);
-      if (turn === sequence.current)
-        setPhoto({ ...prepared, preview: URL.createObjectURL(prepared.image) });
-    } catch (cause) {
-      if (turn === sequence.current)
-        setNotice(
-          cause instanceof Error ? cause.message : "사진을 읽지 못했어요.",
-        );
+      for (const [index, file] of files.entries()) {
+        setPreparing(`사진 준비 중 ${index + 1} / ${files.length}`);
+        try {
+          const prepared = await preparePhoto(file);
+          if (controller.signal.aborted) return;
+          const preview = URL.createObjectURL(prepared.thumbnail);
+          previews.current.add(preview);
+          const item = {
+            ...prepared,
+            preview,
+            filename: file.name,
+            saved: false,
+          };
+          setPhotos((current) => [...current, item]);
+        } catch (cause) {
+          if (controller.signal.aborted) return;
+          rejected.push(
+            `${file.name} · ${cause instanceof Error ? cause.message : "사진을 읽지 못했어요."}`,
+          );
+        }
+      }
+      setSkipped(rejected);
     } finally {
-      if (turn === sequence.current) setPreparing(false);
+      if (!controller.signal.aborted) {
+        operation.current = null;
+        setPreparing("");
+      }
     }
   }
-  function submit(event: FormEvent) {
+  function forget(photo: UploadPhoto) {
+    URL.revokeObjectURL(photo.preview);
+    previews.current.delete(photo.preview);
+    setPhotos((current) => current.filter((item) => item.id !== photo.id));
+  }
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!photo || preparing || busy) return;
-    save(photo, title.trim(), picked, category);
+    if (!remaining.length || operation.current || busy) return;
+    const controller = new AbortController();
+    operation.current = controller;
+    setBusy(true);
+    // Retries must send the same ID, bytes, and metadata if a response was lost.
+    setAttempted(true);
+    let saved = 0;
+    try {
+      for (const photo of remaining) {
+        let error: string | undefined;
+        try {
+          await uploadPhoto(
+            photo,
+            title.trim(),
+            category,
+            picked ? week : null,
+            controller.signal,
+          );
+        } catch (cause) {
+          if (controller.signal.aborted) return;
+          if (cause instanceof BoardError && cause.status === 401) {
+            onSessionExpired();
+            return;
+          }
+          error = failure(cause);
+        }
+        if (controller.signal.aborted) return;
+        if (!error) saved++;
+        setPhotos((current) =>
+          current.map((item) =>
+            item.id === photo.id ? { ...item, saved: !error, error } : item,
+          ),
+        );
+      }
+      if (saved)
+        onSaved(
+          photos.length - remaining.length + saved,
+          picked,
+          saved === remaining.length,
+        );
+    } finally {
+      if (!controller.signal.aborted) {
+        operation.current = null;
+        setBusy(false);
+      }
+    }
   }
   return (
     <OpsDialog title="메이크업 사진 추가" busy={busy} close={close}>
       <form className="makeup-form" onSubmit={submit}>
-        <label className="makeup-upload">
-          {preview && (
-            <Image
-              unoptimized
-              src={preview}
-              fill
-              alt="선택한 사진 미리보기"
-              sizes="420px"
+        {!attempted && (
+          <label className="makeup-upload">
+            <span>
+              <ImagePlus size={20} aria-hidden="true" />
+              {preparing ||
+                (photos.length
+                  ? "사진 더 선택"
+                  : "앨범에서 사진 선택 · 여러 장 가능")}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              aria-label="메이크업 사진 선택"
+              disabled={busy || Boolean(preparing)}
+              onChange={(event) => {
+                const selected = Array.from(event.target.files ?? []);
+                event.target.value = "";
+                void choose(selected);
+              }}
             />
-          )}
-          <span>
-            <ImagePlus size={20} aria-hidden="true" />
-            {preparing
-              ? "사진 준비 중…"
-              : photo
-                ? "다른 사진 선택"
-                : "앨범에서 사진 선택"}
-          </span>
-          <input
-            type="file"
-            accept="image/*"
-            aria-label="메이크업 사진 선택"
-            disabled={busy}
-            onChange={(event) => void choose(event.target.files?.[0])}
-          />
-        </label>
+          </label>
+        )}
+        <input
+          type="hidden"
+          name="selectedPhotos"
+          value={photos.map((p) => p.id).join(",") || preparing}
+        />
+        {photos.length > 0 && (
+          <div>
+            <p className="makeup-batch-count" role="status">
+              {attempted
+                ? `${photos.length}장 중 ${photos.length - remaining.length}장 저장`
+                : `선택한 사진 ${photos.length}장`}
+            </p>
+            <ul className="makeup-batch-grid">
+              {photos.map((photo) => (
+                <li key={photo.id}>
+                  <div className="makeup-batch-preview">
+                    <Image
+                      unoptimized
+                      src={photo.preview}
+                      fill
+                      alt={`${photo.filename} 미리보기`}
+                      sizes="100px"
+                    />
+                    {!attempted && (
+                      <button
+                        type="button"
+                        onClick={() => forget(photo)}
+                        aria-label={`${photo.filename} 선택 해제`}
+                      >
+                        ×
+                      </button>
+                    )}
+                    {photo.saved && (
+                      <span className="makeup-batch-saved">
+                        <Check size={13} aria-hidden="true" /> 저장됨
+                      </span>
+                    )}
+                  </div>
+                  {photo.error && (
+                    <p className="makeup-error" role="alert">
+                      {photo.filename} · {photo.error}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {skipped.length > 0 && (
+          <details className="makeup-skipped">
+            <summary>선택에서 제외된 파일 {skipped.length}개</summary>
+            <ul>
+              {skipped.map((message, index) => (
+                <li key={index}>{message}</li>
+              ))}
+            </ul>
+          </details>
+        )}
         <label className="makeup-name">
-          룩 이름 <span>(선택)</span>
+          {photos.length > 1 ? "공통 룩 이름" : "룩 이름"} <span>(선택)</span>
           <input
             type="text"
             name="title"
@@ -488,13 +632,13 @@ function UploadDialog({
             placeholder="예: 로즈 브라운 스모키"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            disabled={busy}
+            disabled={attempted}
           />
         </label>
         <input type="hidden" name="category" value={category ?? ""} />
         <CategoryPicker
           value={category}
-          disabled={busy}
+          disabled={attempted}
           onChange={setCategory}
         />
         <label className="makeup-choice">
@@ -503,21 +647,22 @@ function UploadDialog({
             name="picked"
             checked={picked}
             onChange={(event) => setPicked(event.target.checked)}
-            disabled={busy}
+            disabled={attempted}
           />
           {weekName} 할 메이크업에도 담기
         </label>
-        {(notice || error) && (
-          <p className="makeup-error" role="alert">
-            {notice || error}
-          </p>
-        )}
         <button
           type="submit"
           className="makeup-primary"
-          disabled={!photo || preparing || busy}
+          disabled={!remaining.length || Boolean(preparing) || busy}
         >
-          사진 저장
+          {busy
+            ? "저장 중…"
+            : attempted
+              ? `남은 ${remaining.length}장 다시 저장`
+              : photos.length > 1
+                ? `사진 ${photos.length}장 저장`
+                : "사진 저장"}
         </button>
       </form>
     </OpsDialog>
@@ -553,7 +698,7 @@ function WeekBoard({
 
   async function change<T>(
     method: string,
-    body: FormData | object,
+    body: object,
     done: (result: T) => void,
   ) {
     if (active.current) return;
@@ -566,11 +711,8 @@ function WeekBoard({
       const result = await request<T>(endpoint, {
         method,
         signal: controller.signal,
-        headers:
-          body instanceof FormData
-            ? undefined
-            : { "Content-Type": "application/json" },
-        body: body instanceof FormData ? body : JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
       if (!controller.signal.aborted) done(result);
     } catch (cause) {
@@ -623,27 +765,11 @@ function WeekBoard({
       },
     );
   }
-  function save(
-    photo: Photo,
-    title: string,
-    picked: boolean,
-    category: LookCategory,
-  ) {
-    const form = new FormData();
-    form.set("id", photo.id);
-    form.set("title", title);
-    form.set("image", photo.image, "look.jpg");
-    form.set("thumbnail", photo.thumbnail, "thumb.jpg");
-    if (category) form.set("category", category);
-    if (picked) form.set("week", week);
-    void change("POST", form, () => {
-      setUpload(null);
-      setNotice(
-        `${categoryLabels[category ?? "unclassified"]} 사진을 저장했어요.`,
-      );
-      void archive.load();
-      if (picked) void weekly.load();
-    });
+  function onSaved(count: number, picked: boolean, finished: boolean) {
+    if (finished) setUpload(null);
+    setNotice(`메이크업 사진 ${count}장을 저장했어요.`);
+    void archive.load();
+    if (picked) void weekly.load();
   }
   function classify(item: Look, category: LookCategory) {
     if (category === (item.category ?? null)) return;
@@ -760,18 +886,20 @@ function WeekBoard({
       </p>
       {upload !== null && (
         <UploadDialog
+          week={week}
           weekName={weekName}
           defaultPick={upload}
           initialCategory={
             filter === "female" || filter === "male" ? filter : null
           }
           busy={busy}
-          error={error}
+          setBusy={setBusy}
+          onSessionExpired={onSessionExpired}
           close={() => {
             setUpload(null);
             setError("");
           }}
-          save={save}
+          onSaved={onSaved}
         />
       )}
       {detail && (

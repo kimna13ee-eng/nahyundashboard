@@ -60,6 +60,10 @@ after(() => {
 function setup() {
   const base = {
     keyword: "출근 메이크업",
+    board: null,
+    sub_keyword: "",
+    summary: "",
+    is_draft: false,
     used: false,
     deleted_at: null,
     created_at: stamp,
@@ -285,6 +289,77 @@ test("checkbox updates reject stale, foreign and removed rows without partial ch
       409,
     );
   assert.equal(f.rows[1].used, false);
+});
+test("blog details round-trip together and draft status is independent of publication", async () => {
+  const f = setup();
+  const input = {
+    id: newId,
+    keyword: "메인",
+    board: "썼어유",
+    sub_keyword: "봄",
+    summary: "두 가지 립 비교",
+    is_draft: true,
+  };
+  const response = await route.POST(request("POST", input));
+  assert.equal(response.status, 201);
+  const created = (await response.json()).item;
+  assert.equal(created.board, input.board);
+  assert.equal(created.is_draft, true);
+  assert.equal(created.used, false);
+  assert.equal((await route.POST(request("POST", input))).status, 200);
+  assert.equal(
+    (await route.POST(request("POST", { ...input, summary: "다른 내용" })))
+      .status,
+    409,
+  );
+  const response2 = await route.PATCH(
+    request("PATCH", {
+      id: newId,
+      expectedUpdatedAt: created.updated_at,
+      keyword: "바뀐 메인",
+      board: "보통의날",
+      summary: "바뀐 요약",
+      is_draft: false,
+    }),
+  );
+  assert.equal(response2.status, 200);
+  const edited = (await response2.json()).item;
+  assert.equal(edited.sub_keyword, "봄");
+  assert.equal(edited.used, false);
+  assert.equal(edited.is_draft, false);
+  assert.equal(edited.keyword, "바뀐 메인");
+  assert.equal(edited.board, "보통의날");
+  assert.equal(
+    (
+      await route.PATCH(
+        request("PATCH", {
+          id: newId,
+          expectedUpdatedAt: created.updated_at,
+          summary: "stale",
+        }),
+      )
+    ).status,
+    409,
+  );
+  assert.equal((await route.POST(request("POST", input))).status, 409);
+  assert.equal(f.rows.find((row) => row.id === newId)?.summary, "바뀐 요약");
+  for (const bad of [
+    { board: "임의 게시판" },
+    { is_draft: "yes" },
+    { sub_keyword: "가".repeat(201) },
+    { summary: "가".repeat(1001) },
+    { summary: null },
+  ]) {
+    assert.equal(
+      (await route.POST(request("POST", { ...input, ...bad }))).status,
+      400,
+    );
+    assert.equal(
+      (await route.PATCH(request("PATCH", { ...ref, ...bad }))).status,
+      400,
+    );
+  }
+  assert.equal((await route.PATCH(request("PATCH", ref))).status, 400);
 });
 test("delete/restore use one atomic RPC with exact token list and strip internal owner field", async () => {
   const f = setup();

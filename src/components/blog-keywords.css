@@ -41,15 +41,18 @@
 }
 .blog-keywords-form {
   display: grid;
-  gap: 10px;
-  margin-top: 20px;
-  padding: 16px;
-  border-radius: 16px;
-  background: #fff0e9;
+  gap: 14px;
+  min-width: 0;
 }
-.blog-keywords-form > label {
+.blog-keywords-form > label:not(.blog-keywords-status) {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
   font-size: 13px;
   font-weight: 650;
+}
+.blog-keywords-form textarea {
+  resize: vertical;
 }
 .blog-keywords-form-actions,
 .blog-keywords-confirm-actions {
@@ -115,18 +118,85 @@
 }
 .blog-keywords-row {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 3px;
+  padding: 8px 13px 2px;
+}
+.personal-planner .blog-keywords-edit {
+  display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 64px;
-  padding: 12px;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+  padding: 3px 0;
+  border: 0;
+  border-radius: 6px;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+}
+.blog-keywords-edit > span {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 3px 7px;
+}
+.blog-keywords-edit svg {
+  flex: none;
+  color: #826b65;
+}
+.blog-keywords-board {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: #f6e3d8;
+  color: #7e4f43;
+  font-size: 11px;
+}
+.blog-keywords-sub,
+.blog-keywords-summary {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+.blog-keywords-sub {
+  color: #785e56;
+  font-size: 12px;
+}
+.blog-keywords-sub span {
+  font-weight: 650;
+}
+.blog-keywords-summary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: #554443;
+  white-space: pre-line;
+  font-size: 13px;
+}
+.blog-keywords-statuses,
+.blog-keywords-status {
+  display: flex;
+  align-items: center;
+}
+.blog-keywords-statuses {
+  flex-wrap: wrap;
+  gap: 0 18px;
+}
+.blog-keywords-status {
+  min-height: 44px;
+  gap: 7px;
   cursor: pointer;
+  font-size: 13px;
+  color: #654d46;
 }
 .personal-planner input.blog-keywords-check {
-  width: 22px;
-  min-width: 22px;
-  height: 22px;
-  min-height: 22px;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
   margin: 0;
   padding: 0;
   accent-color: #4e936a;
@@ -146,14 +216,6 @@
   color: #56705d;
   text-decoration: line-through;
   text-decoration-color: #95b59e;
-}
-.blog-keywords-used {
-  font-size: 10px;
-  color: #35614a;
-  background: #d8eddd;
-  border-radius: 999px;
-  padding: 5px 8px;
-  white-space: nowrap;
 }
 .blog-keywords-empty {
   display: grid;
