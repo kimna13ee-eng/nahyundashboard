@@ -164,8 +164,20 @@
   border-radius: 15px;
   background: #fff6ef;
 }
-.blog-keywords-list > li.is-used {
-  background: #eff7f0;
+.blog-keywords-list > li[data-board="보통의날"] {
+  background: #e6f5ed;
+  --board-label-bg: #c3e7d4;
+  --board-label-ink: #285843;
+}
+.blog-keywords-list > li[data-board="썼어유"] {
+  background: #f1ebfc;
+  --board-label-bg: #e0d2f6;
+  --board-label-ink: #584076;
+}
+.blog-keywords-list > li[data-board="블러셔 진열대"] {
+  background: #ffeaeb;
+  --board-label-bg: #ffd1d6;
+  --board-label-ink: #84394d;
 }
 .blog-keywords-row {
   display: grid;
@@ -201,8 +213,8 @@
   display: inline-block;
   padding: 2px 7px;
   border-radius: 8px;
-  background: #f6e3d8;
-  color: #7e4f43;
+  background: var(--board-label-bg, #f6e3d8);
+  color: var(--board-label-ink, #7e4f43);
   font-size: 11px;
 }
 .blog-keywords-sub,

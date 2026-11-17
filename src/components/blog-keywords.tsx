@@ -794,7 +794,11 @@ function KeywordCollection({
         items.length > 0 && (
           <ul className="blog-keywords-list" aria-label="블로그 키워드 목록">
             {items.map((item) => (
-              <li key={item.id} className={item.used ? "is-used" : ""}>
+              <li
+                key={item.id}
+                data-board={item.board ?? undefined}
+                className={item.used ? "is-used" : ""}
+              >
                 <div className="blog-keywords-row">
                   <button
                     type="button"
