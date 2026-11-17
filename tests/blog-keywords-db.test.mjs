@@ -14,6 +14,101 @@ const detailsMigration = await readFile(
   "supabase/personal/028_blog_post_details.sql",
   "utf8",
 );
+const archiveMigration = await readFile(
+  "supabase/personal/029_blog_keyword_archive.sql",
+  "utf8",
+);
+
+test("collection export, snapshot-guarded clear and undo include every active status and isolate owners", async () => {
+  const db = new PGlite();
+  const become = (id) =>
+    db.exec(
+      `reset role; set role authenticated; set request.jwt.claim.sub='${id}'`,
+    );
+  const scalar = async (sql, args = []) =>
+    (await db.query(sql, args)).rows[0].result;
+  const archive = (action, snapshot = null) =>
+    scalar("select ops_blog_keyword_archive($1,$2) as result", [
+      action,
+      snapshot,
+    ]);
+  const restore = (batch) =>
+    scalar("select ops_blog_keyword_archive_restore($1)::int as result", [
+      batch,
+    ]);
+  try {
+    await db.exec(`create schema auth; create role anon; create role authenticated;
+      create table auth.users(id uuid primary key); insert into auth.users values('${owner}'),('${other}');
+      create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+      grant usage on schema auth,public to authenticated,anon;`);
+    await db.exec(migration);
+    await db.exec(detailsMigration);
+    await become(owner);
+    await db.exec(
+      "insert into ops_blog_keywords(id,keyword) select gen_random_uuid(), '소재 '||n from generate_series(1,1002) n",
+    );
+    await db.exec(
+      "update ops_blog_keywords set used=true, deleted_at=now() where keyword='소재 1'",
+    );
+    await db.exec("reset role");
+    await db.exec(archiveMigration);
+    await db.exec(archiveMigration);
+    await db.exec("set role anon");
+    await assert.rejects(archive("export"), /permission denied/);
+    await assert.rejects(restore(randomUUID()), /permission denied/);
+    await become(other);
+    await db.exec(
+      "insert into ops_blog_keywords(id,keyword) values(gen_random_uuid(),'다른 계정')",
+    );
+    await become(owner);
+    const original = await archive("export");
+    assert.equal(original.count, 1001);
+    assert.equal(original.items.length, 1001);
+    assert.ok(
+      original.items.every((row) => !("id" in row) && !("owner_id" in row)),
+    );
+    assert.deepEqual(await archive("summary"), {
+      count: 1001,
+      snapshot: original.snapshot,
+    });
+    await assert.rejects(archive("clear", "invalid"), /invalid/i);
+    await db.exec(
+      "update ops_blog_keywords set is_draft=true, summary='초안' where keyword='소재 2'",
+    );
+    await assert.rejects(archive("clear", original.snapshot), /changed/);
+    const edited = await archive("summary");
+    await db.exec(
+      "insert into ops_blog_keywords(id,keyword) values(gen_random_uuid(),'추가된 소재')",
+    );
+    await assert.rejects(archive("clear", edited.snapshot), /changed/);
+    await db.exec(
+      "update ops_blog_keywords set used=true where keyword='소재 3'",
+    );
+    const before = await archive("export");
+    const batch = await archive("clear", before.snapshot);
+    assert.equal(batch.count, 1002);
+    assert.equal((await archive("summary")).count, 0);
+    await assert.rejects(archive("clear", before.snapshot), /changed/);
+    await become(other);
+    assert.equal((await archive("summary")).count, 1);
+    assert.equal(await restore(batch.batchId), 0);
+    await become(owner);
+    await db.exec(
+      "insert into ops_blog_keywords(id,keyword) values(gen_random_uuid(),'삭제 후 등록')",
+    );
+    assert.equal(await restore(batch.batchId), 1002);
+    assert.equal(await restore(batch.batchId), 0);
+    const after = await archive("export");
+    assert.equal(after.count, 1003);
+    const columns = ({ updated_at, ...rest }) => rest;
+    assert.deepEqual(
+      after.items.slice(1).map(columns),
+      before.items.map(columns),
+    );
+  } finally {
+    await db.close();
+  }
+});
 
 test("blog keyword storage isolates owners, validates fields and cannot permanently delete", async () => {
   const db = new PGlite();

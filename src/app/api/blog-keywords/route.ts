@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { createHash } from "node:crypto";
 import { json, sameOrigin } from "@/lib/http";
 import {
   workspaceSession,
@@ -77,6 +78,10 @@ async function handle(req: NextRequest) {
       if (result.error) return failure(result.error);
       return json({
         items: (result.data || []).slice(0, blogKeywordLimit),
+        total: result.count ?? result.data?.length ?? 0,
+        collectionId: createHash("sha256")
+          .update(`blog-keywords/${user.id}`)
+          .digest("hex"),
         truncated:
           (result.count || 0) > blogKeywordLimit ||
           (result.data?.length || 0) > blogKeywordLimit,

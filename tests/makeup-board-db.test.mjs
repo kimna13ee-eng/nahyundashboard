@@ -68,6 +68,12 @@ test("private photo bytes and week picks are isolated; photo creation, retry and
     await db.exec("reset role");
     await db.exec(categoryMigration);
     await db.exec(categoryMigration);
+    await db.exec(
+      await readFile(
+        "supabase/personal/030_makeup_delete_selected.sql",
+        "utf8",
+      ),
+    );
     await become(owner);
     const filtered = (category, picked = false, offset = 0) =>
       sql("select * from ops_list_makeup_looks($1,$2,$3,$4)", [
@@ -124,11 +130,24 @@ test("private photo bytes and week picks are isolated; photo creation, retry and
     await create(id, monday, "내 사진");
     await become(owner);
     assert.equal((await list(next, true))[0].title, "피치 룩");
-    await sql("delete from ops_makeup_looks where id=$1", [id]);
+    await create(second, next, "두 번째 룩");
+    const kept = "55555555-5555-4555-8555-555555555555";
+    await create(kept, null, "남길 사진");
+    const removeSelected = () =>
+      sql("select ops_delete_selected_makeup_looks($1) as count", [
+        [id, second, id],
+      ]);
+    assert.deepEqual(await removeSelected(), [{ count: 2 }]);
+    assert.deepEqual(await removeSelected(), [{ count: 0 }]);
     assert.deepEqual(await sql("select * from ops_makeup_week_picks"), []);
+    assert.deepEqual(
+      (await list(monday, false)).map((row) => row.id),
+      [kept],
+    );
     await become(other);
     assert.equal((await list(monday, true))[0].title, "내 사진");
     await db.exec("reset role; set role anon");
+    await assert.rejects(removeSelected(), /permission denied/i);
     await assert.rejects(list(monday, false), /permission denied/i);
     await assert.rejects(
       sql("select image from ops_makeup_looks"),

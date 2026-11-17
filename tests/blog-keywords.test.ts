@@ -52,6 +52,7 @@ const hooks = registerHooks({
   },
 });
 const route = await import("../src/app/api/blog-keywords/route.ts");
+const archive = await import("../src/app/api/blog-keywords/archive/route.ts");
 after(() => {
   hooks.deregister();
   delete scope.__blogFixture;
@@ -247,6 +248,74 @@ test("GET returns only the owner's active items with bounded count and no owner 
   const large = await (await route.GET(request())).json();
   assert.equal(large.items.length, 500);
   assert.equal(large.truncated, true);
+  assert.equal(large.total, 501);
+  assert.equal(large.collectionId, body.collectionId);
+});
+test("archive CSV preserves Korean, quotes and line breaks and safely opens formula-looking cells", async () => {
+  const f = setup();
+  const snapshot = "a".repeat(64);
+  f.client = {
+    rpc: async () => ({
+      data: {
+        snapshot,
+        count: 1,
+        items: [
+          {
+            ...f.rows[0],
+            keyword: '=a,"예시"',
+            board: "썼어유",
+            sub_keyword: " +123",
+            summary: "두 줄\n새 줄",
+            is_draft: true,
+          },
+        ],
+      },
+    }),
+  };
+  const response = await archive.GET(request("GET", undefined, "format=csv"));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("X-Archive-Count"), "1");
+  assert.equal(response.headers.get("X-Archive-Snapshot"), snapshot);
+  assert.equal(response.headers.get("X-Archive-Newest-Created-At"), stamp);
+  assert.match(
+    response.headers.get("Content-Disposition")!,
+    /attachment;.*\.csv/,
+  );
+  const bytes = Buffer.from(await response.arrayBuffer());
+  assert.deepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+  assert.ok(
+    bytes
+      .toString("utf8")
+      .includes(
+        '"썼어유","\'=a,""예시""","\' +123","두 줄\n새 줄","예","아니오"',
+      ),
+  );
+  assert.ok(bytes.toString("utf8").endsWith("\r\n"));
+  assert.equal(
+    (
+      await archive.GET(
+        request("GET", undefined, "workspace=FRENGLE&format=csv"),
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await archive.DELETE(
+        request("DELETE", { snapshot }, "", "https://other.test"),
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (await archive.DELETE(request("DELETE", { snapshot: "wrong" }))).status,
+    400,
+  );
+  f.signedIn = false;
+  assert.equal(
+    (await archive.GET(request("GET", undefined, "format=csv"))).status,
+    401,
+  );
 });
 test("create retries are idempotent but never overwrite a checked or changed keyword", async () => {
   const f = setup();

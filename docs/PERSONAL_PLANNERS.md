@@ -20,8 +20,10 @@ The separately untracked diary app is not part of this release.
   or database writes.
 - Add topics with the plus button and choose 블러셔 진열대, 썼어유, or 보통의날.
   Each topic has a main keyword, optional sub-keyword and short content summary.
-  임시저장 tracks a draft separately from the used checkbox. Only used items are
-  included in bulk deletion and undo.
+  임시저장 tracks a draft separately from the used checkbox. At 30 accumulated topics,
+  the dashboard prompts the user to save a CSV. The download includes all active
+  topics across the three boards. The user can delete used topics or confirm a
+  separate whole-collection deletion.
   Keywords and used state are private to the signed-in PERSONAL account.
 - 메이크업 보드 (`/?view=makeup-board`) stores reference photos in the PERSONAL
   account. Each Monday starts a new selection. Removing a photo from a week's
@@ -29,6 +31,9 @@ The separately untracked diary app is not part of this release.
   The 여자, 남자 and 미분류 filters apply to both the selected week and the archive.
   Choose several photos from the album to give them the same category and
   optional weekly selection in one upload. Individual looks can be reclassified later.
+  Check photos in the archive to delete them together. Select-all covers the
+  photos currently shown under the active filter. Confirming removes those photos
+  from the archive and every week where they were picked.
 - Yoga uses a seven-day selector and the selected day's video cards. Add/edit
   collects date, URL, title and optional minutes. Existing video-title lookup and
   iPhone push subscription remain available. Alerts still fire at 21:00 Seoul.
@@ -58,9 +63,12 @@ delete/restore RPC. There are no environment-variable changes. It does not repur
 or delete old personal records, business data, or Google sheets.
 Apply `supabase/personal/028_blog_post_details.sql` for the board, sub-keyword,
 summary and draft fields. Existing topics keep their main keyword and used state.
+Apply `supabase/personal/029_blog_keyword_archive.sql` for full-collection exports
+and snapshot-checked deletion.
 
 Apply `supabase/personal/026_makeup_board.sql`, then
 `supabase/personal/027_makeup_look_category.sql` to the PERSONAL database.
+Apply `supabase/personal/030_makeup_delete_selected.sql` for batch photo deletion.
 Existing photos start in 미분류. Photo uploads and weekly selections use the existing
 PERSONAL session. No storage bucket or additional environment variable is needed.
 

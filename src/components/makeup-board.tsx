@@ -227,6 +227,7 @@ function PhotoList({
   onToggle,
   onAdd,
   hasLibrary,
+  selection,
 }: {
   list: GalleryState;
   picked: boolean;
@@ -237,6 +238,7 @@ function PhotoList({
   onToggle: (item: Look) => void;
   onAdd: () => void;
   hasLibrary: boolean;
+  selection?: { ids: Set<string>; toggle: (id: string) => void };
 }) {
   const { page, loading, error, load } = list;
   let emptyTitle = picked
@@ -252,7 +254,7 @@ function PhotoList({
     <>
       {page && page.items.length > 0 && (
         <ul className="makeup-grid">
-          {page.items.map((item) => (
+          {page.items.map((item, index) => (
             <li className="makeup-tile" key={item.id}>
               <button
                 type="button"
@@ -268,6 +270,17 @@ function PhotoList({
                   alt={item.title || "메이크업 참고 사진"}
                 />
               </button>
+              {selection && (
+                <label className="makeup-select-photo">
+                  <input
+                    type="checkbox"
+                    aria-label={`${item.title || `사진 ${index + 1}`} 삭제할 사진으로 선택`}
+                    checked={selection.ids.has(item.id)}
+                    disabled={disabled}
+                    onChange={() => selection.toggle(item.id)}
+                  />
+                </label>
+              )}
               <button
                 type="button"
                 className="makeup-pin"
@@ -688,6 +701,8 @@ function WeekBoard({
   const [upload, setUpload] = useState<boolean | null>(null);
   const [detail, setDetail] = useState<Look | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [deletingIds, setDeletingIds] = useState<string[] | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const active = useRef<AbortController | null>(null);
@@ -695,6 +710,11 @@ function WeekBoard({
   const todayWeek = yogaWeek(seoulDate())![0];
   const weekName = todayWeek === week ? "이번 주" : "선택한 주";
   const blocked = busy || archive.loading || weekly.loading;
+  const shown = archive.page?.items ?? [];
+  const chosen = shown
+    .filter((item) => selected.has(item.id))
+    .map((item) => item.id);
+  const allChosen = shown.length > 0 && chosen.length === shown.length;
 
   async function change<T>(
     method: string,
@@ -791,6 +811,32 @@ function WeekBoard({
       void weekly.load();
     });
   }
+  function toggleSelection(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function removeSelected() {
+    if (!deletingIds?.length) return;
+    void change<{ count: number }>(
+      "DELETE",
+      { ids: deletingIds },
+      ({ count }) => {
+        setSelected(new Set());
+        setDeletingIds(null);
+        setNotice(
+          count
+            ? `선택한 사진 ${count}장을 삭제했어요.`
+            : "선택한 사진은 이미 삭제됐어요.",
+        );
+        void archive.load();
+        void weekly.load();
+      },
+    );
+  }
   function jump(days: number) {
     const target = moveYogaDay(week, days);
     if (target && yogaWeek(target)) onWeek(target);
@@ -869,14 +915,47 @@ function WeekBoard({
             사진 추가
           </button>
         </header>
+        {shown.length > 0 && (
+          <div className="makeup-selection-bar">
+            <label>
+              <input
+                type="checkbox"
+                checked={allChosen}
+                ref={(input) => {
+                  if (input)
+                    input.indeterminate = chosen.length > 0 && !allChosen;
+                }}
+                onChange={() =>
+                  setSelected(
+                    new Set(allChosen ? [] : shown.map((item) => item.id)),
+                  )
+                }
+                disabled={blocked}
+              />
+              표시된 사진 전체 선택
+            </label>
+            <button
+              type="button"
+              disabled={blocked || !chosen.length}
+              onClick={() => {
+                setError("");
+                setDeletingIds(chosen);
+              }}
+            >
+              <Trash2 size={16} aria-hidden="true" />
+              {chosen.length ? `${chosen.length}장 삭제` : "선택 삭제"}
+            </button>
+          </div>
+        )}
         <PhotoList
           {...listProps}
           list={archive}
           picked={false}
+          selection={{ ids: selected, toggle: toggleSelection }}
           onAdd={() => openUpload(false)}
         />
       </section>
-      {!detail && upload === null && error && (
+      {!detail && !deletingIds && upload === null && error && (
         <p className="makeup-error" role="alert">
           {error}
         </p>
@@ -884,6 +963,48 @@ function WeekBoard({
       <p className="makeup-notice" role="status">
         {notice}
       </p>
+      {deletingIds && (
+        <OpsDialog
+          title={`사진 ${deletingIds.length}장 삭제`}
+          busy={busy}
+          close={() => {
+            setDeletingIds(null);
+            setError("");
+          }}
+        >
+          <div className="makeup-confirm">
+            <p>
+              선택한 사진 {deletingIds.length}장을 보관함과 모든 주의 목록에서
+              영구 삭제할까요?
+            </p>
+            {error && (
+              <p role="alert" className="makeup-error">
+                {error}
+              </p>
+            )}
+            <div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setDeletingIds(null);
+                  setError("");
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                className="makeup-danger"
+                onClick={removeSelected}
+              >
+                선택한 사진 삭제
+              </button>
+            </div>
+          </div>
+        </OpsDialog>
+      )}
       {upload !== null && (
         <UploadDialog
           week={week}

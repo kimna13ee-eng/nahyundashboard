@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Pencil, Plus, RefreshCw, Trash2, Undo2 } from "lucide-react";
+import {
+  Bell,
+  Download,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import {
   blogBoards,
   blogKeywordLimit,
@@ -9,6 +17,7 @@ import {
   type BlogKeyword,
 } from "@/lib/blog-keywords";
 import { OpsDialog } from "./ops-dialog";
+import { seoulToday } from "@/lib/leave";
 import "./blog-keywords.css";
 
 type Props = { enabled: boolean; onSessionExpired?: () => void };
@@ -19,6 +28,15 @@ type Fields = Pick<
 >;
 type Create = Fields & { id: string };
 type Editor = { original: BlogKeyword | null; fields: Fields };
+type ArchivePreview = { count: number; snapshot: string };
+type ArchiveBatch = { count: number; batchId: string };
+const reminderThreshold = 30;
+const collectionPath = "/api/blog-keywords";
+const archivePath = collectionPath + "/archive";
+
+function reminderKey(collectionId: string) {
+  return "personal.blog-keywords.last-export." + collectionId;
+}
 
 function fieldsOf(row?: Partial<Fields> | null): Fields {
   return {
@@ -39,23 +57,41 @@ class KeywordRequestError extends Error {
   }
 }
 
-async function request(method: string, signal: AbortSignal, body?: unknown) {
-  const response = await fetch("/api/blog-keywords", {
+async function fetchCollection(
+  method: string,
+  signal: AbortSignal,
+  body?: unknown,
+  path = collectionPath,
+) {
+  const response = await fetch(path, {
     method,
     cache: "no-store",
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]),
+    signal: AbortSignal.any([
+      signal,
+      AbortSignal.timeout(path === collectionPath ? 20000 : 60000),
+    ]),
   });
-  const data = await response.json();
-  if (!response.ok)
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
     throw new KeywordRequestError(
       response.status === 401
         ? "로그인이 만료됐어요. 다시 로그인해 주세요."
         : data.error || "키워드를 저장소에서 확인하지 못했어요.",
       response.status,
     );
-  return data;
+  }
+  return response;
+}
+
+async function request(
+  method: string,
+  signal: AbortSignal,
+  body?: unknown,
+  path = collectionPath,
+) {
+  return (await fetchCollection(method, signal, body, path)).json();
 }
 
 function identity(item: BlogKeyword): Identity {
@@ -72,6 +108,14 @@ function KeywordCollection({
   onSessionExpired,
 }: Pick<Props, "onSessionExpired">) {
   const [items, setItems] = useState<BlogKeyword[]>([]);
+  const [total, setTotal] = useState(0);
+  const [collectionId, setCollectionId] = useState("");
+  const [lastExportedAt, setLastExportedAt] = useState("");
+  const [lastSnapshot, setLastSnapshot] = useState("");
+  const [archivePreview, setArchivePreview] = useState<ArchivePreview | null>(
+    null,
+  );
+  const [archiveUndo, setArchiveUndo] = useState<ArchiveBatch | null>(null);
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -111,6 +155,17 @@ function KeywordCollection({
         if (controller.signal.aborted) return;
         const rows = data.items as BlogKeyword[];
         setItems(rows);
+        setTotal(data.total ?? rows.length);
+        setCollectionId(data.collectionId ?? "");
+        if (data.collectionId) {
+          try {
+            setLastExportedAt(
+              localStorage.getItem(reminderKey(data.collectionId)) || "",
+            );
+          } catch {
+            // The current visit still remembers the download if storage is disabled.
+          }
+        }
         const activeIds = new Set(rows.map((row) => row.id));
         setUndo((current) => current.filter((row) => !activeIds.has(row.id)));
         setTruncated(Boolean(data.truncated));
@@ -148,14 +203,27 @@ function KeywordCollection({
     lock.current = true;
     setLoading(true);
     setDeleting(null);
+    setArchivePreview(null);
     setRevision((value) => value + 1);
   }
 
-  async function mutate(
+  function mutate(
     method: string,
     body: unknown,
     success: (data: { item: BlogKeyword; items: BlogKeyword[] }) => void,
     creating = false,
+  ) {
+    return perform(
+      (signal) => request(method, signal, body),
+      success,
+      creating ? "create" : "update",
+    );
+  }
+
+  async function perform<T>(
+    operation: (signal: AbortSignal) => Promise<T>,
+    success: (data: T) => void,
+    kind: "create" | "update" | "read",
   ) {
     if (lock.current || !loaded || stale) return;
     lock.current = true;
@@ -165,7 +233,7 @@ function KeywordCollection({
     const controller = new AbortController();
     mutation.current = controller;
     try {
-      const data = await request(method, controller.signal, body);
+      const data = await operation(controller.signal);
       if (controller.signal.aborted || !active.current) return;
       success(data);
     } catch (cause) {
@@ -173,17 +241,22 @@ function KeywordCollection({
       const status = cause instanceof KeywordRequestError ? cause.status : 0;
       setError(errorMessage(cause));
       setDeleting(null);
-      if (creating) {
+      setArchivePreview(null);
+      if (kind === "create") {
         const uncertain = status === 0 || status >= 500;
         setUncertainCreate(uncertain);
         if (!uncertain) pendingCreate.current = null;
       }
-      if (status === 409 || (!creating && (status === 0 || status >= 500)))
+      if (
+        status === 409 ||
+        (kind === "update" && (status === 0 || status >= 500))
+      )
         setStale(true);
       if (status === 401) {
         setItems([]);
         setLoaded(false);
         setUndo([]);
+        setArchiveUndo(null);
         sessionExpired.current?.();
       }
     } finally {
@@ -251,6 +324,8 @@ function KeywordCollection({
       "POST",
       pendingCreate.current,
       ({ item }) => {
+        if (!items.some((row) => row.id === item.id))
+          setTotal((value) => value + 1);
         if (
           items.length >= blogKeywordLimit &&
           !items.some((row) => row.id === item.id)
@@ -305,6 +380,8 @@ function KeywordCollection({
         const ids = new Set(deleted.map((item) => item.id));
         setItems((current) => current.filter((item) => !ids.has(item.id)));
         setUndo(deleted);
+        setTotal((value) => value - ids.size);
+        if (truncated) setRevision((value) => value + 1);
         setDeleting(null);
         setNotice(`${deleted.length}개 키워드를 삭제했어요.`);
       },
@@ -317,6 +394,12 @@ function KeywordCollection({
       { action: "restore", items: undo.map(identity) },
       ({ items: restored }) => {
         const ids = new Set(restored.map((item) => item.id));
+        setTotal(
+          (value) =>
+            value +
+            restored.filter((item) => !items.some((row) => row.id === item.id))
+              .length,
+        );
         if (
           restored.length + items.filter((item) => !ids.has(item.id)).length >
           blogKeywordLimit
@@ -337,7 +420,116 @@ function KeywordCollection({
     );
   }
 
+  function exportCsv() {
+    void perform(
+      async (signal) => {
+        const response = await fetchCollection(
+          "GET",
+          signal,
+          undefined,
+          archivePath + "?format=csv",
+        );
+        if (!response.headers.get("content-type")?.includes("text/csv"))
+          throw new KeywordRequestError(
+            "CSV 파일을 불러오지 못했어요. 다시 시도해 주세요.",
+            502,
+          );
+        return {
+          blob: await response.blob(),
+          count: Number(response.headers.get("X-Archive-Count")),
+          newest: response.headers.get("X-Archive-Newest-Created-At") ?? "",
+          snapshot: response.headers.get("X-Archive-Snapshot") ?? "",
+        };
+      },
+      ({ blob, count, newest, snapshot }) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `블로그-소재-${seoulToday()}.csv`;
+        document.body.appendChild(link);
+        try {
+          link.click();
+        } finally {
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        }
+        setLastSnapshot(snapshot);
+        if (newest) {
+          setLastExportedAt(newest);
+          if (collectionId) {
+            try {
+              localStorage.setItem(reminderKey(collectionId), newest);
+            } catch {
+              // Downloads also work without access to local storage.
+            }
+          }
+        }
+        setNotice(`소재 ${count}개의 CSV 다운로드를 시작했어요.`);
+      },
+      "read",
+    );
+  }
+
+  function previewRemoveAll() {
+    void perform<ArchivePreview>(
+      (signal) => request("GET", signal, undefined, archivePath),
+      (preview) => {
+        if (preview.count > 0) setArchivePreview(preview);
+        else {
+          setNotice("삭제할 소재가 없어요.");
+          setRevision((value) => value + 1);
+        }
+      },
+      "read",
+    );
+  }
+
+  function removeAll() {
+    if (!archivePreview) return;
+    void perform<ArchiveBatch>(
+      (signal) =>
+        request(
+          "DELETE",
+          signal,
+          { snapshot: archivePreview.snapshot },
+          archivePath,
+        ),
+      (batch) => {
+        setArchivePreview(null);
+        setArchiveUndo(batch);
+        setItems([]);
+        setTotal(0);
+        setTruncated(false);
+        setNotice(`소재 ${batch.count}개를 삭제했어요.`);
+        setRevision((value) => value + 1);
+      },
+      "update",
+    );
+  }
+
+  function restoreAll() {
+    if (!archiveUndo) return;
+    void perform<{ count: number }>(
+      (signal) =>
+        request("POST", signal, { batchId: archiveUndo.batchId }, archivePath),
+      ({ count }) => {
+        setArchiveUndo(null);
+        setNotice(`소재 ${count}개를 복원했어요.`);
+        setRevision((value) => value + 1);
+      },
+      "update",
+    );
+  }
+
   const checked = items.filter((item) => item.used);
+  // Loaded in newest-first order. Even the capped list contains the first 30
+  // active additions since the last download whenever a reminder is due.
+  const reminderDue =
+    total >= reminderThreshold &&
+    (!lastExportedAt ||
+      items.filter(
+        (row) => Date.parse(row.created_at) > Date.parse(lastExportedAt),
+      ).length >= reminderThreshold);
   const blocked = !loaded || loading || busy || stale;
   const latest =
     editor?.original && items.find((item) => item.id === editor.original?.id);
@@ -517,7 +709,7 @@ function KeywordCollection({
       )}
 
       {!editor && errorPanel}
-      {(notice || undo.length > 0) && (
+      {(notice || undo.length > 0 || archiveUndo) && (
         <div className="blog-keywords-notice" role="status">
           <span>{notice}</span>
           {undo.length > 0 && (
@@ -525,12 +717,22 @@ function KeywordCollection({
               <Undo2 size={15} aria-hidden="true" /> 삭제 취소 ({undo.length}개)
             </button>
           )}
+          {archiveUndo && (
+            <button type="button" disabled={blocked} onClick={restoreAll}>
+              <Undo2 size={15} aria-hidden="true" /> 전체 삭제 취소 (
+              {archiveUndo.count}개)
+            </button>
+          )}
         </div>
       )}
 
       <div className="blog-keywords-toolbar">
         <p>
-          {loaded ? (
+          {loaded && truncated ? (
+            <>
+              전체 소재 <strong>{total}</strong>개
+            </>
+          ) : loaded ? (
             <>
               안 쓴 소재 <strong>{items.length - checked.length}</strong> · 쓴
               소재 <strong>{checked.length}</strong>
@@ -549,6 +751,34 @@ function KeywordCollection({
           <RefreshCw size={17} aria-hidden="true" />
         </button>
       </div>
+
+      {loaded && total > 0 && (
+        <div
+          className={"blog-keywords-archive" + (reminderDue ? " is-due" : "")}
+        >
+          {reminderDue && (
+            <p role="status">
+              <Bell size={17} aria-hidden="true" />
+              <span>
+                <strong>소재가 {total}개 쌓였어요.</strong> CSV로 저장해 두세요.
+              </span>
+            </p>
+          )}
+          <div className="blog-keywords-archive-actions">
+            <button type="button" disabled={blocked} onClick={exportCsv}>
+              <Download size={16} aria-hidden="true" /> CSV 저장
+            </button>
+            <button
+              type="button"
+              disabled={blocked}
+              aria-haspopup="dialog"
+              onClick={previewRemoveAll}
+            >
+              <Trash2 size={15} aria-hidden="true" /> 전체 삭제
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading && !loaded ? (
         <p className="blog-keywords-empty" role="status">
@@ -640,8 +870,8 @@ function KeywordCollection({
       )}
       {truncated && (
         <p className="blog-keywords-limit">
-          소재가 많아 최근 500개만 표시돼요. 삭제는 이 목록에서 체크한 항목에만
-          적용돼요.
+          최근 {blogKeywordLimit}개를 표시하고 있어요. CSV 저장과 전체 삭제는
+          모든 소재에 적용돼요.
         </p>
       )}
 
@@ -669,6 +899,34 @@ function KeywordCollection({
               </button>
               <button type="button" disabled={busy} onClick={removeChecked}>
                 {deleting.length}개 삭제
+              </button>
+            </div>
+          </div>
+        </OpsDialog>
+      )}
+      {archivePreview && (
+        <OpsDialog
+          title="블로그 소재 전체 삭제"
+          busy={busy}
+          close={() => setArchivePreview(null)}
+        >
+          <div className="blog-keywords-confirm">
+            <p>
+              모든 게시판의 소재 <strong>{archivePreview.count}개</strong>를
+              삭제할까요? 임시저장한 소재와 이미 쓴 소재도 함께 삭제돼요.
+            </p>
+            {lastSnapshot && lastSnapshot !== archivePreview.snapshot && (
+              <p>
+                마지막 CSV 다운로드 이후 목록이 바뀌었어요. 최신 파일이 필요하면
+                취소하고 CSV를 다시 저장해 주세요.
+              </p>
+            )}
+            <div className="blog-keywords-confirm-actions">
+              <button type="button" data-dialog-close disabled={busy}>
+                취소
+              </button>
+              <button type="button" disabled={blocked} onClick={removeAll}>
+                {archivePreview.count}개 전체 삭제
               </button>
             </div>
           </div>

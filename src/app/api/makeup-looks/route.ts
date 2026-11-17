@@ -60,12 +60,29 @@ async function mutate(req: NextRequest) {
       if (result.error || !result.data) return makeupError(result.error);
       return json({ item: result.data }, 201);
     }
+    const deleting = req.method === "DELETE";
     const raw = await readMutation(
       req,
-      req.method === "DELETE" ? ["id"] : ["id", "week", "picked", "category"],
+      deleting ? ["id", "ids"] : ["id", "week", "picked", "category"],
+      deleting ? 1048576 : undefined,
     );
+    if (deleting && Object.hasOwn(raw, "ids")) {
+      if (
+        Object.hasOwn(raw, "id") ||
+        !Array.isArray(raw.ids) ||
+        !raw.ids.length
+      )
+        throw new MakeupInputError("삭제할 사진을 선택해 주세요.");
+      const ids = [...new Set(raw.ids.map(lookId))];
+      const result = await client.rpc("ops_delete_selected_makeup_looks", {
+        p_ids: ids,
+      });
+      return result.error
+        ? makeupError(result.error)
+        : json({ count: result.data });
+    }
     const id = lookId(raw.id);
-    if (req.method === "DELETE") {
+    if (deleting) {
       const result = await client
         .from(photoTable)
         .delete()

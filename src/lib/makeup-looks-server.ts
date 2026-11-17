@@ -103,10 +103,14 @@ async function readBounded(req: Request, limit: number) {
   return Buffer.concat(chunks, size);
 }
 
-export async function readMutation(req: Request, allowed: string[]) {
+export async function readMutation(
+  req: Request,
+  allowed: string[],
+  limit = 4096,
+) {
   let value: unknown;
   try {
-    value = JSON.parse((await readBounded(req, 4096)).toString("utf8"));
+    value = JSON.parse((await readBounded(req, limit)).toString("utf8"));
   } catch (error) {
     if (error instanceof MakeupInputError) throw error;
     throw new MakeupInputError("입력 내용을 확인해 주세요.");

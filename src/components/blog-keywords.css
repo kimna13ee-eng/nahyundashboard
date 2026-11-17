@@ -94,6 +94,57 @@
 .blog-keywords-toolbar strong {
   color: #3d2c2e;
 }
+.blog-keywords-archive {
+  margin: 0 0 12px;
+}
+.blog-keywords-archive.is-due {
+  padding: 12px;
+  background: #fff1ca;
+  border-radius: 15px;
+}
+.blog-keywords-archive p {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0 0 8px;
+  color: #6a502a;
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+.blog-keywords-archive p svg {
+  flex: none;
+  margin-top: 2px;
+}
+.blog-keywords-archive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.personal-planner .blog-keywords-archive-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  gap: 6px;
+  padding: 8px 14px;
+  color: #654d46;
+  background: #f9efe8;
+  font-size: 13px;
+}
+.personal-planner .blog-keywords-archive-actions button:last-child {
+  background: transparent;
+  color: #874d44;
+}
+.personal-planner
+  .blog-keywords-archive.is-due
+  .blog-keywords-archive-actions
+  button:first-child {
+  background: #ffe08a;
+  color: #503914;
+}
 .personal-planner .blog-keywords-refresh {
   width: 44px;
   height: 44px;
