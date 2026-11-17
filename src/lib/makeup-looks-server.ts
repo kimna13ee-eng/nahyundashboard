@@ -136,7 +136,7 @@ async function photoValue(file: FormDataEntryValue | null, limit: number) {
   return "\\x" + bytes.toString("hex");
 }
 
-export async function readUpload(req: Request) {
+export async function readPhotoForm(req: Request, allowed: string[]) {
   const contentType = req.headers.get("content-type") || "";
   if (!/^multipart\/form-data\s*;/i.test(contentType))
     throw new MakeupInputError("사진 파일 형식을 확인해 주세요.", 415);
@@ -150,14 +150,30 @@ export async function readUpload(req: Request) {
     throw new MakeupInputError("사진 파일을 다시 선택해 주세요.");
   }
   for (const key of form.keys()) {
-    if (
-      !["id", "title", "image", "thumbnail", "week", "category"].includes(
-        key,
-      ) ||
-      form.getAll(key).length !== 1
-    )
+    if (!allowed.includes(key) || form.getAll(key).length !== 1)
       throw new MakeupInputError("사진 입력 내용을 확인해 주세요.");
   }
+  return form;
+}
+
+export async function readPhotoFields(form: FormData) {
+  return {
+    p_image: await photoValue(form.get("image"), fullLimit),
+    p_thumbnail: form.has("thumbnail")
+      ? await photoValue(form.get("thumbnail"), thumbnailLimit)
+      : null,
+  };
+}
+
+export async function readUpload(req: Request) {
+  const form = await readPhotoForm(req, [
+    "id",
+    "title",
+    "image",
+    "thumbnail",
+    "week",
+    "category",
+  ]);
   const title = form.get("title") ?? "";
   if (
     typeof title !== "string" ||
@@ -170,10 +186,7 @@ export async function readUpload(req: Request) {
     p_title: title.trim(),
     p_category: lookCategory(form.get("category")),
     p_week: form.has("week") ? monday(form.get("week")) : null,
-    p_image: await photoValue(form.get("image"), fullLimit),
-    p_thumbnail: form.has("thumbnail")
-      ? await photoValue(form.get("thumbnail"), thumbnailLimit)
-      : null,
+    ...(await readPhotoFields(form)),
   };
 }
 

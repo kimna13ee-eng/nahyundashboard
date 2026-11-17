@@ -34,6 +34,9 @@ The separately untracked diary app is not part of this release.
   Check photos in the archive to delete them together. Select-all covers the
   photos currently shown under the active filter. Confirming removes those photos
   from the archive and every week where they were picked.
+  Between the week and the archive, 메이크업 팁 keeps a personal collection of
+  photos or screenshots with notes. Tap a tip to view the larger image and memo.
+  Tips are available across weeks and makeup category filters.
 - Yoga uses a seven-day selector and the selected day's video cards. Add/edit
   collects date, URL, title and optional minutes. Existing video-title lookup and
   iPhone push subscription remain available. Alerts still fire at 21:00 Seoul.
@@ -69,6 +72,7 @@ and snapshot-checked deletion.
 Apply `supabase/personal/026_makeup_board.sql`, then
 `supabase/personal/027_makeup_look_category.sql` to the PERSONAL database.
 Apply `supabase/personal/030_makeup_delete_selected.sql` for batch photo deletion.
+Apply `supabase/personal/031_makeup_tips.sql` for private photo and memo tips.
 Existing photos start in 미분류. Photo uploads and weekly selections use the existing
 PERSONAL session. No storage bucket or additional environment variable is needed.
 

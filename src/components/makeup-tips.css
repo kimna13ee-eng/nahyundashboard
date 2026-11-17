@@ -1,0 +1,188 @@
+.makeup-tips {
+  min-width: 0;
+  padding: clamp(15px, 3vw, 28px);
+  border: 1px solid #eddbd5;
+  border-radius: 22px;
+  background: #fff5ed;
+  box-shadow: 0 8px 24px #3d2c2e10;
+}
+.tip-head,
+.tip-actions,
+.tip-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.tip-head {
+  justify-content: space-between;
+}
+.tip-head h2 {
+  margin: 0;
+  font-size: clamp(17px, 2.6vw, 21px);
+  line-height: 1.35;
+}
+.personal-planner .tip-primary,
+.personal-planner .tip-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 650;
+}
+.personal-planner .tip-actions button {
+  background: #f4e7e2;
+  color: #61464c;
+}
+.personal-planner .tip-primary,
+.personal-planner .tip-actions .tip-primary {
+  color: #713f3c;
+  background: #ffdcd0;
+}
+.personal-planner .tip-actions .tip-danger {
+  color: white;
+  background: #953c4e;
+}
+.personal-planner .tip-actions .tip-delete {
+  color: #953c4e;
+}
+.tip-list {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.personal-planner .tip-list button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 62px;
+  padding: 9px 11px;
+  border: 1px solid #f1e0d7;
+  border-radius: 14px;
+  background: #fffdfa;
+  color: #493238;
+  text-align: left;
+}
+.tip-list button > img {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 9px;
+  object-fit: cover;
+}
+.tip-list button > svg {
+  flex: none;
+  color: #865d61;
+}
+.tip-excerpt {
+  flex: 1;
+  min-width: 0;
+}
+.tip-excerpt > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.45;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.tip-excerpt time {
+  display: block;
+  margin-top: 3px;
+  color: #795e5a;
+  font-size: 12px;
+}
+.makeup-tips .tip-state,
+.makeup-tips > .tip-error {
+  margin: 12px 0 0;
+  color: #705758;
+  font-size: 13px;
+}
+.tip-detail {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.tip-detail p {
+  margin: 0;
+}
+.tip-memo {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tip-actions,
+.tip-pages {
+  justify-content: flex-end;
+}
+.tip-memo-field {
+  display: grid;
+  gap: 5px;
+  font-weight: 650;
+}
+.tip-memo-field textarea {
+  resize: vertical;
+}
+.tip-photo-link,
+.tip-editor-photo {
+  display: block;
+  padding: 6px;
+  border-radius: 14px;
+  background: #f8ece7;
+}
+.tip-photo-link img,
+.tip-editor-photo img {
+  width: 100%;
+  height: min(47dvh, 420px);
+  display: block;
+  object-fit: contain;
+}
+.tip-editor-photo img {
+  height: min(29dvh, 220px);
+}
+.tip-editor-photo button {
+  min-height: 44px;
+}
+.tip-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  gap: 7px;
+  min-height: 52px;
+  border: 1px dashed #ba8991;
+  border-radius: 14px;
+  color: #72414e;
+  background: #fff7f2;
+}
+.tip-file:focus-within {
+  outline: 3px solid #9472d5;
+}
+.personal-planner .tip-file input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.personal-planner .tip-link {
+  min-height: 44px;
+  padding: 2px 6px;
+  border: 0;
+  color: #754154;
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tip-detail .tip-error,
+.makeup-tips > .tip-error {
+  color: #92394b;
+}

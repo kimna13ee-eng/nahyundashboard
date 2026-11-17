@@ -14,6 +14,7 @@ const fakeSession =
       "export class WorkspaceAccessError extends Error {status=401;}",
       "export async function workspaceSession(params) {",
       "if(params.toString()!=='workspace=PERSONAL')throw new Error('unexpected workspace');",
+      "if(globalThis.__tipTestClient)return {client:globalThis.__tipTestClient,user:{id:'owner'}};",
       "throw new WorkspaceAccessError('로그인이 필요해요');}",
     ].join("\n"),
   );
@@ -35,6 +36,10 @@ const hooks = registerHooks({
 after(() => hooks.deregister());
 const api = await import("../src/app/api/makeup-looks/route.ts");
 const images = await import("../src/app/api/makeup-looks/[id]/image/route.ts");
+const tips = await import("../src/app/api/makeup-tips/route.ts");
+const tipImages = await import(
+  "../src/app/api/makeup-tips/[id]/image/route.ts"
+);
 const { readUpload, MakeupInputError } = await import(
   "../src/lib/makeup-looks-server.ts"
 );
@@ -71,6 +76,90 @@ test("photo bytes and listings require the personal session; foreign mutations f
     (await api.GET(req(path + "?week=2026-11-16&category=unknown"))).status,
     400,
   );
+});
+
+test("tip notes and private images are owner-only; invalid and cross-origin changes never write", async () => {
+  const path = origin + "/api/makeup-tips";
+  const req = (method: string, form?: FormData, sender = origin) =>
+    new NextRequest(path, {
+      method,
+      headers: { host: "planner.example", origin: sender },
+      body: form,
+    });
+  assert.equal((await tips.GET(req("GET"))).status, 401);
+  assert.equal(
+    (
+      await tipImages.GET(
+        new NextRequest(path + "/" + id + "/image?size=thumb&v=1"),
+        { params: Promise.resolve({ id }) },
+      )
+    ).status,
+    401,
+  );
+  for (const method of ["POST", "PATCH", "DELETE"] as const) {
+    assert.equal((await tips[method](req(method))).status, 401);
+    assert.equal(
+      (await tips[method](req(method, undefined, "https://other.example")))
+        .status,
+      403,
+    );
+  }
+  const session = globalThis as typeof globalThis & {
+    __tipTestClient?: object;
+  };
+  const writes: { name: string; args: Record<string, unknown> }[] = [];
+  session.__tipTestClient = {
+    rpc(name: string, args: Record<string, unknown>) {
+      writes.push({ name, args });
+      return {
+        single: async () => ({
+          data: {
+            id,
+            content: args.p_content,
+            has_photo: args.p_image != null,
+          },
+          error: null,
+        }),
+      };
+    },
+  };
+  try {
+    const form = new FormData();
+    form.set("id", id);
+    form.set("content", "  부드러운 경계  ");
+    const response = await tips.POST(req("POST", form));
+    assert.equal(response.status, 201);
+    assert.deepEqual(await response.json(), {
+      item: { id, content: "부드러운 경계", has_photo: false },
+    });
+    assert.deepEqual(writes, [
+      {
+        name: "ops_create_makeup_tip",
+        args: {
+          p_id: id,
+          p_content: "부드러운 경계",
+          p_image: null,
+          p_thumbnail: null,
+        },
+      },
+    ]);
+    form.set("content", "");
+    assert.equal((await tips.POST(req("POST", form))).status, 400);
+    form.set("image", new Blob(["not a photo"]), "screenshot.jpg");
+    assert.equal((await tips.POST(req("POST", form))).status, 415);
+    form.delete("image");
+    form.set("content", "x".repeat(1501));
+    assert.equal((await tips.POST(req("POST", form))).status, 400);
+    form.set("content", "새 메모");
+    form.set("expectedUpdatedAt", "invalid");
+    assert.equal((await tips.POST(req("POST", form))).status, 400);
+    form.set("removeImage", "true");
+    form.set("content", "");
+    assert.equal((await tips.PATCH(req("PATCH", form))).status, 400);
+    assert.equal(writes.length, 1);
+  } finally {
+    delete session.__tipTestClient;
+  }
 });
 
 test("multipart saves raster bytes and validates the actual file, limits and exact week", async () => {
