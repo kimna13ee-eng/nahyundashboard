@@ -1,6 +1,6 @@
 # PERSONAL planners
 
-The main app now has two views: 콘텐츠 플래너 and 요가 플래너.
+The main app has three views: 콘텐츠 플래너, 메이크업 보드 and 요가 플래너.
 Company/ALL/demo entry points redirect to `/`. Old `view` parameters open content,
 except Calendar/Yoga links, which retain their yoga date and schedule ID.
 Existing business, journal, leave, calendar and record data is preserved; this
@@ -9,7 +9,7 @@ The separately untracked diary app is not part of this release.
 
 ## Mobile layout
 
-- Two fixed bottom tabs with safe-area spacing; a small account dialog replaces
+- Three fixed bottom tabs with safe-area spacing; a small account dialog replaces
   the old Settings page. Existing PERSONAL credentials continue to work.
 - The content screen shows the fixed reels schedule and a blog keyword inbox.
   The old planning/drafts/performance sheet viewer is no longer mounted or fetched.
@@ -21,6 +21,9 @@ The separately untracked diary app is not part of this release.
 - Add keywords with the plus button. Checking a keyword records it as used for a
   blog post. The same checked items can be deleted together and restored with undo.
   Keywords and used state are private to the signed-in PERSONAL account.
+- 메이크업 보드 (`/?view=makeup-board`) stores reference photos in the PERSONAL
+  account. Each Monday starts a new selection. Removing a photo from a week's
+  board keeps it in the archive and in other weeks where it was selected.
 - Yoga uses a seven-day selector and the selected day's video cards. Add/edit
   collects date, URL, title and optional minutes. Existing video-title lookup and
   iPhone push subscription remain available. Alerts still fire at 21:00 Seoul.
@@ -48,6 +51,10 @@ Apply `supabase/personal/025_blog_keywords.sql` to the PERSONAL database before
 deploying the keyword inbox. It adds its own owner-scoped table and atomic batch
 delete/restore RPC. There are no environment-variable changes. It does not repurpose
 or delete old personal records, business data, or Google sheets.
+
+Apply `supabase/personal/026_makeup_board.sql` to the PERSONAL database before
+deploying the makeup board. Photo uploads and weekly selections use the existing
+PERSONAL session. No storage bucket or additional environment variable is needed.
 
 Transient background session checks preserve an already open draft. Account
 changes and explicit expiry remount/clear account-scoped components. Logout also

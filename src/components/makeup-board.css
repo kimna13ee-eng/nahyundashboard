@@ -1,0 +1,339 @@
+.makeup-board {
+  --board-rose: #88455b;
+  --board-muted: #796365;
+  --board-border: #eddbd5;
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+.makeup-board h2,
+.makeup-board p {
+  margin: 0;
+}
+.makeup-week,
+.makeup-archive {
+  min-width: 0;
+  border: 1px solid var(--board-border);
+  border-radius: 22px;
+  padding: clamp(15px, 3vw, 28px);
+  box-shadow: 0 8px 24px rgba(61, 44, 46, 0.065);
+}
+.makeup-week {
+  background: linear-gradient(115deg, #f9e1e3, #ffefe8);
+}
+.makeup-archive {
+  background: #fffdfa;
+  scroll-margin-top: 16px;
+}
+.makeup-week-head,
+.makeup-archive-head,
+.makeup-week-title,
+.makeup-week-controls,
+.makeup-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.makeup-week-head,
+.makeup-archive-head {
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.makeup-week-head h2,
+.makeup-archive-head h2 {
+  font-size: clamp(17px, 2.6vw, 21px);
+  font-weight: 700;
+  line-height: 1.35;
+}
+.makeup-week-title > svg {
+  color: var(--board-rose);
+  flex-shrink: 0;
+}
+.makeup-week-controls {
+  background: #ffffffb8;
+  border-radius: 999px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  gap: 0;
+  max-width: 100%;
+}
+.makeup-week-controls button,
+.makeup-delete {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--board-rose);
+}
+.makeup-week-controls > span {
+  text-align: center;
+}
+.makeup-week-controls button.makeup-current {
+  padding-inline: 9px;
+  font-size: 12px;
+}
+.makeup-board button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.makeup-board button.makeup-primary,
+.makeup-board .makeup-confirm button,
+.makeup-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 650;
+  color: #fff;
+  background: #874558;
+}
+.makeup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.makeup-tile {
+  position: relative;
+  min-width: 0;
+}
+.makeup-cover {
+  position: relative;
+  display: block;
+  border: 0;
+  border-radius: 12px;
+  padding: 0;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  background: #ede0d9;
+  overflow: hidden;
+}
+.makeup-week .makeup-cover {
+  border: 3px solid #fff9f2;
+  box-shadow: 0 3px 10px #5d354018;
+}
+.makeup-cover img {
+  object-fit: cover;
+}
+.makeup-pin {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  border: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: #68404b;
+  isolation: isolate;
+}
+.makeup-pin::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 5px;
+  background: #fffaf4f0;
+  border-radius: 50%;
+  box-shadow: 0 1px 5px #44252f30;
+}
+.makeup-pin[aria-pressed="true"] {
+  color: #fff;
+}
+.makeup-pin[aria-pressed="true"]::before {
+  background: #86465b;
+}
+.makeup-caption {
+  display: block;
+  padding: 6px 2px 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.makeup-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 14px;
+  background: #fff9f6b8;
+  border: 1px dashed #d8b9bb;
+  border-radius: 14px;
+}
+.makeup-empty > svg {
+  flex: none;
+  width: 43px;
+  height: 43px;
+  padding: 10px;
+  color: var(--board-rose);
+  background: #f4dfde;
+  border-radius: 15px;
+}
+.makeup-empty strong {
+  font-size: 14px;
+}
+.makeup-empty p,
+.makeup-state {
+  color: var(--board-muted);
+  font-size: 13px;
+}
+.makeup-board .makeup-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13px;
+  color: #793c51;
+  font-weight: 650;
+  padding: 2px;
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.makeup-board .makeup-more {
+  display: flex;
+  margin: 14px auto 0;
+  background: #f6e8e2;
+  color: #6c4751;
+}
+.makeup-state {
+  padding: 14px 0;
+}
+.makeup-notice {
+  font-size: 13px;
+  color: #67484a;
+}
+.makeup-notice:empty {
+  display: none;
+}
+.makeup-form,
+.makeup-detail {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.makeup-upload,
+.makeup-full {
+  display: grid;
+  position: relative;
+  overflow: hidden;
+  place-items: center;
+  min-height: 140px;
+  border-radius: 15px;
+  background: #f7e9e2;
+}
+.makeup-upload {
+  height: clamp(150px, 25dvh, 245px);
+  cursor: pointer;
+  border: 1px dashed #bc8795;
+}
+.makeup-upload:focus-within {
+  outline: 3px solid #9472d5;
+  outline-offset: 3px;
+}
+.makeup-upload img,
+.makeup-full img {
+  object-fit: contain;
+}
+.makeup-upload > span {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  border-radius: 999px;
+  padding: 9px 14px;
+  color: #723849;
+  background: #fffaf5ee;
+  font-weight: 650;
+}
+.personal-planner .makeup-upload input[type="file"] {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.makeup-name {
+  display: block;
+  font-weight: 650;
+}
+.makeup-name > span {
+  font-weight: 400;
+  color: var(--board-muted);
+  font-size: 12px;
+}
+.makeup-name input {
+  display: block;
+  margin-top: 5px;
+}
+.makeup-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.makeup-choice input {
+  accent-color: #88455b;
+  width: 18px;
+  height: 18px;
+}
+.makeup-full {
+  height: min(52dvh, 540px);
+  background: #f0e6e0;
+}
+.makeup-detail-actions {
+  justify-content: space-between;
+}
+.makeup-delete {
+  margin-inline-start: auto;
+  color: #9a4551;
+}
+.makeup-confirm p {
+  margin: 0 0 12px;
+}
+.makeup-confirm > div {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.makeup-board .makeup-confirm button {
+  color: #61464c;
+  background: #f4e7e2;
+}
+.makeup-board .makeup-confirm .makeup-danger {
+  color: #fff;
+  background: #a03d4d;
+}
+.makeup-error {
+  color: #9a3542;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 620px) {
+  .makeup-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+@media (min-width: 900px) {
+  .makeup-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

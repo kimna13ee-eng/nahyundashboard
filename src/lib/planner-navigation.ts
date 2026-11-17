@@ -1,6 +1,6 @@
 import { validYogaDay } from "./yoga-week.ts";
 
-export type PlannerView = "content" | "yoga";
+export type PlannerView = "content" | "makeup" | "yoga";
 export type PlannerLocation = {
   view: PlannerView;
   day?: string;
@@ -10,6 +10,7 @@ export type PlannerLocation = {
 /** Keep existing iPhone notification links working after retiring Calendar. */
 export function plannerLocation(params: URLSearchParams): PlannerLocation {
   const view = params.get("view");
+  if (view === "makeup-board") return { view: "makeup" };
   const yoga = ["yoga", "yoga-planner", "calendar"].includes(view || "");
   const date = params.get("date") || "";
   const schedule = params.get("schedule") || "";

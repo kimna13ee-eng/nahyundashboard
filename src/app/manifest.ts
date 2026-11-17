@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "나의 플래너",
     short_name: "나의 플래너",
     lang: "ko",
-    description: "콘텐츠와 요가를 위한 개인 플래너",
+    description: "콘텐츠와 메이크업, 요가를 위한 개인 플래너",
     start_url: "/",
     scope: "/",
     display: "standalone",

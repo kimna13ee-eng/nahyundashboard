@@ -30,6 +30,33 @@ const YogaSpace = dynamic(
     import("./personal-yoga-space").then((module) => module.PersonalYogaSpace),
   { loading: () => <PanelLoading /> },
 );
+const MakeupBoard = dynamic(
+  () => import("./makeup-board").then((module) => module.MakeupBoard),
+  { loading: () => <PanelLoading /> },
+);
+const plannerTabs = {
+  content: {
+    title: "콘텐츠 플래너",
+    icon: "✏️",
+    href: "/",
+    description: "만들고 싶은 이야기, 하나씩 차근차근.",
+  },
+  makeup: {
+    title: "메이크업 보드",
+    icon: "💄",
+    href: "/?view=makeup-board",
+    description: "",
+  },
+  yoga: {
+    title: "요가 플래너",
+    icon: "🧘",
+    href: "/?view=yoga-planner",
+    description: "오늘의 몸과 마음에 맞는 영상 한 편.",
+  },
+} satisfies Record<
+  PlannerView,
+  { title: string; icon: string; href: string; description: string }
+>;
 type Session = { configured: boolean; user: { email?: string } | null };
 type AuthState = "loading" | "ready" | "error";
 
@@ -148,11 +175,7 @@ export function PersonalPlannerShell() {
   function move(view: PlannerView) {
     if (location.view === view) return;
     setLocation({ view });
-    window.history.pushState(
-      null,
-      "",
-      view === "yoga" ? "/?view=yoga-planner" : "/",
-    );
+    window.history.pushState(null, "", plannerTabs[view].href);
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
@@ -241,9 +264,9 @@ export function PersonalPlannerShell() {
   const signedIn =
     authState === "ready" && Boolean(session?.configured && session.user);
   const identity = `${session?.user?.email || "guest"}:${revision}`;
-  const yoga = location.view === "yoga";
+  const currentTab = plannerTabs[location.view];
   return (
-    <div className={`personal-planner ${yoga ? "is-yoga" : "is-content"}`}>
+    <div className={`personal-planner is-${location.view}`}>
       <a href="#planner-main" className="planner-skip">
         본문으로 바로가기
       </a>
@@ -276,15 +299,11 @@ export function PersonalPlannerShell() {
       <main id="planner-main" className="planner-main">
         <div className="planner-page-heading">
           <span className="planner-heading-chip" aria-hidden="true">
-            {yoga ? "🧘" : "✏️"}
+            {currentTab.icon}
           </span>
           <div>
-            <h1>{yoga ? "요가 플래너" : "콘텐츠 플래너"}</h1>
-            <p>
-              {yoga
-                ? "오늘의 몸과 마음에 맞는 영상 한 편."
-                : "만들고 싶은 이야기, 하나씩 차근차근."}
-            </p>
+            <h1>{currentTab.title}</h1>
+            {currentTab.description && <p>{currentTab.description}</p>}
           </div>
         </div>
         {signedIn && error && !accountOpen && (
@@ -295,12 +314,17 @@ export function PersonalPlannerShell() {
         {authState === "loading" ? (
           <PanelLoading />
         ) : signedIn ? (
-          yoga ? (
+          location.view === "yoga" ? (
             <YogaSpace
               key={`yoga:${identity}:${location.day || "today"}:${location.schedule || ""}`}
               enabled
               initialDay={location.day}
               focusedId={location.schedule}
+              onSessionExpired={expired}
+            />
+          ) : location.view === "makeup" ? (
+            <MakeupBoard
+              key={`makeup:${identity}`}
               onSessionExpired={expired}
             />
           ) : (
@@ -323,7 +347,7 @@ export function PersonalPlannerShell() {
             <p>
               기존 PERSONAL 계정으로 로그인하면
               <br />
-              블로그 소재와 요가 일정을 이어서 볼 수 있어요.
+              콘텐츠와 메이크업 사진, 요가 일정을 볼 수 있어요.
             </p>
             {error && (
               <p role="alert" className="planner-error">
@@ -354,26 +378,20 @@ export function PersonalPlannerShell() {
         )}
       </main>
       <nav className="planner-tabs" aria-label="플래너 메뉴">
-        <button
-          type="button"
-          aria-current={!yoga ? "page" : undefined}
-          onClick={() => move("content")}
-        >
-          <span className="planner-tab-icon" aria-hidden="true">
-            ✏️
-          </span>
-          <span>콘텐츠 플래너</span>
-        </button>
-        <button
-          type="button"
-          aria-current={yoga ? "page" : undefined}
-          onClick={() => move("yoga")}
-        >
-          <span className="planner-tab-icon" aria-hidden="true">
-            🧘
-          </span>
-          <span>요가 플래너</span>
-        </button>
+        {(Object.keys(plannerTabs) as PlannerView[]).map((view) => (
+          <button
+            key={view}
+            type="button"
+            data-view={view}
+            aria-current={location.view === view ? "page" : undefined}
+            onClick={() => move(view)}
+          >
+            <span className="planner-tab-icon" aria-hidden="true">
+              {plannerTabs[view].icon}
+            </span>
+            <span>{plannerTabs[view].title}</span>
+          </button>
+        ))}
       </nav>
       {accountOpen && (
         <OpsDialog

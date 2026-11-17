@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { plannerLocation } from "../src/lib/planner-navigation.ts";
 
+test("the makeup board opens directly without carrying over a yoga selection", () => {
+  assert.deepEqual(
+    plannerLocation(new URLSearchParams("view=makeup-board&date=2026-11-17")),
+    { view: "makeup" },
+  );
+});
+
 test("existing iPhone calendar notification opens the same yoga date and video", () => {
   assert.deepEqual(
     plannerLocation(
