@@ -25,7 +25,22 @@ import { moveYogaDay, yogaWeek } from "@/lib/yoga-week";
 import { OpsDialog } from "./ops-dialog";
 import "./makeup-board.css";
 
-type Look = { id: string; title: string; created_at: string; picked: boolean };
+type LookCategory = "female" | "male" | null;
+type CategoryFilter = "all" | "unclassified" | NonNullable<LookCategory>;
+const categoryLabels = {
+  all: "전체",
+  female: "여자",
+  male: "남자",
+  unclassified: "미분류",
+} as const;
+const categories = ["female", "male", "unclassified"] as const;
+type Look = {
+  id: string;
+  title: string;
+  created_at: string;
+  picked: boolean;
+  category: LookCategory;
+};
 type Page = { items: Look[]; nextOffset: number | null };
 type Photo = { id: string; image: Blob; thumbnail: Blob };
 type SessionProps = { onSessionExpired: () => void };
@@ -68,6 +83,7 @@ function failure(error: unknown) {
 function usePhotoList(
   week: string,
   picked: boolean,
+  filter: CategoryFilter,
   onSessionExpired: () => void,
 ) {
   const [page, setPage] = useState<Page | null>(null);
@@ -84,6 +100,7 @@ function usePhotoList(
       try {
         const query = new URLSearchParams({ week, offset: String(offset) });
         if (picked) query.set("picked", "true");
+        if (filter !== "all") query.set("category", filter);
         const result = await request<Page>(`${endpoint}?${query}`, {
           signal: controller.signal,
         });
@@ -108,7 +125,7 @@ function usePhotoList(
         if (!controller.signal.aborted) setLoading(false);
       }
     },
-    [week, picked, onSessionExpired],
+    [week, picked, filter, onSessionExpired],
   );
 
   useEffect(() => {
@@ -198,6 +215,7 @@ function PhotoList({
   list,
   picked,
   weekName,
+  filter,
   disabled,
   onOpen,
   onToggle,
@@ -207,6 +225,7 @@ function PhotoList({
   list: GalleryState;
   picked: boolean;
   weekName: string;
+  filter: CategoryFilter;
   disabled: boolean;
   onOpen: (item: Look) => void;
   onToggle: (item: Look) => void;
@@ -214,6 +233,15 @@ function PhotoList({
   hasLibrary: boolean;
 }) {
   const { page, loading, error, load } = list;
+  let emptyTitle = picked
+    ? "이번에 해보고 싶은 룩이 있나요?"
+    : "첫 메이크업 사진을 보관해 보세요.";
+  if (filter !== "all") {
+    const label = categoryLabels[filter];
+    emptyTitle = picked
+      ? `${weekName}에 담은 ${label} 룩이 없어요.`
+      : `${label}로 분류된 사진이 없어요.`;
+  }
   return (
     <>
       {page && page.items.length > 0 && (
@@ -248,8 +276,15 @@ function PhotoList({
                   <Bookmark size={19} />
                 )}
               </button>
-              {item.title && (
-                <span className="makeup-caption">{item.title}</span>
+              {(filter === "all" || item.title) && (
+                <div className="makeup-caption">
+                  {filter === "all" && (
+                    <span className="makeup-category-tag">
+                      {categoryLabels[item.category ?? "unclassified"]}
+                    </span>
+                  )}
+                  {item.title && <span>{item.title}</span>}
+                </div>
               )}
             </li>
           ))}
@@ -280,15 +315,13 @@ function PhotoList({
             <Images size={25} aria-hidden="true" />
           )}
           <div>
-            <strong>
-              {picked
-                ? "이번에 해보고 싶은 룩이 있나요?"
-                : "첫 메이크업 사진을 보관해 보세요."}
-            </strong>
+            <strong>{emptyTitle}</strong>
             <p>
               {picked && hasLibrary
                 ? "보관함 사진의 책갈피를 누르면 여기에 모여요."
-                : "앨범에서 참고할 사진 한 장을 골라주세요."}
+                : filter === "all"
+                  ? "앨범에서 참고할 사진 한 장을 골라주세요."
+                  : "사진을 추가하거나 다른 사진을 열어 분류를 바꿔주세요."}
             </p>
             {picked &&
               (hasLibrary ? (
@@ -322,9 +355,40 @@ function PhotoList({
   );
 }
 
+function CategoryPicker({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: LookCategory;
+  disabled: boolean;
+  onChange: (value: LookCategory) => void;
+}) {
+  return (
+    <fieldset className="makeup-category-field" disabled={disabled}>
+      <legend>룩 분류</legend>
+      <div className="makeup-category-options">
+        {categories.map((category) => (
+          <button
+            type="button"
+            key={category}
+            aria-pressed={(value ?? "unclassified") === category}
+            onClick={() =>
+              onChange(category === "unclassified" ? null : category)
+            }
+          >
+            {categoryLabels[category]}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 function UploadDialog({
   weekName,
   defaultPick,
+  initialCategory,
   close,
   save,
   busy,
@@ -332,8 +396,14 @@ function UploadDialog({
 }: {
   weekName: string;
   defaultPick: boolean;
+  initialCategory: LookCategory;
   close: () => void;
-  save: (photo: Photo, title: string, picked: boolean) => void;
+  save: (
+    photo: Photo,
+    title: string,
+    picked: boolean,
+    category: LookCategory,
+  ) => void;
   busy: boolean;
   error: string;
 }) {
@@ -343,6 +413,7 @@ function UploadDialog({
   const [preparing, setPreparing] = useState(false);
   const [title, setTitle] = useState("");
   const [picked, setPicked] = useState(defaultPick);
+  const [category, setCategory] = useState(initialCategory);
   const [notice, setNotice] = useState("");
   const preview = photo?.preview;
   const sequence = useRef(0);
@@ -377,7 +448,7 @@ function UploadDialog({
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!photo || preparing || busy) return;
-    save(photo, title.trim(), picked);
+    save(photo, title.trim(), picked, category);
   }
   return (
     <OpsDialog title="메이크업 사진 추가" busy={busy} close={close}>
@@ -420,6 +491,12 @@ function UploadDialog({
             disabled={busy}
           />
         </label>
+        <input type="hidden" name="category" value={category ?? ""} />
+        <CategoryPicker
+          value={category}
+          disabled={busy}
+          onChange={setCategory}
+        />
         <label className="makeup-choice">
           <input
             type="checkbox"
@@ -449,15 +526,23 @@ function UploadDialog({
 
 function WeekBoard({
   week,
+  filter,
+  busy,
+  setBusy,
   onWeek,
   onSessionExpired,
-}: SessionProps & { week: string; onWeek: (week: string) => void }) {
-  const archive = usePhotoList(week, false, onSessionExpired);
-  const weekly = usePhotoList(week, true, onSessionExpired);
+}: SessionProps & {
+  week: string;
+  filter: CategoryFilter;
+  busy: boolean;
+  setBusy: (value: boolean) => void;
+  onWeek: (week: string) => void;
+}) {
+  const archive = usePhotoList(week, false, filter, onSessionExpired);
+  const weekly = usePhotoList(week, true, filter, onSessionExpired);
   const [upload, setUpload] = useState<boolean | null>(null);
   const [detail, setDetail] = useState<Look | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const active = useRef<AbortController | null>(null);
@@ -538,18 +623,37 @@ function WeekBoard({
       },
     );
   }
-  function save(photo: Photo, title: string, picked: boolean) {
+  function save(
+    photo: Photo,
+    title: string,
+    picked: boolean,
+    category: LookCategory,
+  ) {
     const form = new FormData();
     form.set("id", photo.id);
     form.set("title", title);
     form.set("image", photo.image, "look.jpg");
     form.set("thumbnail", photo.thumbnail, "thumb.jpg");
+    if (category) form.set("category", category);
     if (picked) form.set("week", week);
     void change("POST", form, () => {
       setUpload(null);
-      setNotice("메이크업 사진을 저장했어요.");
+      setNotice(
+        `${categoryLabels[category ?? "unclassified"]} 사진을 저장했어요.`,
+      );
       void archive.load();
       if (picked) void weekly.load();
+    });
+  }
+  function classify(item: Look, category: LookCategory) {
+    if (category === (item.category ?? null)) return;
+    void change("PATCH", { id: item.id, category }, () => {
+      setDetail((previous) =>
+        previous?.id === item.id ? { ...previous, category } : previous,
+      );
+      void archive.load();
+      void weekly.load();
+      setNotice("룩 분류를 저장했어요.");
     });
   }
   function remove(item: Look) {
@@ -567,6 +671,7 @@ function WeekBoard({
   }
   const listProps = {
     weekName,
+    filter,
     disabled: blocked,
     onOpen: openLook,
     onToggle: toggle,
@@ -657,6 +762,9 @@ function WeekBoard({
         <UploadDialog
           weekName={weekName}
           defaultPick={upload}
+          initialCategory={
+            filter === "female" || filter === "male" ? filter : null
+          }
           busy={busy}
           error={error}
           close={() => {
@@ -686,6 +794,13 @@ function WeekBoard({
                 alt={detail.title || "메이크업 참고 사진"}
               />
             </div>
+            {!confirmDelete && (
+              <CategoryPicker
+                value={detail.category}
+                disabled={blocked}
+                onChange={(category) => classify(detail, category)}
+              />
+            )}
             {error && (
               <p role="alert" className="makeup-error">
                 {error}
@@ -744,12 +859,36 @@ function WeekBoard({
 
 export function MakeupBoard({ onSessionExpired }: SessionProps) {
   const [week, setWeek] = useState(() => yogaWeek(seoulDate())![0]);
+  const [filter, setFilter] = useState<CategoryFilter>("all");
+  const [busy, setBusy] = useState(false);
   return (
-    <WeekBoard
-      key={week}
-      week={week}
-      onWeek={setWeek}
-      onSessionExpired={onSessionExpired}
-    />
+    <>
+      <div
+        role="group"
+        aria-label="메이크업 분류 필터"
+        className="makeup-filter"
+      >
+        {(["all", ...categories] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={filter === value}
+            disabled={busy}
+            onClick={() => setFilter(value)}
+          >
+            {categoryLabels[value]}
+          </button>
+        ))}
+      </div>
+      <WeekBoard
+        key={`${week}:${filter}`}
+        week={week}
+        filter={filter}
+        busy={busy}
+        setBusy={setBusy}
+        onWeek={setWeek}
+        onSessionExpired={onSessionExpired}
+      />
+    </>
   );
 }

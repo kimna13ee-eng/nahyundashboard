@@ -67,15 +67,20 @@ test("photo bytes and listings require the personal session; foreign mutations f
     403,
   );
   assert.equal((await api.GET(req(path + "?week=2026-11-18"))).status, 400);
+  assert.equal(
+    (await api.GET(req(path + "?week=2026-11-16&category=unknown"))).status,
+    400,
+  );
 });
 
 test("multipart saves raster bytes and validates the actual file, limits and exact week", async () => {
-  const payload = (image: Blob, week = "2026-11-16") => {
+  const payload = (image: Blob, week = "2026-11-16", category?: string) => {
     const f = new FormData();
     f.set("image", image, "photo.jpg");
     f.set("title", "  로즈  ");
     f.set("id", id);
     f.set("week", week);
+    if (category !== undefined) f.set("category", category);
     return new Request(origin, { method: "POST", body: f });
   };
   const picture = new Blob(
@@ -86,6 +91,15 @@ test("multipart saves raster bytes and validates the actual file, limits and exa
   assert.equal(result.p_title, "로즈");
   assert.equal(result.p_image, "\\xffd8ffe000104a4649460001");
   assert.equal(result.p_thumbnail, null);
+  assert.equal(result.p_category, null);
+  assert.equal(
+    (await readUpload(payload(picture, "2026-11-16", "male"))).p_category,
+    "male",
+  );
+  await assert.rejects(
+    readUpload(payload(picture, "2026-11-16", "unclassified")),
+    /분류/,
+  );
   await assert.rejects(
     readUpload(payload(new Blob(["<svg></svg>"], { type: "image/jpeg" }))),
     (e: unknown) => e instanceof MakeupInputError && e.status === 415,

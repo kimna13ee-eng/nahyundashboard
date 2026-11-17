@@ -24,6 +24,8 @@ The separately untracked diary app is not part of this release.
 - 메이크업 보드 (`/?view=makeup-board`) stores reference photos in the PERSONAL
   account. Each Monday starts a new selection. Removing a photo from a week's
   board keeps it in the archive and in other weeks where it was selected.
+  The 여자, 남자 and 미분류 filters apply to both the selected week and the archive.
+  A look's category can be chosen at upload or changed when viewing the photo.
 - Yoga uses a seven-day selector and the selected day's video cards. Add/edit
   collects date, URL, title and optional minutes. Existing video-title lookup and
   iPhone push subscription remain available. Alerts still fire at 21:00 Seoul.
@@ -52,8 +54,9 @@ deploying the keyword inbox. It adds its own owner-scoped table and atomic batch
 delete/restore RPC. There are no environment-variable changes. It does not repurpose
 or delete old personal records, business data, or Google sheets.
 
-Apply `supabase/personal/026_makeup_board.sql` to the PERSONAL database before
-deploying the makeup board. Photo uploads and weekly selections use the existing
+Apply `supabase/personal/026_makeup_board.sql`, then
+`supabase/personal/027_makeup_look_category.sql` to the PERSONAL database.
+Existing photos start in 미분류. Photo uploads and weekly selections use the existing
 PERSONAL session. No storage bucket or additional environment variable is needed.
 
 Transient background session checks preserve an already open draft. Account

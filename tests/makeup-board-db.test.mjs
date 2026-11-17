@@ -9,6 +9,10 @@ test("private photo bytes and week picks are isolated; photo creation, retry and
     "supabase/personal/026_makeup_board.sql",
     "utf8",
   );
+  const categoryMigration = await readFile(
+    "supabase/personal/027_makeup_look_category.sql",
+    "utf8",
+  );
   const owner = "11111111-1111-4111-8111-111111111111";
   const other = "22222222-2222-4222-8222-222222222222";
   const id = "33333333-3333-4333-8333-333333333333";
@@ -61,6 +65,57 @@ test("private photo bytes and week picks are isolated; photo creation, retry and
       [id],
     );
     assert.deepEqual(await list(monday, true), []);
+    await db.exec("reset role");
+    await db.exec(categoryMigration);
+    await db.exec(categoryMigration);
+    await become(owner);
+    const filtered = (category, picked = false, offset = 0) =>
+      sql("select * from ops_list_makeup_looks($1,$2,$3,$4)", [
+        next,
+        picked,
+        offset,
+        category,
+      ]);
+    const classified = (category) =>
+      sql(
+        "select * from ops_create_makeup_look($1,'스모키',decode('ffd8ff','hex'),null,$2,$3)",
+        [second, next, category],
+      );
+    const changeCategory = (look, category) =>
+      sql(
+        "update ops_makeup_looks set category=$2 where id=$1 returning id, category",
+        [look, category],
+      );
+    assert.equal((await filtered("unclassified", true))[0].id, id);
+    assert.equal((await filtered(null))[0].category, null);
+    await assert.rejects(classified("invalid"), /check constraint/i);
+    assert.equal((await classified("male"))[0].category, "male");
+    await changeCategory(second, "female");
+    assert.equal((await classified("male"))[0].category, "female");
+    assert.deepEqual(
+      (await filtered("female", true)).map((r) => r.id),
+      [second],
+    );
+    assert.deepEqual(await filtered("male", true), []);
+    await changeCategory(id, "male");
+    // A look on a later unfiltered page must appear on page one for its category.
+    await sql(
+      "insert into ops_makeup_looks(id,title,image,category) select gen_random_uuid(),'룩',decode('ff','hex'),'female' from generate_series(1,42)",
+    );
+    assert.equal((await filtered("female")).length, 41);
+    assert.equal((await filtered("female", false, 40)).length, 3);
+    assert.deepEqual(
+      (await filtered("male")).map((r) => r.id),
+      [id],
+    );
+    await changeCategory(id, null);
+    assert.equal((await filtered("unclassified", true))[0].id, id);
+    await become(other);
+    assert.deepEqual(await filtered("unclassified"), []);
+    assert.deepEqual(await changeCategory(id, "female"), []);
+    await become(owner);
+    assert.equal((await filtered("unclassified", true))[0].id, id);
+    await sql("delete from ops_makeup_looks where id <> $1", [id]);
     await become(other);
     assert.deepEqual(await list(next, false), []);
     assert.deepEqual(await sql("select image from ops_makeup_looks"), []);

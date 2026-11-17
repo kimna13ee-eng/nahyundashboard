@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { json, sameOrigin } from "@/lib/http";
 import {
   allowedQuery,
+  lookCategory,
   lookId,
   makeupError,
   MakeupInputError,
@@ -16,8 +17,10 @@ import {
 export async function GET(req: NextRequest) {
   try {
     const params = req.nextUrl.searchParams;
-    allowedQuery(params, ["week", "offset", "picked"]);
+    allowedQuery(params, ["week", "offset", "picked", "category"]);
     const week = monday(params.get("week"));
+    const category = params.get("category");
+    if (category !== "unclassified") lookCategory(category);
     const rawOffset = params.get("offset") ?? "0";
     const offset = Number(rawOffset);
     if (
@@ -32,6 +35,7 @@ export async function GET(req: NextRequest) {
       p_week: week,
       p_offset: offset,
       p_picked_only: params.get("picked") === "true",
+      p_category: category,
     });
     if (result.error) return makeupError(result.error);
     const entries = result.data ?? [];
@@ -58,7 +62,7 @@ async function mutate(req: NextRequest) {
     }
     const raw = await readMutation(
       req,
-      req.method === "DELETE" ? ["id"] : ["id", "week", "picked"],
+      req.method === "DELETE" ? ["id"] : ["id", "week", "picked", "category"],
     );
     const id = lookId(raw.id);
     if (req.method === "DELETE") {
@@ -68,6 +72,24 @@ async function mutate(req: NextRequest) {
         .eq("owner_id", user.id)
         .eq("id", id);
       return result.error ? makeupError(result.error) : json({ id });
+    }
+    if (Object.hasOwn(raw, "category")) {
+      if (Object.hasOwn(raw, "week") || Object.hasOwn(raw, "picked"))
+        throw new MakeupInputError(
+          "분류 변경과 주간 선택은 각각 저장해 주세요.",
+        );
+      const category = lookCategory(raw.category);
+      const result = await client
+        .from(photoTable)
+        .update({ category })
+        .eq("owner_id", user.id)
+        .eq("id", id)
+        .select("id,category")
+        .maybeSingle();
+      if (result.error) return makeupError(result.error);
+      return result.data
+        ? json(result.data)
+        : json({ error: "사진을 찾을 수 없어요." }, 404);
     }
     const week = monday(raw.week);
     if (typeof raw.picked !== "boolean")

@@ -1,7 +1,10 @@
 import { uuid } from "./ops.ts";
 import { validYogaDay } from "./yoga-week.ts";
 import { json } from "@/lib/http";
-import { WorkspaceAccessError, workspaceSession } from "@/lib/workspaces/server";
+import {
+  WorkspaceAccessError,
+  workspaceSession,
+} from "@/lib/workspaces/server";
 
 export const photoTable = "ops_makeup_looks";
 export const picksTable = "ops_makeup_week_picks";
@@ -33,6 +36,11 @@ export function allowedQuery(params: URLSearchParams, allowed: string[]) {
 export function lookId(value: unknown) {
   if (!uuid(value)) throw new MakeupInputError("사진을 다시 선택해 주세요.");
   return value.toLowerCase();
+}
+
+export function lookCategory(value: unknown) {
+  if (value === null || value === "female" || value === "male") return value;
+  throw new MakeupInputError("메이크업 분류를 확인해 주세요.");
 }
 
 export function monday(value: unknown) {
@@ -139,7 +147,9 @@ export async function readUpload(req: Request) {
   }
   for (const key of form.keys()) {
     if (
-      !["id", "title", "image", "thumbnail", "week"].includes(key) ||
+      !["id", "title", "image", "thumbnail", "week", "category"].includes(
+        key,
+      ) ||
       form.getAll(key).length !== 1
     )
       throw new MakeupInputError("사진 입력 내용을 확인해 주세요.");
@@ -154,6 +164,7 @@ export async function readUpload(req: Request) {
   return {
     p_id: lookId(form.get("id")),
     p_title: title.trim(),
+    p_category: lookCategory(form.get("category")),
     p_week: form.has("week") ? monday(form.get("week")) : null,
     p_image: await photoValue(form.get("image"), fullLimit),
     p_thumbnail: form.has("thumbnail")
