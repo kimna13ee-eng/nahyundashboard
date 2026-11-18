@@ -34,6 +34,10 @@ const MakeupBoard = dynamic(
   () => import("./makeup-board").then((module) => module.MakeupBoard),
   { loading: () => <PanelLoading /> },
 );
+const ShootingSkills = dynamic(
+  () => import("./shooting-skills").then((module) => module.ShootingSkills),
+  { loading: () => <PanelLoading /> },
+);
 const plannerTabs = {
   content: {
     title: "콘텐츠 플래너",
@@ -52,6 +56,12 @@ const plannerTabs = {
     icon: "🧘",
     href: "/?view=yoga-planner",
     description: "오늘의 몸과 마음에 맞는 영상 한 편.",
+  },
+  shooting: {
+    title: "촬영 스킬",
+    icon: "📷",
+    href: "/?view=shooting-skills",
+    description: "조명부터 카메라 설정까지, 나만의 촬영 메모.",
   },
 } satisfies Record<
   PlannerView,
@@ -320,6 +330,11 @@ export function PersonalPlannerShell() {
               enabled
               initialDay={location.day}
               focusedId={location.schedule}
+              onSessionExpired={expired}
+            />
+          ) : location.view === "shooting" ? (
+            <ShootingSkills
+              key={`shooting:${identity}`}
               onSessionExpired={expired}
             />
           ) : location.view === "makeup" ? (

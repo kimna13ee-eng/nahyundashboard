@@ -146,7 +146,7 @@
   border: 1px solid #efded2;
   border-radius: 28px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   background: #fffdfaf5;
   box-shadow: 0 8px 32px #3d2c2e18;
@@ -177,6 +177,10 @@
 }
 .planner-tab-icon {
   font-size: 23px;
+}
+.personal-planner .planner-tabs button[data-view="shooting"][aria-current] {
+  background: #fff0bd;
+  color: #70552e;
 }
 @media (max-width: 480px) {
   .personal-planner .planner-tabs button {
