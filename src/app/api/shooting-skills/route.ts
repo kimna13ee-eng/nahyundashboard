@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
       .from(table)
       .select(columns)
       .eq("owner_id", user.id)
+      .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .range(Number(raw), Number(raw) + 30);
@@ -63,12 +64,31 @@ async function mutate(req: NextRequest) {
     allowedQuery(req.nextUrl.searchParams, []);
     const value = await readMutation(
       req,
-      ["id", "title", "content", "expectedUpdatedAt"],
+      ["id", "title", "content", "expectedUpdatedAt", "targetId", "after"],
       70000,
     );
     if (!uuid(value.id))
       throw new MakeupInputError("메모를 다시 선택해 주세요.");
     const { client, user } = await makeupSession();
+    if (req.method === "PATCH" && "targetId" in value) {
+      if (
+        !uuid(value.targetId) ||
+        value.id === value.targetId ||
+        typeof value.after !== "boolean"
+      )
+        throw new MakeupInputError("이동할 위치를 다시 선택해 주세요.");
+      const result = await client.rpc("ops_move_shooting_skill", {
+        p_id: value.id,
+        p_target: value.targetId,
+        p_after: value.after,
+      });
+      if (result.error)
+        return json(
+          { error: "순서를 저장하지 못했어요. 목록을 다시 불러와 주세요." },
+          409,
+        );
+      return json({ moved: true });
+    }
     if (
       req.method !== "POST" &&
       (typeof value.expectedUpdatedAt !== "string" ||

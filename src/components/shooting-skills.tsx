@@ -30,6 +30,10 @@ export function ShootingSkills({
   const [notice, setNotice] = useState("");
   const textarea = useRef<HTMLTextAreaElement>(null);
   const lock = useRef(false);
+  const drag = useRef<{ id: string; target: string; after: boolean } | null>(
+    null,
+  );
+  const [drop, setDrop] = useState<{ id: string; after: boolean } | null>(null);
 
   const call = useCallback(
     async <T,>(url: string, options?: RequestInit): Promise<T> => {
@@ -82,6 +86,30 @@ export function ShootingSkills({
     },
     [call],
   );
+
+  async function move(id: string, targetId: string, after: boolean) {
+    if (lock.current || loading || id === targetId) return;
+    setNotice("");
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await call("/api/shooting-skills", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, targetId, after }),
+      });
+      setNotice("메모 순서를 저장했어요.");
+      await load();
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "순서를 저장하지 못했어요.",
+      );
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -206,7 +234,69 @@ export function ShootingSkills({
       )}
       <div className="shooting-list">
         {items.map((item) => (
-          <article className="shooting-card" key={item.id}>
+          <article
+            className={`shooting-card${drop?.id === item.id ? (drop.after ? " drop-after" : " drop-before") : ""}`}
+            key={item.id}
+            data-tip-id={item.id}
+          >
+            <button
+              className="shooting-drag"
+              aria-label={`${item.title} 순서 이동`}
+              title="끌어서 이동 · 키보드 위아래 화살표로 이동"
+              disabled={busy || loading}
+              onPointerDown={(event) => {
+                if (event.button !== 0 || busy || loading) return;
+                event.preventDefault();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                drag.current = { id: item.id, target: item.id, after: false };
+              }}
+              onPointerMove={(event) => {
+                if (!drag.current) return;
+                const card = document
+                  .elementFromPoint(event.clientX, event.clientY)
+                  ?.closest<HTMLElement>("[data-tip-id]");
+                if (event.clientY < 90) window.scrollBy(0, -16);
+                if (event.clientY > window.innerHeight - 130)
+                  window.scrollBy(0, 16);
+                if (!card || card.dataset.tipId === item.id) {
+                  setDrop(null);
+                  drag.current.target = item.id;
+                  return;
+                }
+                const after =
+                  event.clientY >
+                  card.getBoundingClientRect().top +
+                    card.getBoundingClientRect().height / 2;
+                drag.current.target = card.dataset.tipId!;
+                drag.current.after = after;
+                setDrop({ id: card.dataset.tipId!, after });
+              }}
+              onPointerUp={() => {
+                const current = drag.current;
+                drag.current = null;
+                setDrop(null);
+                if (current)
+                  void move(current.id, current.target, current.after);
+              }}
+              onPointerCancel={() => {
+                drag.current = null;
+                setDrop(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowUp" && event.key !== "ArrowDown")
+                  return;
+                event.preventDefault();
+                const after = event.key === "ArrowDown";
+                const target =
+                  items[
+                    items.findIndex((row) => row.id === item.id) +
+                      (after ? 1 : -1)
+                  ];
+                if (target) void move(item.id, target.id, after);
+              }}
+            >
+              ⠿ <span>이동</span>
+            </button>
             <h2>
               <button
                 onClick={() => open(item)}
