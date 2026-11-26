@@ -1,0 +1,109 @@
+.period-yoga {
+  margin: 24px 0;
+  padding: 24px;
+  border: 1px solid #efdbdf;
+  border-radius: 20px;
+  background: #fff0f1;
+  box-shadow: 0 8px 24px #3d2c2e0d;
+}
+.period-yoga header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.period-yoga h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.period-yoga header p,
+.period-yoga-hint {
+  color: #876a74;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.personal-planner .period-yoga header button,
+.period-yoga-form > button {
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: #f7cbd6;
+  color: #623847;
+  font-weight: 700;
+  min-height: 44px;
+}
+.period-yoga-empty {
+  padding: 20px 0;
+  color: #876a74;
+  line-height: 1.8;
+}
+.period-yoga-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+.period-yoga-list article {
+  min-width: 0;
+  background: #fffdfa;
+  padding: 18px;
+  border-radius: 16px;
+}
+.period-yoga-list h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.period-yoga-notes {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.period-yoga-minutes {
+  color: #7f5667;
+  font-size: 13px;
+}
+.period-yoga-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.period-yoga-actions a,
+.period-yoga-actions button {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+}
+.period-yoga-actions a {
+  background: #f9e1e8;
+  color: #623847;
+  text-decoration: none;
+}
+.period-yoga-form {
+  display: grid;
+  gap: 18px;
+}
+.period-yoga-form label {
+  display: grid;
+  gap: 8px;
+}
+.period-yoga-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid #efdbdf;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+}
+@media (max-width: 480px) {
+  .period-yoga {
+    padding: 18px;
+  }
+  .period-yoga h2 {
+    font-size: 18px;
+  }
+}

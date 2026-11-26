@@ -1,0 +1,170 @@
+import type { NextRequest } from "next/server";
+import { json, sameOrigin } from "@/lib/http";
+import { uuid } from "@/lib/ops";
+import { parseScheduleVideoUrl } from "@/lib/schedule-category";
+import {
+  allowedQuery,
+  makeupSession,
+  MakeupInputError,
+  readMutation,
+} from "@/lib/makeup-looks-server";
+import { WorkspaceAccessError } from "@/lib/workspaces/server";
+const table = "ops_period_yoga";
+const columns =
+  "id,title,video_url,duration_minutes,notes,created_at,updated_at";
+const conflict = () =>
+  json({ error: "다른 화면에서 변경됐어요. 목록을 다시 불러와 주세요." }, 409);
+function failure(error: unknown) {
+  if (
+    error instanceof MakeupInputError ||
+    error instanceof WorkspaceAccessError
+  )
+    return json({ error: error.message }, error.status);
+  return json(
+    {
+      error:
+        "요가 영상을 저장하거나 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+    },
+    503,
+  );
+}
+export async function GET(req: NextRequest) {
+  try {
+    allowedQuery(req.nextUrl.searchParams, ["offset"]);
+    const raw = req.nextUrl.searchParams.get("offset") || "0";
+    if (!/^(0|[1-9]\d*)$/.test(raw) || Number(raw) > 1000000)
+      throw new MakeupInputError("목록을 다시 불러와 주세요.");
+    const { client, user } = await makeupSession();
+    const result = await client
+      .from(table)
+      .select(columns)
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(Number(raw), Number(raw) + 20);
+    if (result.error) return failure(result.error);
+    return json({
+      items: (result.data || []).slice(0, 20),
+      nextOffset: (result.data || []).length > 20 ? Number(raw) + 20 : null,
+    });
+  } catch (error) {
+    return failure(error);
+  }
+}
+async function mutate(req: NextRequest) {
+  if (!sameOrigin(req))
+    return json({ error: "허용되지 않은 요청입니다." }, 403);
+  try {
+    allowedQuery(req.nextUrl.searchParams, []);
+    const value = await readMutation(
+      req,
+      [
+        "id",
+        "title",
+        "video_url",
+        "duration_minutes",
+        "notes",
+        "expectedUpdatedAt",
+      ],
+      24000,
+    );
+    if (!uuid(value.id))
+      throw new MakeupInputError("영상을 다시 선택해 주세요.");
+    const { client, user } = await makeupSession();
+    if (
+      req.method !== "POST" &&
+      (typeof value.expectedUpdatedAt !== "string" ||
+        !Number.isFinite(Date.parse(value.expectedUpdatedAt)))
+    )
+      throw new MakeupInputError("목록을 다시 불러와 주세요.");
+    if (req.method === "DELETE") {
+      const result = await client
+        .from(table)
+        .delete()
+        .eq("owner_id", user.id)
+        .eq("id", value.id)
+        .eq("updated_at", value.expectedUpdatedAt)
+        .select("id")
+        .maybeSingle();
+      if (result.error) return failure(result.error);
+      return result.data ? json({ id: value.id }) : conflict();
+    }
+    if (
+      typeof value.title !== "string" ||
+      !value.title.trim() ||
+      value.title.length > 120 ||
+      value.title.includes("\0") ||
+      typeof value.notes !== "string" ||
+      value.notes.length > 2000 ||
+      value.notes.includes("\0")
+    )
+      throw new MakeupInputError(
+        "제목은 120자, 메모는 2,000자 이내로 입력해 주세요.",
+      );
+    let video_url: string;
+    try {
+      video_url = parseScheduleVideoUrl(value.video_url);
+    } catch (error) {
+      throw new MakeupInputError(
+        error instanceof Error ? error.message : "영상 링크를 확인해 주세요.",
+      );
+    }
+    if (!video_url) throw new MakeupInputError("영상 링크를 입력해 주세요.");
+    const duration = value.duration_minutes;
+    if (
+      duration !== null &&
+      (typeof duration !== "number" ||
+        !Number.isInteger(duration) ||
+        duration < 1 ||
+        duration > 1440)
+    )
+      throw new MakeupInputError("운동 시간은 1~1440분 사이로 입력해 주세요.");
+    const fields = {
+      title: value.title.trim(),
+      video_url,
+      duration_minutes: duration,
+      notes: value.notes,
+    };
+    if (req.method === "POST") {
+      const result = await client
+        .from(table)
+        .insert({ id: value.id, ...fields })
+        .select(columns)
+        .single();
+      if (result.error?.code === "23505") {
+        const prior = await client
+          .from(table)
+          .select(columns)
+          .eq("owner_id", user.id)
+          .eq("id", value.id)
+          .maybeSingle();
+        if (
+          prior.data &&
+          prior.data.title === fields.title &&
+          prior.data.video_url === fields.video_url &&
+          prior.data.duration_minutes === fields.duration_minutes &&
+          prior.data.notes === fields.notes
+        )
+          return json({ item: prior.data });
+        return conflict();
+      }
+      if (result.error) return failure(result.error);
+      return json({ item: result.data });
+    }
+    const result = await client
+      .from(table)
+      .update(fields)
+      .eq("owner_id", user.id)
+      .eq("id", value.id)
+      .eq("updated_at", value.expectedUpdatedAt)
+      .select(columns)
+      .maybeSingle();
+    if (result.error) return failure(result.error);
+    return result.data ? json({ item: result.data }) : conflict();
+  } catch (error) {
+    return failure(error);
+  }
+}
+export const POST = mutate;
+export const PATCH = mutate;
+export const DELETE = mutate;

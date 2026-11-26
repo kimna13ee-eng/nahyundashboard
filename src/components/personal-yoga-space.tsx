@@ -25,6 +25,7 @@ import {
 import { OpsDialog } from "./ops-dialog";
 import { YogaVideoFields } from "./yoga-video-fields";
 import { YogaReminderPanel } from "./yoga-reminder-panel";
+import { PeriodYoga } from "./period-yoga";
 import "./personal-yoga-space.css";
 
 type Props = {
@@ -588,6 +589,7 @@ export function PersonalYogaSpace({
           {displayDay(day)} 영상 등록
         </button>
       </section>
+      {enabled && <PeriodYoga onSessionExpired={onSessionExpired} />}
       <details
         className="personal-yoga-reminder-details"
         onToggle={(event) => setRemindersOpen(event.currentTarget.open)}
